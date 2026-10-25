@@ -59,6 +59,7 @@ class AccesosTenantController
         if (($validado['sucursal_id'] ?? '') !== '') {
             $sucursalId = (int) SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail()->getKey();
         }
+        $sucursalId = $this->sedeDeQuienRegistra($request, $sucursalId);
 
         $acceso = $this->accesos->registrar($persona, $metodo, $sucursalId, Carbon::now());
 
@@ -116,6 +117,34 @@ class AccesosTenantController
                     ->all(),
             ],
         ]);
+    }
+
+    /**
+     * En qué sede queda la entrada. Un pase vale en cualquier sede del negocio, así que la
+     * persona puede ser de otra (no se acota por persona); pero quien está acotado a unas
+     * sedes (R19, ADR 0098) solo registra entradas en una de ellas: sin indicarla, la suya
+     * si tiene una sola.
+     */
+    private function sedeDeQuienRegistra(Request $request, ?int $sucursalId): ?int
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+        $sedes = $actor instanceof Usuario ? $this->alcance->sucursalesPermitidas($actor) : null;
+        if ($sedes === null) {
+            return $sucursalId;
+        }
+        abort_if($sedes === [], 403, 'Aún no tienes una sucursal asignada.');
+        if ($sucursalId === null) {
+            if (count($sedes) === 1) {
+                return $sedes[0];
+            }
+
+            throw ValidationException::withMessages(['sucursal_id' => ['Indica en qué sucursal registras la entrada.']]);
+        }
+        if (! in_array($sucursalId, $sedes, true)) {
+            abort(403, 'Esa sucursal no es de las tuyas.');
+        }
+
+        return $sucursalId;
     }
 
     /**

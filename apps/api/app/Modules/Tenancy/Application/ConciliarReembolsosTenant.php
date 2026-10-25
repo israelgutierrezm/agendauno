@@ -6,9 +6,16 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Exceptions\TenancyException;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
+use App\Modules\Tenancy\Pasarelas\PasarelaConDevoluciones;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Aclara las devoluciones en línea que quedaron sin respuesta: las inciertas (la
@@ -42,12 +49,78 @@ class ConciliarReembolsosTenant
      */
     private const HORAS_PENDIENTE = 48;
 
+    /**
+     * Devoluciones hechas en el panel de la pasarela (ADR 0209): se revisan los cobros en
+     * línea aprobados de estos días, cada uno a lo más una vez en este lapso de horas y
+     * hasta este número por pasada (los que llevan más sin revisar primero).
+     */
+    private const DIAS_DEVOLUCIONES_EXTERNAS = 30;
+
+    private const HORAS_ENTRE_REVISIONES = 24;
+
+    private const COBROS_POR_PASADA = 50;
+
     public function __construct(
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly IncidenciasCobroTenant $incidencias,
+        private readonly RegistroDePasarelasTenant $registro,
     ) {}
 
     public function ejecutar(): int
+    {
+        return $this->aclararPendientes() + $this->devolucionesEnLaPasarela();
+    }
+
+    /**
+     * Las devoluciones hechas directo en el panel de la pasarela cuyo aviso no llegó: se
+     * le pregunta qué devoluciones tiene cada cobro aprobado reciente y se registran las
+     * que falten ({@see ReembolsarPagoTenant::desdeLaPasarela()}, idempotente con el
+     * aviso). Devuelve cuántas se registraron.
+     */
+    public function devolucionesEnLaPasarela(): int
+    {
+        $registradas = 0;
+        $ahora = Carbon::now();
+
+        PagoTenant::query()
+            ->whereIn('proveedor', ProveedorPasarela::enLinea())
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+            ->whereNotNull('referencia_externa')
+            ->where('created_at', '>=', $ahora->copy()->subDays(self::DIAS_DEVOLUCIONES_EXTERNAS))
+            ->where(fn ($q) => $q->whereNull('revisado_en')->orWhere('revisado_en', '<=', $ahora->copy()->subHours(self::HORAS_ENTRE_REVISIONES)))
+            ->orderByRaw('revisado_en is not null')
+            ->orderBy('revisado_en')
+            ->orderBy('id')
+            ->limit(self::COBROS_POR_PASADA)
+            ->get()
+            ->each(function (PagoTenant $pago) use (&$registradas, $ahora): void {
+                try {
+                    $pasarela = $this->registro->resolver($pago->proveedor);
+                    if (! $pasarela instanceof PasarelaConDevoluciones) {
+                        return;
+                    }
+                    $devoluciones = $pasarela->devoluciones($pago, $this->registro->llaves($pago->proveedor));
+                } catch (Throwable $e) {
+                    // Sin llaves o sin respuesta: se vuelve a preguntar en la próxima revisión.
+                    Log::warning('No se pudieron consultar las devoluciones del cobro.', ['pago' => $pago->ulid, 'error' => $e->getMessage()]);
+                    $pago->update(['revisado_en' => $ahora]);
+
+                    return;
+                }
+                $pago->update(['revisado_en' => $ahora]);
+                foreach ($devoluciones as $devolucion) {
+                    $antes = ReembolsoTenant::query()->where('referencia_externa', $devolucion['id'])->exists();
+                    $this->reembolsos->desdeLaPasarela($pago->refresh(), $devolucion['id'], $devolucion['monto_minor'], $devolucion['moneda'], $devolucion['llave']);
+                    if (! $antes && ReembolsoTenant::query()->where('referencia_externa', $devolucion['id'])->exists()) {
+                        $registradas++;
+                    }
+                }
+            });
+
+        return $registradas;
+    }
+
+    private function aclararPendientes(): int
     {
         $aclaradas = 0;
 

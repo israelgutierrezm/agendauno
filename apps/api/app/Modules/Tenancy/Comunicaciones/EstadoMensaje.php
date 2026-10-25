@@ -11,6 +11,11 @@ namespace App\Modules\Tenancy\Comunicaciones;
 enum EstadoMensaje: string
 {
     case Encolado = 'encolado';
+    // Tomado por una pasada del envío (ADR 0209): se está entregando. Si la pasada se
+    // corta antes de anotar cómo terminó, no se vuelve a mandar (como máximo una vez):
+    // al rato queda fallido sin reintento. Es un estado interno: el listado lo muestra
+    // como «en cola».
+    case Enviando = 'enviando';
     case Enviado = 'enviado';
     case Fallido = 'fallido';
     // No se envía: dejó de aplicar (p. ej. el recordatorio de un horario que se reprogramó).

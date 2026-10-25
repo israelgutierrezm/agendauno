@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\BitacoraTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Support\Csv;
@@ -33,6 +34,9 @@ class AuditoriaController
 
     public function index(Request $request): JsonResponse|Response
     {
+        // La bitácora es de todo el negocio (cambios de cualquier sede, del sistema y de
+        // las pasarelas): quien está acotado a unas sedes (R19, ADR 0098) no la ve.
+        abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403, 'La bitácora es de todo el negocio: tu rol solo ve tus sucursales.');
         $filtros = $request->validate([
             'desde' => ['nullable', 'date_format:Y-m-d'],
             // Días del negocio; el final no puede quedar antes que el inicio.

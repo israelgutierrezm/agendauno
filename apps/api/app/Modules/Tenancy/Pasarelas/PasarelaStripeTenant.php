@@ -23,7 +23,7 @@ use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
  * compra con `domiciliar`) ligada al cliente de la persona en la cuenta del negocio;
  * cada renovación se cobra sin el cliente presente (`off_session`).
  */
-class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, PasarelaDomiciliable, PasarelaReembolsable, PasarelaTenant
+class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConDevoluciones, PasarelaConsultable, PasarelaDomiciliable, PasarelaReembolsable, PasarelaTenant
 {
     public function nombre(): string
     {
@@ -109,6 +109,24 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, P
         }
 
         return ResultadoPago::pendiente($referencia);
+    }
+
+    /**
+     * Las devoluciones exitosas del cobro en Stripe (también las hechas en su panel).
+     */
+    public function devoluciones(PagoTenant $pago, array $llaves): array
+    {
+        $cliente = self::api($llaves);
+        $referencia = (string) $pago->referencia_externa;
+        $intent = str_starts_with($referencia, 'cs_') ? $cliente->paymentIntentDeSesion($referencia) : $referencia;
+        if (! is_string($intent) || ! str_starts_with($intent, 'pi_')) {
+            return [];
+        }
+
+        return array_values(array_map(
+            static fn (array $r): array => ['id' => $r['id'], 'monto_minor' => $r['monto_minor'], 'moneda' => $r['moneda'], 'llave' => $r['llave']],
+            array_filter($cliente->reembolsosDeIntent($intent), static fn (array $r): bool => $r['estado'] === 'succeeded' && $r['id'] !== ''),
+        ));
     }
 
     /**

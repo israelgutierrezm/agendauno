@@ -103,15 +103,19 @@ class NotificacionesMercadoPago
             default => null,
         };
 
-        // Devoluciones que quedaron en proceso: cómo terminaron.
+        // Devoluciones: las que pidió la plataforma y quedaron en proceso se concilian; las
+        // hechas en el panel de Mercado Pago se registran (ADR 0209).
         $devoluciones = is_array($cobro['refunds'] ?? null) ? $cobro['refunds'] : [];
         foreach ($devoluciones as $devolucion) {
             if (! is_array($devolucion)) {
                 continue;
             }
             $estado = (string) ($devolucion['status'] ?? '');
-            if (in_array($estado, ['approved', 'rejected', 'cancelled', 'canceled'], true)) {
-                $this->reembolsos->conciliar((string) ($devolucion['id'] ?? ''), $estado === 'approved');
+            $devolucionId = (string) ($devolucion['id'] ?? '');
+            if ($estado === 'approved') {
+                $this->reembolsos->desdeLaPasarela($pago, $devolucionId, MontoDecimal::aCentavos((float) ($devolucion['amount'] ?? 0)), (string) ($cobro['currency_id'] ?? $pago->moneda));
+            } elseif (in_array($estado, ['rejected', 'cancelled', 'canceled'], true)) {
+                $this->reembolsos->conciliar($devolucionId, false);
             }
         }
     }

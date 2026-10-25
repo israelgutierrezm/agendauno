@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AccesoTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
@@ -118,4 +121,28 @@ it('el acceso abierto vale todo su último día en la hora del negocio y solo en
         ->and($entrar($sedeB['sucursal']))->toBeFalse();
     $this->travelTo(CarbonImmutable::parse('2026-11-01 08:00', 'America/Mexico_City'));
     expect($entrar($sedeA['sucursal']))->toBeFalse();
+});
+
+it('un pase vale en cualquier sede, pero quien está acotado solo registra la entrada en una de las suyas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sedeA = agendaSemilla($e);
+    $sedeB = agendaSemilla($e);
+    // Beto es cliente de la sede B; llega a la A.
+    $beto = crearMiembroEnSucursal($e, 'Beto', $sedeB['sucursal']);
+    $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
+    $url = "/api/v1/app/{$e['slug']}/accesos";
+
+    // Sin sede asignada (con varias): no registra entradas.
+    $this->postJson($url, ['persona_id' => $beto, 'metodo' => 'qr'], conBearer($recep))->assertForbidden();
+
+    asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $sedeA['sucursal']);
+    // En la otra sede, no; en la suya, sí (aunque Beto sea de la B); sin indicarla, la suya.
+    $this->postJson($url, ['persona_id' => $beto, 'metodo' => 'qr', 'sucursal_id' => $sedeB['sucursal']], conBearer($recep))->assertForbidden();
+    $this->postJson($url, ['persona_id' => $beto, 'metodo' => 'qr', 'sucursal_id' => $sedeA['sucursal']], conBearer($recep))->assertCreated();
+    $this->postJson($url, ['persona_id' => $beto, 'metodo' => 'qr'], conBearer($recep))->assertCreated();
+    [$sedes, $idA] = app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), fn (): array => [
+        AccesoTenant::query()->orderBy('id')->pluck('sucursal_id')->map(fn (mixed $id): int => (int) $id)->all(),
+        (int) SucursalTenant::query()->where('ulid', $sedeA['sucursal'])->value('id'),
+    ]);
+    expect($sedes)->toBe([$idA, $idA]);
 });

@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pasarelas\MontoDecimal;
+use App\Modules\Tenancy\Pasarelas\PasarelaOpenPayTenant;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 
 /**
@@ -55,9 +56,17 @@ class NotificacionesOpenPay
             return;
         }
 
+        // Una devolución: el cargo se relee en OpenPay (el aviso no va firmado). La que pidió
+        // la plataforma se concilia; la hecha en el panel de OpenPay se registra (ADR 0209).
         if ($tipo === 'charge.refunded') {
-            $devolucion = is_array($transaccion['refund'] ?? null) ? $transaccion['refund'] : [];
-            $this->reembolsos->conciliar((string) ($devolucion['id'] ?? ''), true);
+            $modo = ConfiguracionPasarelaTenant::query()->where('proveedor', 'openpay')->value('modo');
+            $cargo = (new ClienteOpenPay($llaves['merchant_id'], $llaves['private_key'], $modo !== 'live'))->cargo($id);
+            $pago = $this->pagoDelCargo($id, $cargo);
+            foreach (PasarelaOpenPayTenant::devolucionDelCargo($cargo, (string) ($pago->moneda ?? 'MXN')) as $devolucion) {
+                $pago instanceof PagoTenant
+                    ? $this->reembolsos->desdeLaPasarela($pago, $devolucion['id'], $devolucion['monto_minor'], $devolucion['moneda'])
+                    : $this->reembolsos->conciliar($devolucion['id'], true);
+            }
 
             return;
         }

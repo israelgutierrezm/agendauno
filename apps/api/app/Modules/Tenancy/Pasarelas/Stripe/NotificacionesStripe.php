@@ -69,12 +69,13 @@ class NotificacionesStripe
             $this->confirmar->rechazarPorReferencia($referencia);
         }
 
-        // Devoluciones que quedaron pendientes: Stripe avisa cómo terminaron.
-        if (in_array($tipo, ['refund.updated', 'refund.failed', 'charge.refund.updated'], true) && is_array($objeto)) {
-            $estado = (string) ($objeto['status'] ?? '');
-            if (in_array($estado, ['succeeded', 'failed', 'canceled'], true)) {
-                $this->reembolsos->conciliar($referencia, $estado === 'succeeded', isset($metadatos['reembolso']) ? (string) $metadatos['reembolso'] : null);
-            }
+        // Devoluciones: las que pidió la plataforma y quedaron pendientes se concilian; las
+        // hechas en el panel de Stripe se registran (ADR 0209).
+        if (in_array($tipo, ['refund.created', 'refund.updated', 'refund.failed', 'charge.refund.updated'], true) && is_array($objeto)) {
+            $this->devolucion($objeto);
+        }
+        if ($tipo === 'charge.refunded' && is_array($objeto)) {
+            $this->cargoDevuelto($objeto);
         }
 
         // Contracargo (ADR 0168): el banco del cliente disputa el cobro.
@@ -90,18 +91,71 @@ class NotificacionesStripe
     }
 
     /**
-     * Una disputa: se ubica su pago por el PaymentIntent (o por la sesión de Checkout que
-     * lo generó) y se abre o se cierra el contracargo.
+     * Una devolución (`refund.*`): si falló, se concilia la que pidió la plataforma; si
+     * se hizo, se concilia la propia o se registra la hecha en el panel de Stripe.
      *
-     * @param  array<string, mixed>  $disputa
+     * @param  array<string, mixed>  $devolucion
      */
-    private function disputa(string $tipo, array $disputa): void
+    private function devolucion(array $devolucion): void
     {
-        $intent = $disputa['payment_intent'] ?? null;
-        $intent = is_array($intent) ? ($intent['id'] ?? null) : $intent;
-        $referencia = (string) ($disputa['id'] ?? '');
-        if (! is_string($intent) || $intent === '' || $referencia === '') {
+        $id = (string) ($devolucion['id'] ?? '');
+        $estado = (string) ($devolucion['status'] ?? '');
+        $metadatos = is_array($devolucion['metadata'] ?? null) ? $devolucion['metadata'] : [];
+        $llave = isset($metadatos['reembolso']) ? (string) $metadatos['reembolso'] : null;
+        if ($id === '') {
             return;
+        }
+        if (in_array($estado, ['failed', 'canceled'], true)) {
+            $this->reembolsos->conciliar($id, false, $llave);
+
+            return;
+        }
+        if ($estado !== 'succeeded') {
+            return;
+        }
+        $pago = $this->pagoDeIntent($devolucion['payment_intent'] ?? null);
+        $pago instanceof PagoTenant
+            ? $this->reembolsos->desdeLaPasarela($pago, $id, (int) ($devolucion['amount'] ?? 0), (string) ($devolucion['currency'] ?? ''), $llave)
+            : $this->reembolsos->conciliar($id, true, $llave);
+    }
+
+    /**
+     * Un cobro devuelto (`charge.refunded`): sus devoluciones, las que trae el aviso o, si
+     * no las trae (versiones nuevas de la API), las que tiene Stripe de ese cobro.
+     *
+     * @param  array<string, mixed>  $cargo
+     */
+    private function cargoDevuelto(array $cargo): void
+    {
+        $intent = $cargo['payment_intent'] ?? null;
+        $intent = is_array($intent) ? ($intent['id'] ?? null) : $intent;
+        if (! is_string($intent) || $intent === '') {
+            return;
+        }
+        $lista = is_array($cargo['refunds']['data'] ?? null) ? $cargo['refunds']['data'] : [];
+        if ($lista === []) {
+            $llave = $this->registro->llaves('stripe')['secret_key'] ?? '';
+            $lista = $llave === '' ? [] : array_map(static fn (array $r): array => [
+                'id' => $r['id'], 'amount' => $r['monto_minor'], 'currency' => $r['moneda'], 'status' => $r['estado'],
+                'metadata' => $r['llave'] !== null ? ['reembolso' => $r['llave']] : [],
+            ], (new ClienteStripe($llave))->reembolsosDeIntent($intent));
+        }
+        foreach ($lista as $devolucion) {
+            if (is_array($devolucion)) {
+                $this->devolucion([...$devolucion, 'payment_intent' => $intent]);
+            }
+        }
+    }
+
+    /**
+     * El pago de un PaymentIntent: el que lo tiene como referencia o el de la sesión de
+     * Checkout que lo generó.
+     */
+    private function pagoDeIntent(mixed $intent): ?PagoTenant
+    {
+        $intent = is_array($intent) ? ($intent['id'] ?? null) : $intent;
+        if (! is_string($intent) || $intent === '') {
+            return null;
         }
         $pago = PagoTenant::query()->where('proveedor', 'stripe')->where('referencia_externa', $intent)->first();
         if (! $pago instanceof PagoTenant) {
@@ -109,6 +163,20 @@ class NotificacionesStripe
             $sesion = $llave !== '' ? (new ClienteStripe($llave))->sesionDeIntent($intent) : null;
             $pago = $sesion !== null ? PagoTenant::query()->where('proveedor', 'stripe')->where('referencia_externa', $sesion)->first() : null;
         }
+
+        return $pago instanceof PagoTenant ? $pago : null;
+    }
+
+    /**
+     * Una disputa: se ubica su pago por el PaymentIntent (o por la sesión de Checkout que
+     * lo generó) y se abre o se cierra el contracargo.
+     *
+     * @param  array<string, mixed>  $disputa
+     */
+    private function disputa(string $tipo, array $disputa): void
+    {
+        $referencia = (string) ($disputa['id'] ?? '');
+        $pago = $referencia !== '' ? $this->pagoDeIntent($disputa['payment_intent'] ?? null) : null;
         if (! $pago instanceof PagoTenant) {
             return;
         }

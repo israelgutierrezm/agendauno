@@ -8,7 +8,9 @@ use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -212,4 +214,23 @@ it('si mientras tanto se cerró la sede a esa hora, el pago tardío no reactiva 
 
     expect(enNegocioTardio($c['e'], fn () => ReservaTenant::query()->where('ulid', $c['reserva'])->value('estado')->value))->toBe('cancelada')
         ->and($this->getJson("/api/v1/app/{$c['e']['slug']}/incidencias-cobro", conBearer($c['e']['bearer']))->json('data'))->toHaveCount(1);
+});
+
+it('al vencer el apartado bloquea primero su orden y después la reserva, el mismo orden que al aprobar su pago', function (): void {
+    $c = citaApartadaSinPagar();
+    $this->travel(31)->minutes();
+    $consultas = [];
+    DB::listen(function (QueryExecuted $q) use (&$consultas): void {
+        $consultas[] = $q->sql;
+    });
+
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
+
+    // En la transacción de la expiración: la orden (con candado) antes que la reserva con
+    // candado (en MySQL las dos llevan `for update`; aquí se ve el orden de las lecturas).
+    $orden = collect($consultas)->search(fn (string $sql): bool => (bool) preg_match('/from "ordenes" where "ordenes"\."id" in/', $sql));
+    $reserva = collect($consultas)->search(fn (string $sql): bool => (bool) preg_match('/^select \* from "reservas" where "reservas"\."id" = \? limit 1/', $sql));
+    expect($orden)->toBeInt()->and($reserva)->toBeInt()->and($orden)->toBeLessThan($reserva);
+    expect(enNegocioTardio($c['e'], fn () => ReservaTenant::query()->where('ulid', $c['reserva'])->value('motivo_cancelacion')))->toBe('vencio_pago')
+        ->and(enNegocioTardio($c['e'], fn () => OrdenTenant::query()->where('ulid', $c['orden'])->value('estado')->value))->toBe('cancelada');
 });

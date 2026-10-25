@@ -57,12 +57,17 @@ class MensajesTenantController
             ->when(isset($validado['desde']), fn ($c) => $c->where('created_at', '>=', $this->fechas->inicioDelDia((string) $validado['desde'])))
             ->when(isset($validado['hasta']), fn ($c) => $c->where('created_at', '<=', $this->fechas->finDelDia((string) $validado['hasta'])));
 
+        // «Enviando» (tomado por una pasada, ADR 0209) es interno: se ve y se cuenta como «en cola».
+        $estados = fn (string $estado): array => $estado === EstadoMensaje::Encolado->value
+            ? [EstadoMensaje::Encolado->value, EstadoMensaje::Enviando->value]
+            : [$estado];
         $pagina = $encontrados()
-            ->when(isset($validado['estado']), fn ($c) => $c->where('estado', $validado['estado']))
+            ->when(isset($validado['estado']), fn ($c) => $c->whereIn('estado', $estados((string) $validado['estado'])))
             ->with(['persona', 'usuario'])
             ->orderByDesc('id')
             ->paginate((int) ($validado['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($validado['page'] ?? 1));
         $porEstado = $encontrados()->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->toBase()->pluck('total', 'estado');
+        $porEstado[EstadoMensaje::Encolado->value] = (int) ($porEstado[EstadoMensaje::Encolado->value] ?? 0) + (int) ($porEstado[EstadoMensaje::Enviando->value] ?? 0);
 
         return response()->json([
             'meta' => [
@@ -71,6 +76,7 @@ class MensajesTenantController
                 'per_page' => $pagina->perPage(),
                 'ultima_pagina' => $pagina->lastPage(),
                 'conteos' => collect(EstadoMensaje::cases())
+                    ->reject(fn (EstadoMensaje $e): bool => $e === EstadoMensaje::Enviando)
                     ->mapWithKeys(fn (EstadoMensaje $e): array => [$e->value => (int) ($porEstado[$e->value] ?? 0)])
                     ->all(),
             ],
@@ -81,7 +87,7 @@ class MensajesTenantController
                 'canal' => $m->canal->value,
                 'destinatario' => $m->destinatario,
                 'asunto' => $m->asunto,
-                'estado' => $m->estado->value,
+                'estado' => $m->estado === EstadoMensaje::Enviando ? EstadoMensaje::Encolado->value : $m->estado->value,
                 'intentos' => $m->intentos,
                 'evento_ulid' => $m->evento_ulid,
                 'creado_en' => $m->created_at?->toIso8601String(),

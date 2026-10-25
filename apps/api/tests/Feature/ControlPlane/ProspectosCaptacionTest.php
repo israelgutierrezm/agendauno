@@ -343,3 +343,23 @@ it('los prospectos se filtran como Miembros (origen, formulario, seguimiento, se
         ->and($pagina['data'])->toHaveCount(1);
     $this->getJson("/api/v1/app/{$e['slug']}/prospectos?origen=otro", conBearer($e['bearer']))->assertUnprocessable();
 });
+
+it('un reenvío anónimo con su correo no pisa lo que ya contó: lo nuevo queda completo en su historial', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $sedeA = agendaSemilla($e)['sucursal'];
+    $sedeB = agendaSemilla($e)['sucursal'];
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $url = "/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios";
+
+    $this->postJson($url, envioCaptacion(['interes' => ['sucursal' => $sedeA]]))->assertCreated();
+    // Alguien más escribe el mismo correo con otro interés: no es otro prospecto, ni lo cambia.
+    $this->postJson($url, envioCaptacion(['nombre' => 'Otra Persona', 'interes' => ['sucursal' => $sedeB]]))->assertCreated();
+
+    $lista = prospectosDelNegocioCaptacion($e);
+    expect($lista['data'])->toHaveCount(1)
+        ->and($lista['data'][0]['nombre'])->toBe('Lucía Prospecto')
+        ->and($lista['data'][0]['interes']['sucursal']['id'])->toBe($sedeA);
+    $detalle = $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$lista['data'][0]['id']}", conBearer($e['bearer']))->assertOk()->json('data');
+    $reenvio = collect($detalle['eventos'])->firstWhere('tipo', 'reenvio');
+    expect($reenvio['detalle'])->toMatchArray(['nombre' => 'Otra Persona', 'interes' => ['sucursal' => $sedeB]]);
+});

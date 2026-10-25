@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ConciliacionPlataformasTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\TarifaPlataformaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ProveedorPartner;
@@ -28,8 +29,19 @@ class ConciliacionPlataformasTenantController
         private readonly RegistrarAuditoria $auditoria,
     ) {}
 
-    public function tarifas(): JsonResponse
+    /**
+     * La conciliación es del negocio completo (lo que paga la plataforma no se reparte
+     * por sede): quien está acotado a unas sedes (R19, ADR 0098) no la ve ni la cambia.
+     */
+    private function exigirNegocioCompleto(Request $request): void
     {
+        abort_if(app(ResolverAccesoTenant::class)->deLaSolicitud($request) !== null, 403, 'La conciliación es de todo el negocio: tu rol solo ve tus sucursales.');
+    }
+
+    public function tarifas(Request $request): JsonResponse
+    {
+        $this->exigirNegocioCompleto($request);
+
         return response()->json(['data' => TarifaPlataformaTenant::query()->orderBy('proveedor')->orderByDesc('vigente_desde')->get()
             ->map(static fn (TarifaPlataformaTenant $t): array => [
                 'id' => $t->ulid,
@@ -43,6 +55,7 @@ class ConciliacionPlataformasTenantController
 
     public function pactarTarifa(Request $request): JsonResponse
     {
+        $this->exigirNegocioCompleto($request);
         $validado = $request->validate([
             'proveedor' => ['required', Rule::enum(ProveedorPartner::class)],
             'monto_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
@@ -60,6 +73,7 @@ class ConciliacionPlataformasTenantController
 
     public function resumen(Request $request): JsonResponse
     {
+        $this->exigirNegocioCompleto($request);
         $validado = $request->validate([
             'proveedor' => ['required', Rule::enum(ProveedorPartner::class)],
             'periodo' => ['required', 'date_format:Y-m'],
@@ -71,6 +85,7 @@ class ConciliacionPlataformasTenantController
     /** Importa el reporte de pagos del mes (CSV o Excel) y responde la conciliación. */
     public function importar(Request $request): JsonResponse
     {
+        $this->exigirNegocioCompleto($request);
         $validado = $request->validate([
             'proveedor' => ['required', Rule::enum(ProveedorPartner::class)],
             'periodo' => ['required', 'date_format:Y-m'],

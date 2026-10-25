@@ -1048,6 +1048,15 @@ class ReservasTenant
             ->pluck('id')
             ->each(function ($id) use (&$expiradas, &$ordenes): void {
                 DB::connection('tenant')->transaction(function () use ($id, &$expiradas, &$ordenes): void {
+                    // Primero sus órdenes y después la reserva (y su sesión): el mismo orden
+                    // que al aprobar su pago (orden → pago → reserva, ADR 0181/0209). Al
+                    // revés, el aviso del pago y esta expiración de la misma cita se
+                    // bloquearían entre sí y MySQL cortaría una de las dos.
+                    $deLaReserva = ReservaTenant::query()->whereKey($id)->first(['orden_id', 'saldo_orden_id']);
+                    $ordenesDeLaReserva = array_values(array_filter([$deLaReserva?->orden_id, $deLaReserva?->saldo_orden_id], static fn ($o): bool => $o !== null));
+                    if ($ordenesDeLaReserva !== []) {
+                        OrdenTenant::query()->whereKey($ordenesDeLaReserva)->orderBy('id')->lockForUpdate()->get();
+                    }
                     $reserva = ReservaTenant::query()->whereKey($id)->lockForUpdate()->first();
                     if (! $reserva instanceof ReservaTenant || $reserva->estado !== EstadoReserva::PendientePago) {
                         return;

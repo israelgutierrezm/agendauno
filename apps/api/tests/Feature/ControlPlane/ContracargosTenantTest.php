@@ -7,6 +7,7 @@ use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
+use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -23,10 +24,24 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
-    $this->cobros = (object) ['mp' => [], 'op' => []];
+    $this->cobros = (object) ['mp' => [], 'op' => [], 'stripe' => []];
     $cobros = $this->cobros;
     Http::fake(function (Request $request) use ($cobros) {
         $ruta = (string) parse_url($request->url(), PHP_URL_PATH);
+        // Stripe: las devoluciones del cobro pi_1 (las pedidas desde aquí y las del panel).
+        if ($request->method() === 'POST' && str_ends_with($ruta, '/refunds')) {
+            $id = 're_propia_'.(count($cobros->stripe) + 1);
+            $cobros->stripe[] = ['id' => $id, 'amount' => (int) $request['amount'], 'currency' => 'mxn', 'status' => 'succeeded', 'payment_intent' => 'pi_1',
+                'metadata' => ['reembolso' => (string) ($request['metadata']['reembolso'] ?? '')]];
+
+            return Http::response(['id' => $id, 'status' => 'succeeded']);
+        }
+        if ($request->method() === 'GET' && str_ends_with($ruta, '/refunds')) {
+            return Http::response(['data' => $cobros->stripe]);
+        }
+        if ($request->method() === 'GET' && str_ends_with($ruta, '/checkout/sessions/cs_1')) {
+            return Http::response(['id' => 'cs_1', 'payment_intent' => 'pi_1']);
+        }
         // Stripe: la sesión de Checkout y la búsqueda de la sesión de un cobro.
         if ($request->method() === 'POST' && str_ends_with($ruta, '/checkout/sessions')) {
             return Http::response(['id' => 'cs_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_1']);
@@ -338,4 +353,142 @@ it('con un contracargo abierto no se devuelve el pago (si se pierde, el banco ya
 
     $this->postJson("/api/v1/app/{$c['slug']}/pagos/{$c['pago']}/reembolsos", ['motivo' => 'Lo pidió', 'manual' => true], conBearer($c['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_REFUNDABLE');
+});
+
+/*
+| Devoluciones hechas directo en el panel de la pasarela (ADR 0209): llegan por su aviso
+| o las encuentra la conciliación, y se registran una sola vez, como desde el panel.
+*/
+
+/** Un paquete pagado en línea con Stripe (sesión cs_1, cobro pi_1). @return array{slug: string, bearer: string, pago: string} */
+function pagoConStripeCobrado(): array
+{
+    $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
+    test()->postJson("/api/v1/webhooks/tenant/{$c['slug']}/stripe", ['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_1', 'payment_status' => 'paid']]])->assertOk();
+
+    return $c;
+}
+
+/** Una devolución del cobro pi_1 hecha en el panel de Stripe. @return array<string, mixed> */
+function devolucionDelPanelDeStripe(string $id, int $monto): array
+{
+    return ['id' => $id, 'object' => 'refund', 'amount' => $monto, 'currency' => 'mxn', 'status' => 'succeeded', 'payment_intent' => 'pi_1', 'metadata' => []];
+}
+
+/**
+ * Las devoluciones del pago ([referencia, monto, vía]) y cómo quedaron el pago, su venta y
+ * sus incidencias.
+ *
+ * @return array{devoluciones: list<array{0: string|null, 1: int, 2: string|null}>, pago: string, orden: string|null, incidencias: list<array{0: string, 1: string}>}
+ */
+function devolucionesEnLaPasarelaDe(string $slug, string $pago): array
+{
+    return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $slug)->firstOrFail(), function () use ($pago): array {
+        $modelo = PagoTenant::query()->where('ulid', $pago)->with('orden')->firstOrFail();
+
+        return [
+            'devoluciones' => ReembolsoTenant::query()->where('pago_id', $modelo->getKey())->where('estado', 'aprobado')->orderBy('id')->get()
+                ->map(fn (ReembolsoTenant $r): array => [$r->referencia_externa, (int) $r->monto_minor, $r->metadata['via'] ?? null])->all(),
+            'pago' => $modelo->estado->value,
+            'orden' => $modelo->orden?->estado->value,
+            'incidencias' => IncidenciaCobroTenant::query()->where('pago_id', $modelo->getKey())->orderBy('id')->get()
+                ->map(fn (IncidenciaCobroTenant $i): array => [$i->tipo, $i->estado])->all(),
+        ];
+    });
+}
+
+it('Stripe: una devolución hecha en su panel llega por su aviso y se registra una sola vez, como desde el panel', function (): void {
+    $c = pagoConStripeCobrado();
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";
+
+    $this->postJson($url, ['id' => 'evt_r1', 'type' => 'refund.created', 'data' => ['object' => devolucionDelPanelDeStripe('re_panel', 89900)]])->assertOk();
+    // Stripe también avisa del cobro devuelto (con la misma devolución) y la actualiza.
+    $this->postJson($url, ['id' => 'evt_c1', 'type' => 'charge.refunded', 'data' => ['object' => ['id' => 'ch_1', 'payment_intent' => 'pi_1', 'refunds' => ['data' => [devolucionDelPanelDeStripe('re_panel', 89900)]]]]])->assertOk();
+    $this->postJson($url, ['id' => 'evt_r2', 'type' => 'refund.updated', 'data' => ['object' => devolucionDelPanelDeStripe('re_panel', 89900)]])->assertOk();
+
+    // Total y sin usar: como desde el panel, el pago queda devuelto y la venta cancelada.
+    expect(devolucionesEnLaPasarelaDe($c['slug'], $c['pago']))->toBe([
+        'devoluciones' => [['re_panel', 89900, 'pasarela_externa']],
+        'pago' => 'reembolsado',
+        'orden' => 'cancelada',
+        'incidencias' => [],
+    ]);
+});
+
+it('Stripe: si lo comprado ya se usó, la devolución del panel solo cuenta el dinero y el negocio decide', function (): void {
+    $c = pagoConStripeCobrado();
+    $derecho = (string) app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $c['slug'])->firstOrFail(), fn () => DerechoTenant::query()->value('ulid'));
+    $this->postJson("/api/v1/app/{$c['slug']}/derechos/{$derecho}/consumos", ['unidades' => 1000], conBearer($c['bearer']))->assertCreated();
+
+    $this->postJson("/api/v1/webhooks/tenant/{$c['slug']}/stripe", ['id' => 'evt_r1', 'type' => 'refund.created', 'data' => ['object' => devolucionDelPanelDeStripe('re_panel', 89900)]])->assertOk();
+
+    expect(devolucionesEnLaPasarelaDe($c['slug'], $c['pago']))->toBe([
+        'devoluciones' => [['re_panel', 89900, 'pasarela_externa']],
+        'pago' => 'reembolsado',
+        'orden' => 'pagada',
+        'incidencias' => [[IncidenciaCobroTenant::DEVOLUCION_EXTERNA, 'abierta']],
+    ]);
+});
+
+it('si el aviso no llegó, la conciliación encuentra la devolución del panel sin repetir las pedidas desde aquí', function (): void {
+    $c = pagoConStripeCobrado();
+    // Desde aquí se devolvió una parte (Stripe la guarda con su llave)...
+    $this->postJson("/api/v1/app/{$c['slug']}/pagos/{$c['pago']}/reembolsos", ['motivo' => 'Descuento', 'monto_minor' => 20000, 'revertir_creditos' => false], conBearer($c['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'aprobado');
+    // ...y el resto en el panel de Stripe, sin que llegara su aviso.
+    $this->cobros->stripe[] = devolucionDelPanelDeStripe('re_panel', 69900);
+
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
+    $this->travel(25)->hours();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
+
+    expect(devolucionesEnLaPasarelaDe($c['slug'], $c['pago']))->toBe([
+        'devoluciones' => [['re_propia_1', 20000, 'pasarela'], ['re_panel', 69900, 'pasarela_externa']],
+        'pago' => 'reembolsado',
+        'orden' => 'cancelada',
+        'incidencias' => [],
+    ]);
+});
+
+it('Mercado Pago: la devolución del panel llega al releer el pago y se registra una sola vez', function (): void {
+    $c = pagoParaContracargo('mercadopago', ['access_token' => 'APP_USR-prueba']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/mercadopago";
+    $cobro = ['id' => 701, 'status' => 'approved', 'external_reference' => $c['pago'], 'transaction_amount' => 899.0, 'currency_id' => 'MXN'];
+    $this->cobros->mp['701'] = $cobro;
+    $this->postJson("{$url}?type=payment&data_id=701")->assertOk();
+
+    $this->cobros->mp['701'] = [...$cobro, 'status' => 'refunded', 'refunds' => [['id' => 9001, 'amount' => 899.0, 'status' => 'approved']]];
+    $this->postJson("{$url}?type=payment&data_id=701")->assertOk();
+    $this->postJson("{$url}?type=payment&data_id=701")->assertOk();
+
+    $estado = devolucionesEnLaPasarelaDe($c['slug'], $c['pago']);
+    expect($estado['devoluciones'])->toBe([['9001', 89900, 'pasarela_externa']])
+        ->and($estado['pago'])->toBe('reembolsado');
+});
+
+it('OpenPay: la devolución del panel llega por su aviso (releyendo el cargo) y se registra una sola vez', function (): void {
+    $c = pagoParaContracargo('openpay', ['merchant_id' => 'm1', 'private_key' => 'sk_op', 'public_key' => 'pk_op']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/openpay";
+    $this->cobros->op['trx1']['status'] = 'completed';
+    $this->postJson($url, ['type' => 'charge.succeeded', 'transaction' => ['id' => 'trx1']])->assertOk();
+
+    $this->cobros->op['trx1']['refund'] = ['id' => 'trr1', 'amount' => 899.0, 'status' => 'completed'];
+    $this->postJson($url, ['type' => 'charge.refunded', 'transaction' => ['id' => 'trx1']])->assertOk();
+    $this->postJson($url, ['type' => 'charge.refunded', 'transaction' => ['id' => 'trx1']])->assertOk();
+
+    expect(devolucionesEnLaPasarelaDe($c['slug'], $c['pago'])['devoluciones'])->toBe([['trr1', 89900, 'pasarela_externa']]);
+});
+
+it('un contracargo perdido sobre un pago ya devuelto por completo no registra otra devolución: lo avisa', function (): void {
+    $c = pagoConStripeCobrado();
+    $this->postJson("/api/v1/app/{$c['slug']}/pagos/{$c['pago']}/reembolsos", ['motivo' => 'Se mudó'], conBearer($c['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'aprobado');
+
+    // Después el banco del cliente lo disputa y Stripe lo da por perdido.
+    $this->postJson("/api/v1/webhooks/tenant/{$c['slug']}/stripe", ['type' => 'charge.dispute.closed', 'data' => ['object' => [...disputaDeStripe(), 'status' => 'lost']]])->assertOk();
+
+    $estado = estadoDelContracargo($c['slug'], $c['pago']);
+    expect($estado['pago']->contracargo_estado)->toBe('perdido')
+        ->and($estado['devoluciones'])->toBe(1)
+        ->and(collect($estado['incidencias'])->firstWhere('tipo', 'contracargo')['detalle'])->toContain('ya se había devuelto por completo');
 });

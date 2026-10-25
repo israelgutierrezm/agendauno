@@ -43,7 +43,9 @@ class ConfirmarPagoTenant
     {
         $abiertos = DB::connection('tenant')->transaction(function () use ($pago, $referencia): array {
             // Primero la orden y después el pago, como el cobro en caja: en orden inverso,
-            // el aviso y la caja con la misma orden se bloquearían entre sí (deadlock).
+            // el aviso y la caja con la misma orden se bloquearían entre sí (deadlock). El
+            // fulfillment de una cita toca su reserva al final: la expiración del apartado
+            // bloquea en el mismo orden (orden → reserva, ADR 0209).
             $ordenId = PagoTenant::query()->whereKey($pago->getKey())->value('orden_id');
             $orden = $ordenId !== null ? OrdenTenant::query()->whereKey($ordenId)->lockForUpdate()->first() : null;
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->first();

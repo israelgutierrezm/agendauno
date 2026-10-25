@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  * cliente autoriza en Mercado Pago; Mercado Pago cobra cada mes (reintenta hasta 4
  * veces en 10 días) y aquí se concilian sus cobros.
  */
-class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
+class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConDevoluciones, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -123,6 +123,34 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultab
         return $vigente
             ? ResultadoPago::pendiente((string) $pago->referencia_externa)
             : ResultadoPago::rechazado('El pago en Mercado Pago ya no se puede completar.');
+    }
+
+    /**
+     * Las devoluciones aprobadas del cobro en Mercado Pago (también las hechas en su
+     * panel): vienen en el propio pago, con su monto en decimal.
+     */
+    public function devoluciones(PagoTenant $pago, array $llaves): array
+    {
+        $api = self::api($llaves);
+        $cobro = self::cobroAprobado($api, $pago);
+        if ($cobro === null || $cobro === '') {
+            return [];
+        }
+        $datos = $api->pago($cobro);
+        $moneda = strtoupper((string) ($datos['currency_id'] ?? $pago->moneda));
+        $devoluciones = [];
+        foreach (is_array($datos['refunds'] ?? null) ? $datos['refunds'] : [] as $devolucion) {
+            if (is_array($devolucion) && (string) ($devolucion['status'] ?? '') === 'approved' && (string) ($devolucion['id'] ?? '') !== '') {
+                $devoluciones[] = [
+                    'id' => (string) $devolucion['id'],
+                    'monto_minor' => MontoDecimal::aCentavos((float) ($devolucion['amount'] ?? 0)),
+                    'moneda' => $moneda,
+                    'llave' => null,
+                ];
+            }
+        }
+
+        return $devoluciones;
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -96,7 +97,10 @@ class FitpassTenantController
         if ($publicaciones->isEmpty()) {
             return response()->json(['data' => []]);
         }
+        // De las sedes de quien consulta (R19): quien está acotado ve solo las suyas.
+        $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
         $sesiones = SesionTenant::query()
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->whereIn('oferta_id', $publicaciones->keys()->all())
             ->where('tipo', TipoSesionTenant::Clase->value)
             ->whereIn('estado', [EstadoSesionTenant::Programada->value, EstadoSesionTenant::Cancelada->value])

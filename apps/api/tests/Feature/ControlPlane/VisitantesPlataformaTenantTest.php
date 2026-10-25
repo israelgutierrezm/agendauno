@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\CheckinTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoPlataformaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -309,4 +312,44 @@ it('quien manda avisos con un token falso gasta su propio cupo, no el de los avi
     // El aviso con el token del negocio sigue entrando y la visita se valida.
     avisoWellhub($url)->assertOk();
     expect($this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/checkins", conBearer($e['bearer']))->assertOk()->json('data'))->toHaveCount(1);
+});
+
+/** Una visita validada de Wellhub en esa clase, con su visitante. */
+function visitaDeWellhubEnClase(string $slug, string $sesion, string $nombre, string $idExterno): void
+{
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $slug)->firstOrFail(), function () use ($sesion, $nombre, $idExterno): void {
+        $visitante = VisitantePlataformaTenant::query()->create([
+            'proveedor' => 'wellhub', 'id_externo' => $idExterno, 'nombre' => $nombre, 'primera_visita_en' => now(), 'ultima_visita_en' => now(),
+        ]);
+        CheckinTenant::query()->create([
+            'sesion_id' => SesionTenant::query()->where('ulid', $sesion)->value('id'), 'proveedor' => 'wellhub', 'referencia_externa' => 'ref-'.$idExterno,
+            'nombre_usuario' => $nombre, 'estado' => CheckinTenant::VALIDADO, 'registrado_en' => now(), 'visitante_id' => $visitante->getKey(), 'origen' => CheckinTenant::ORIGEN_AUTOMATICO,
+        ]);
+    });
+}
+
+it('quien está acotado a una sede ve solo las visitas y los visitantes de sus clases; la conciliación es de todo el negocio', function (): void {
+    $e = estudioConSesion('fluo-wh', 'f@correo.mx');
+    $sedeA = agendaSemilla($e);
+    $sedeB = agendaSemilla($e);
+    visitaDeWellhubEnClase($e['slug'], crearSesionTenant($e, $sedeA, 10, '2026-10-01 07:00:00'), 'Ana Wellhub', 'wh-ana');
+    visitaDeWellhubEnClase($e['slug'], crearSesionTenant($e, $sedeB, 10, '2026-10-01 07:00:00'), 'Beto Wellhub', 'wh-beto');
+    $rol = (string) $this->postJson("/api/v1/app/{$e['slug']}/roles", ['nombre' => 'Gerencia', 'permisos' => ['facturacion.ver']], conBearer($e['bearer']))
+        ->assertCreated()->json('data.clave');
+    $gerente = personalConSesion($e['slug'], $e['bearer'], 'gerente@correo.mx', $rol);
+    asignarSucursal($e, usuarioIdPorEmail($e, 'gerente@correo.mx'), $sedeA['sucursal']);
+    $app = "/api/v1/app/{$e['slug']}";
+
+    $this->getJson("{$app}/reportes/plataformas?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.resumen.visitas', 2);
+    $this->getJson("{$app}/reportes/plataformas?desde=2026-10-01&hasta=2026-10-01", conBearer($gerente))->assertOk()
+        ->assertJsonPath('data.resumen.visitas', 1)->assertJsonPath('data.resumen.nuevos', 1);
+    expect(collect($this->getJson("{$app}/visitantes-plataforma", conBearer($gerente))->assertOk()->json('data'))->pluck('nombre')->all())->toBe(['Ana Wellhub']);
+    $beto = (string) collect($this->getJson("{$app}/visitantes-plataforma", conBearer($e['bearer']))->json('data'))->firstWhere('nombre', 'Beto Wellhub')['id'];
+    $this->getJson("{$app}/visitantes-plataforma/{$beto}", conBearer($gerente))->assertNotFound();
+    $this->getJson("{$app}/visitantes-plataforma/{$beto}", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.historial_total', 1);
+
+    // Lo que paga la plataforma no se reparte por sede: la conciliación no es para un rol acotado.
+    $this->getJson("{$app}/plataformas/conciliacion?proveedor=wellhub&periodo=2026-10", conBearer($gerente))->assertForbidden();
+    $this->getJson("{$app}/plataformas/tarifas", conBearer($gerente))->assertForbidden();
+    $this->getJson("{$app}/plataformas/conciliacion?proveedor=wellhub&periodo=2026-10", conBearer($e['bearer']))->assertOk();
 });

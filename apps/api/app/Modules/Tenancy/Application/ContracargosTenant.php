@@ -22,7 +22,9 @@ use Illuminate\Support\Facades\DB;
  * - **Ganado:** el dinero se queda; la incidencia se cierra sola.
  * - **Perdido:** la pasarela devolvió el dinero al cliente: cuenta como una devolución
  *   (corte, movimientos y reportes) y el pago queda devuelto. Lo que compró no se
- *   cancela solo: la incidencia sigue abierta para que el negocio decida.
+ *   cancela solo: la incidencia sigue abierta para que el negocio decida. Si el pago ya
+ *   estaba devuelto por completo, no se registra otra devolución (el dinero no salió
+ *   dos veces de los libros): la incidencia dice que el cliente lo recibió dos veces.
  *
  * Idempotente: el mismo aviso dos veces no duplica nada.
  *
@@ -103,9 +105,7 @@ class ContracargosTenant
                 'contracargo_en' => $bloqueado->contracargo_en ?? now(),
                 'contracargo_cerrado_en' => now(),
             ]);
-            if (! $ganado) {
-                $this->devolucion($bloqueado, $referencia, $monto);
-            }
+            $yaDevuelto = ! $ganado && ! $this->devolucion($bloqueado, $referencia, $monto);
 
             $dinero = self::dinero($monto, (string) $bloqueado->moneda);
             $abiertas = IncidenciaCobroTenant::query()
@@ -117,7 +117,11 @@ class ContracargosTenant
                 $abiertas->each(fn (IncidenciaCobroTenant $i) => $this->incidencias->cerrar($i, "Se ganó el contracargo: el pago de {$dinero} se queda."));
             } else {
                 // Perdido sin aviso de apertura (llegó desordenado o no llegó): se abre aquí.
-                $detalle = "Se perdió el contracargo: {$this->pasarela($bloqueado)} devolvió {$dinero} al cliente. Decide si cancelas lo que compró.";
+                // Sobre un pago ya devuelto por completo, el cliente recibió el dinero dos
+                // veces: no se registra otra devolución, se le dice al negocio.
+                $detalle = $yaDevuelto
+                    ? "Se perdió el contracargo de {$dinero}, pero el pago ya se había devuelto por completo: el cliente recibió su dinero dos veces. Recupéralo con el cliente o reclámalo en {$this->pasarela($bloqueado)}."
+                    : "Se perdió el contracargo: {$this->pasarela($bloqueado)} devolvió {$dinero} al cliente. Decide si cancelas lo que compró.";
                 $abiertas->isEmpty()
                     ? $this->incidencias->porPago(IncidenciaCobroTenant::CONTRACARGO, $bloqueado, $detalle, ['referencia' => $referencia])
                     : $abiertas->each(fn (IncidenciaCobroTenant $i) => $i->update(['detalle' => $detalle]));
@@ -134,15 +138,22 @@ class ContracargosTenant
 
     /**
      * Lo perdido sale como devolución (sin revertir créditos: lo decide el negocio) y
-     * el pago queda devuelto, total o parcialmente. Una sola por disputa.
+     * el pago queda devuelto, total o parcialmente. Una sola por disputa, y nunca por
+     * más de lo que quedaba sin devolver: si el pago ya estaba devuelto por completo, no
+     * se registra ninguna (devuelve false; el negocio lo ve en su incidencia).
      */
-    private function devolucion(PagoTenant $pago, string $referencia, int $montoMinor): void
+    private function devolucion(PagoTenant $pago, string $referencia, int $montoMinor): bool
     {
         $existe = ReembolsoTenant::query()->where('pago_id', $pago->getKey())->where('referencia_externa', $referencia)->exists();
+        $devueltoAntes = (int) $pago->reembolsos()->whereIn('estado', EstadoReembolso::comprometidos())->sum('monto_minor');
+        $restante = (int) $pago->monto_minor - $devueltoAntes;
+        if (! $existe && $restante <= 0) {
+            return false;
+        }
         if (! $existe) {
             ReembolsoTenant::query()->create([
                 'pago_id' => $pago->getKey(),
-                'monto_minor' => $montoMinor,
+                'monto_minor' => min($montoMinor, $restante),
                 'moneda' => $pago->moneda,
                 'estado' => EstadoReembolso::Aprobado->value,
                 'proveedor' => $pago->proveedor,
@@ -158,6 +169,8 @@ class ContracargosTenant
         $pago->update([
             'estado' => $devuelto >= $pago->monto_minor ? EstadoPago::Reembolsado->value : EstadoPago::ParcialmenteReembolsado->value,
         ]);
+
+        return true;
     }
 
     private function pasarela(PagoTenant $pago): string

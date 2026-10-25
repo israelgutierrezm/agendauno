@@ -113,3 +113,16 @@ it('las fechas de la bitácora son días del negocio y el final no va antes del 
         ->assertStatus(422)->assertJsonValidationErrors(['hasta'], 'meta.errors');
     $this->getJson("/api/v1/app/{$e['slug']}/auditorias?desde=2026-10-01&hasta=2026-10-01", conBearer($e['bearer']))->assertOk();
 });
+
+it('la bitácora es de todo el negocio: no la ve quien está acotado a unas sedes', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $rol = (string) $this->postJson("/api/v1/app/{$e['slug']}/roles", ['nombre' => 'Auditoría', 'permisos' => ['auditoria.ver']], conBearer($e['bearer']))
+        ->assertCreated()->json('data.clave');
+    $auditor = personalConSesion($e['slug'], $e['bearer'], 'auditor@correo.mx', $rol);
+    $sedeA = agendaSemilla($e)['sucursal'];
+    agendaSemilla($e);
+    // Con varias sedes, acotado a una: no la ve; el dueño, sí.
+    asignarSucursal($e, usuarioIdPorEmail($e, 'auditor@correo.mx'), $sedeA);
+    $this->getJson("/api/v1/app/{$e['slug']}/auditorias", conBearer($auditor))->assertForbidden();
+    $this->getJson("/api/v1/app/{$e['slug']}/auditorias", conBearer($e['bearer']))->assertOk();
+});

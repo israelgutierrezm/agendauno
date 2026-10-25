@@ -47,6 +47,13 @@ class EnviarMensajesTenant
 
     private const SEGUNDOS = [ColaDeMensajes::AVISOS => 45, ColaDeMensajes::CAMPANAS => 30];
 
+    /**
+     * Minutos tras los que un mensaje que quedó «enviando» (la pasada se cortó entre
+     * entregarlo y anotarlo) se da por fallido sin reintento. Mucho más que lo que dura
+     * una pasada (75 s): nunca toca uno que todavía se está entregando.
+     */
+    public const MINUTOS_ENVIO_CORTADO = 15;
+
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
         private readonly EntregarPushTenant $push,
@@ -63,6 +70,7 @@ class EnviarMensajesTenant
     {
         $enviados = 0;
         $hasta = microtime(true) + self::SEGUNDOS[$tipo];
+        $this->cerrarEnviosCortados();
 
         ColaDeMensajes::pendientes($tipo)
             ->orderBy('id')
@@ -140,8 +148,14 @@ class EnviarMensajesTenant
     }
 
     /**
-     * Suma su intento solo si sigue como se leyó (mismo estado y mismos intentos) y su
-     * campaña no está en pausa ni cancelada. Devuelve si quedó reclamado.
+     * Lo toma para entregarlo («enviando», con su intento) solo si sigue como se leyó
+     * (mismo estado y mismos intentos) y su campaña no está en pausa ni cancelada.
+     * Devuelve si quedó tomado.
+     *
+     * Como máximo una vez: tomado, ya no es pendiente. Si la pasada se corta entre
+     * entregarlo y anotar cómo terminó, no se vuelve a mandar ({@see self::cerrarEnviosCortados()}):
+     * un aviso repetido (dos cobros recordados, dos campañas) es peor que uno que hay que
+     * revisar en la bandeja de salida.
      */
     private function reclamar(MensajeTenant $mensaje): bool
     {
@@ -153,14 +167,32 @@ class EnviarMensajesTenant
                 'difusion_id',
                 DifusionTenant::query()->whereIn('estado', [DifusionTenant::PAUSADA, DifusionTenant::CANCELADA])->select('id'),
             ))
-            ->update(['intentos' => $mensaje->intentos + 1]);
+            ->update(['estado' => EstadoMensaje::Enviando->value, 'intentos' => $mensaje->intentos + 1]);
         if ($reclamado === 0) {
             return false;
         }
+        $mensaje->estado = EstadoMensaje::Enviando;
         $mensaje->intentos++;
-        $mensaje->syncOriginalAttribute('intentos');
+        $mensaje->syncOriginalAttributes(['estado', 'intentos']);
 
         return true;
+    }
+
+    /**
+     * Los que quedaron «enviando» de una pasada que se cortó: no se sabe si salieron, así
+     * que no se reintentan (como máximo una vez); quedan fallidos, con el motivo, para
+     * revisarlos en la bandeja de salida.
+     */
+    private function cerrarEnviosCortados(): void
+    {
+        MensajeTenant::query()
+            ->where('estado', EstadoMensaje::Enviando->value)
+            ->where('updated_at', '<', now()->subMinutes(self::MINUTOS_ENVIO_CORTADO))
+            ->update([
+                'estado' => EstadoMensaje::Fallido->value,
+                'intentos' => self::MAX_INTENTOS,
+                'ultimo_error' => 'El envío se cortó y no se sabe si salió: no se vuelve a mandar para no repetirlo.',
+            ]);
     }
 
     private function entregar(MensajeTenant $mensaje): void

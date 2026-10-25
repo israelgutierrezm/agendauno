@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\CheckinTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -45,7 +46,50 @@ class VisitantesPlataformaTenantController
     /** Estados de una visita que cuentan como visita (las rechazadas no se guardan). */
     private const VISITAS = [CheckinTenant::VALIDADO, CheckinTenant::NO_VERIFICABLE, CheckinTenant::EXCEPCION];
 
-    public function __construct(private readonly FechasNegocioTenant $fechas) {}
+    public function __construct(
+        private readonly FechasNegocioTenant $fechas,
+        private readonly ResolverAccesoTenant $acceso,
+    ) {}
+
+    /**
+     * Las sedes que ve quien consulta (null = todas). Quien está acotado a unas sedes (R19,
+     * ADR 0098) solo ve las visitas y reservas de sus clases, y a los visitantes que
+     * vinieron o reservaron en ellas; una visita sin clase no es de ninguna sede.
+     *
+     * @return list<int>|null
+     */
+    private function sedes(Request $request): ?array
+    {
+        return $this->acceso->deLaSolicitud($request);
+    }
+
+    /**
+     * Lo que cuelga de una clase (visitas, reservas), solo de esas sedes.
+     *
+     * @template TModelo of Model
+     *
+     * @param  Builder<TModelo>  $consulta
+     * @param  list<int>|null  $sedes
+     * @return Builder<TModelo>
+     */
+    private static function deSusSedes(Builder $consulta, ?array $sedes): Builder
+    {
+        return $sedes === null ? $consulta : $consulta->whereHas('sesion', fn (Builder $s) => $s->whereIn('sucursal_id', $sedes));
+    }
+
+    /**
+     * Visitantes que vinieron o reservaron en esas sedes.
+     *
+     * @param  Builder<VisitantePlataformaTenant>  $consulta
+     * @param  list<int>|null  $sedes
+     * @return Builder<VisitantePlataformaTenant>
+     */
+    private static function visitantesDeSusSedes(Builder $consulta, ?array $sedes): Builder
+    {
+        return $sedes === null ? $consulta : $consulta->where(fn (Builder $w) => $w
+            ->whereHas('checkins', fn (Builder $c) => self::deSusSedes($c, $sedes))
+            ->orWhereHas('lugares', fn (Builder $l) => self::deSusSedes($l, $sedes)));
+    }
 
     public function resumen(Request $request): JsonResponse
     {
@@ -60,22 +104,23 @@ class VisitantesPlataformaTenantController
         $inicio = $this->fechas->inicioDelDia((string) $validado['desde']);
         $fin = $this->fechas->finDelDia((string) $validado['hasta']);
         $proveedor = $validado['proveedor'] ?? null;
+        $sedes = $this->sedes($request);
 
         /** @var Collection<int, CheckinTenant> $visitas */
-        $visitas = CheckinTenant::query()
+        $visitas = self::deSusSedes(CheckinTenant::query(), $sedes)
             ->with('sesion.oferta')
             ->whereIn('estado', self::VISITAS)
             ->whereBetween('registrado_en', [$inicio, $fin])
             ->when($proveedor !== null, fn (Builder $q) => $q->where('proveedor', $proveedor))
             ->get(['id', 'sesion_id', 'proveedor', 'estado', 'origen', 'visitante_id', 'registrado_en']);
 
-        $nuevos = VisitantePlataformaTenant::query()
+        $nuevos = self::visitantesDeSusSedes(VisitantePlataformaTenant::query(), $sedes)
             ->whereBetween('primera_visita_en', [$inicio, $fin])
             ->when($proveedor !== null, fn (Builder $q) => $q->where('proveedor', $proveedor))
             ->count();
 
         // Reservas desde la app de la plataforma de las clases del periodo, por cómo quedaron.
-        $reservas = LugarPlataformaTenant::query()
+        $reservas = self::deSusSedes(LugarPlataformaTenant::query(), $sedes)
             ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
             ->whereHas('sesion', fn (Builder $q) => $q->whereBetween('inicia_en', [$inicio, $fin]))
             ->when($proveedor !== null, fn (Builder $q) => $q->where('proveedor', $proveedor))
@@ -143,8 +188,9 @@ class VisitantesPlataformaTenantController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $q = trim((string) ($filtros['q'] ?? ''));
-        $pagina = VisitantePlataformaTenant::query()
-            ->withCount(['checkins as visitas' => fn (Builder $c) => $c->whereIn('estado', self::VISITAS)])
+        $sedes = $this->sedes($request);
+        $pagina = self::visitantesDeSusSedes(VisitantePlataformaTenant::query(), $sedes)
+            ->withCount(['checkins as visitas' => fn (Builder $c) => self::deSusSedes($c, $sedes)->whereIn('estado', self::VISITAS)])
             ->when(($filtros['proveedor'] ?? null) !== null, fn (Builder $c) => $c->where('proveedor', $filtros['proveedor']))
             ->when($q !== '', fn (Builder $c) => $c->where(fn (Builder $w) => $w
                 ->where('nombre', 'like', "%{$q}%")
@@ -177,8 +223,8 @@ class VisitantesPlataformaTenantController
     public function show(Request $request): JsonResponse
     {
         $visitante = $this->visitante($request);
-        $visitas = $this->consultaVisitas($visitante);
-        $reservas = $this->consultaReservas($visitante);
+        $visitas = $this->consultaVisitas($visitante, $this->sedes($request));
+        $reservas = $this->consultaReservas($visitante, $this->sedes($request));
 
         return response()->json(['data' => [
             ...$this->presentar($visitante, $this->correosDeAlumnos(collect([$visitante]))),
@@ -197,7 +243,7 @@ class VisitantesPlataformaTenantController
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
-        $pagina = $this->consultaVisitas($this->visitante($request))
+        $pagina = $this->consultaVisitas($this->visitante($request), $this->sedes($request))
             ->paginate((int) ($validado['per_page'] ?? self::RECIENTES), ['*'], 'page', (int) ($validado['page'] ?? 1));
 
         return response()->json([
@@ -213,7 +259,7 @@ class VisitantesPlataformaTenantController
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
-        $pagina = $this->consultaReservas($this->visitante($request))
+        $pagina = $this->consultaReservas($this->visitante($request), $this->sedes($request))
             ->paginate((int) ($validado['per_page'] ?? self::RECIENTES), ['*'], 'page', (int) ($validado['page'] ?? 1));
 
         return response()->json([
@@ -224,18 +270,21 @@ class VisitantesPlataformaTenantController
 
     private function visitante(Request $request): VisitantePlataformaTenant
     {
-        return VisitantePlataformaTenant::query()
-            ->withCount(['checkins as visitas' => fn (Builder $c) => $c->whereIn('estado', self::VISITAS)])
+        $sedes = $this->sedes($request);
+
+        return self::visitantesDeSusSedes(VisitantePlataformaTenant::query(), $sedes)
+            ->withCount(['checkins as visitas' => fn (Builder $c) => self::deSusSedes($c, $sedes)->whereIn('estado', self::VISITAS)])
             ->where('ulid', (string) $request->route('visitante'))
             ->firstOrFail();
     }
 
     /**
+     * @param  list<int>|null  $sedes
      * @return Builder<CheckinTenant>
      */
-    private function consultaVisitas(VisitantePlataformaTenant $visitante): Builder
+    private function consultaVisitas(VisitantePlataformaTenant $visitante, ?array $sedes): Builder
     {
-        return CheckinTenant::query()
+        return self::deSusSedes(CheckinTenant::query(), $sedes)
             ->with('sesion.oferta')
             ->where('visitante_id', $visitante->getKey())
             ->whereIn('estado', self::VISITAS)
@@ -244,11 +293,12 @@ class VisitantesPlataformaTenantController
     }
 
     /**
+     * @param  list<int>|null  $sedes
      * @return Builder<LugarPlataformaTenant>
      */
-    private function consultaReservas(VisitantePlataformaTenant $visitante): Builder
+    private function consultaReservas(VisitantePlataformaTenant $visitante, ?array $sedes): Builder
     {
-        return LugarPlataformaTenant::query()
+        return self::deSusSedes(LugarPlataformaTenant::query(), $sedes)
             ->with('sesion.oferta')
             ->where('visitante_id', $visitante->getKey())
             ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)

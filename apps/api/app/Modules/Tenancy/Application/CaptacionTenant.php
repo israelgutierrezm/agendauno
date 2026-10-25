@@ -131,19 +131,31 @@ class CaptacionTenant
             ];
 
             if ($abierto instanceof ProspectoTenant) {
-                // Mismo interesado: se actualiza lo que trae de nuevo, sin abrir otro. Su
+                // Mismo correo o teléfono que un prospecto abierto: no se abre otro. Un envío
+                // anónimo no prueba que sea la misma persona, así que no pisa lo que ya
+                // contó: solo llena lo que estaba vacío, y lo nuevo (su nombre, sus respuestas
+                // y su interés) queda completo en el evento «Reenvío» de su historial. Su
                 // campaña es la de su primera solicitud; si no la tenía, la de esta.
                 $contexto = $abierto->contexto_medicion_id === null
                     ? $this->atribucion->registrar($datos['atribucion'] ?? null, null, $datos['medicion'] ?? null, $datos['ip'] ?? null, $datos['agente'] ?? null)
                     : null;
+                $vacios = array_filter($interes, static fn (?int $id, string $campo): bool => $id !== null && $abierto->getAttribute($campo) === null, ARRAY_FILTER_USE_BOTH);
                 $abierto->update(array_filter([
                     'contexto_medicion_id' => $contexto?->getKey(),
                     'telefono' => $abierto->telefono ?? $telefono,
                     'email' => $abierto->email ?? $email,
-                    ...array_filter($interes, static fn (?int $id): bool => $id !== null),
+                    ...$vacios,
+                    'respuestas' => $abierto->respuestas === null && $respuestas !== [] ? $respuestas : null,
+                    'aviso_version' => $abierto->aviso_version === null ? $comunes['aviso_version'] : null,
+                    'acepto_aviso_en' => $abierto->acepto_aviso_en === null ? $comunes['acepto_aviso_en'] : null,
+                ], static fn (mixed $v): bool => $v !== null));
+                $this->evento($abierto, TipoEventoProspecto::Reenvio, array_filter([
+                    'formulario' => $formulario->nombre,
+                    'nombre' => trim($datos['nombre']),
                     'respuestas' => $respuestas !== [] ? $respuestas : null,
-                ], static fn (mixed $v): bool => $v !== null) + $comunes);
-                $this->evento($abierto, TipoEventoProspecto::Reenvio, ['formulario' => $formulario->nombre]);
+                    'interes' => array_filter((array) ($datos['interes'] ?? []), static fn (mixed $v): bool => is_string($v) && $v !== '') ?: null,
+                    'aviso_version' => $aviso?->version,
+                ], static fn (mixed $v): bool => $v !== null));
 
                 return $abierto;
             }

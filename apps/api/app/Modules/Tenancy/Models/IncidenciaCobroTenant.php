@@ -42,6 +42,12 @@ class IncidenciaCobroTenant extends Model
     /** Se pagó una clase de prueba que la persona ya había usado (ADR 0137). */
     public const PRIMERA_VEZ_REPETIDA = 'primera_vez_repetida';
 
+    /**
+     * Una devolución hecha en el panel de la pasarela que no se pudo aplicar sola (lo
+     * comprado ya se usó, la cita sigue en pie o no cuadra con el pago; ADR 0209).
+     */
+    public const DEVOLUCION_EXTERNA = 'devolucion_externa';
+
     protected $connection = 'tenant';
 
     protected $table = 'incidencias_cobro';

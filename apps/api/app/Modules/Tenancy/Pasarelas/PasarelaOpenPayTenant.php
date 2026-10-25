@@ -34,7 +34,7 @@ use Illuminate\Support\Carbon;
  * por su precio y la suscripción con el primer cobro en la próxima renovación.
  * OpenPay cobra solo y aquí se concilian los cargos de ese cliente.
  */
-class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
+class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConDevoluciones, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -106,6 +106,43 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, 
             'failed', 'cancelled', 'expired' => ResultadoPago::rechazado('El cargo de OpenPay venció o falló.'),
             default => ResultadoPago::pendiente($referencia),
         };
+    }
+
+    /**
+     * La devolución del cargo en OpenPay, si la tiene (también la hecha en su panel):
+     * viene en el propio cargo (`refund`), con su monto en decimal.
+     */
+    public function devoluciones(PagoTenant $pago, array $llaves): array
+    {
+        $referencia = (string) $pago->referencia_externa;
+        if ($referencia === '') {
+            return [];
+        }
+
+        return self::devolucionDelCargo($this->api($llaves)->cargo($referencia), (string) $pago->moneda);
+    }
+
+    /**
+     * La devolución que trae un cargo de OpenPay (completada), como la lista que espera
+     * {@see PasarelaConDevoluciones}.
+     *
+     * @param  array<string, mixed>  $cargo
+     * @return list<array{id: string, monto_minor: int, moneda: string, llave: string|null}>
+     */
+    public static function devolucionDelCargo(array $cargo, string $moneda): array
+    {
+        $devolucion = is_array($cargo['refund'] ?? null) ? $cargo['refund'] : [];
+        $id = (string) ($devolucion['id'] ?? '');
+        if ($id === '' || ! in_array((string) ($devolucion['status'] ?? 'completed'), ['completed', ''], true)) {
+            return [];
+        }
+
+        return [[
+            'id' => $id,
+            'monto_minor' => MontoDecimal::aCentavos((float) ($devolucion['amount'] ?? 0)),
+            'moneda' => strtoupper((string) ($devolucion['currency'] ?? $cargo['currency'] ?? $moneda)),
+            'llave' => null,
+        ]];
     }
 
     /**

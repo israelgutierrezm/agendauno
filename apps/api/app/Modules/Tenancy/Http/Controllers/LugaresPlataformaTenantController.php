@@ -134,9 +134,13 @@ class LugaresPlataformaTenantController
      * Lo que falta marcar en el panel de Fitpass: asistencias e inasistencias de las
      * últimas 48 horas (después Fitpass ya no acepta cambios y de eso depende su pago).
      */
-    public function porMarcar(): JsonResponse
+    public function porMarcar(Request $request): JsonResponse
     {
+        $usuario = $this->usuario($request);
+
+        // Solo las de las clases que puede operar quien las marca (sus sedes, R19).
         return response()->json(['data' => $this->reservas->porMarcarEnPlataforma(ProveedorPartner::Fitpass)
+            ->filter(fn (LugarPlataformaTenant $l): bool => $l->sesion instanceof SesionTenant && $this->acceso->puedeOperar($l->sesion, $usuario))
             ->map(static fn (LugarPlataformaTenant $l): array => [
                 'id' => $l->ulid,
                 'reservacion' => substr((string) $l->referencia_externa, strlen(ReservasPlataformaTenant::referencia(ProveedorPartner::Fitpass, ''))),

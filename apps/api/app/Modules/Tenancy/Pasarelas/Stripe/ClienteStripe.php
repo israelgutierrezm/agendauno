@@ -411,6 +411,30 @@ class ClienteStripe
     }
 
     /**
+     * Las devoluciones de un cobro (las pedidas desde aquí y las hechas en el panel de
+     * Stripe), con su estado (`succeeded`, `pending`, `failed`, `canceled`…) y la llave
+     * con que se pidió, si fue desde aquí (metadata `reembolso`).
+     *
+     * @return list<array{id: string, monto_minor: int, moneda: string, estado: string, llave: string|null}>
+     */
+    public function reembolsosDeIntent(string $paymentIntent): array
+    {
+        /** @var array{data?: list<array{id?: string, amount?: int, currency?: string, status?: string, metadata?: array<string, string>}>} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/refunds', ['payment_intent' => $paymentIntent, 'limit' => 100])
+            ->throw()
+            ->json();
+
+        return array_map(static fn (array $r): array => [
+            'id' => (string) ($r['id'] ?? ''),
+            'monto_minor' => (int) ($r['amount'] ?? 0),
+            'moneda' => strtoupper((string) ($r['currency'] ?? '')),
+            'estado' => (string) ($r['status'] ?? ''),
+            'llave' => isset($r['metadata']['reembolso']) ? (string) $r['metadata']['reembolso'] : null,
+        ], $json['data'] ?? []);
+    }
+
+    /**
      * Vence una sesión de Checkout abierta. Devuelve su estado final: `expired` (ya
      * no se puede pagar) o `complete` (ya se pagó).
      */

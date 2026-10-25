@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
@@ -346,6 +347,129 @@ class ReembolsarPagoTenant
     }
 
     /**
+     * Una devolución YA HECHA que la pasarela reporta de un cobro (por su aviso o al
+     * conciliar): si es una de las que pidió la plataforma, se concilia; si no, se hizo
+     * en el panel de la pasarela y se registra ({@see self::registrarExterna()}).
+     */
+    public function desdeLaPasarela(PagoTenant $pago, string $referencia, int $montoMinor, string $moneda, ?string $llave = null): ?ReembolsoTenant
+    {
+        return $this->conciliar($referencia, true, $llave) ?? $this->registrarExterna($pago, $referencia, $montoMinor, $moneda);
+    }
+
+    /**
+     * Una devolución hecha directo en el panel de la pasarela (no desde aquí): se
+     * registra como devolución del pago, una sola vez por su id en la pasarela.
+     *
+     * - Si es una que pidió la plataforma y quedó sin su id (la pasarela no respondió o
+     *   la dejó pendiente), por el mismo monto, se completa esa en vez de crear otra.
+     * - Tiene el efecto de una devolución desde el panel: el pago queda devuelto (total o
+     *   en parte), cuenta en el corte y los reportes, y lo comprado se revierte como lo
+     *   haría el panel (proporcional en una parcial; en la que deja todo devuelto, se
+     *   cancela la venta). Sin revertir, como el panel, en una renovación o un cobro doble.
+     * - Si el panel no lo habría permitido (algo de lo comprado ya se usó, o es una cita
+     *   que sigue en pie, o devolvió más de lo que quedaba), solo cuenta el dinero y queda
+     *   una incidencia para que el negocio decida.
+     * - En otra moneda que el pago no se registra: queda la incidencia.
+     */
+    public function registrarExterna(PagoTenant $pago, string $referencia, int $montoMinor, string $moneda): ?ReembolsoTenant
+    {
+        if ($referencia === '' || $montoMinor <= 0) {
+            return null;
+        }
+        $registrada = ReembolsoTenant::query()->where('referencia_externa', $referencia)->first();
+        if ($registrada instanceof ReembolsoTenant) {
+            return $registrada;
+        }
+
+        return DB::connection('tenant')->transaction(function () use ($pago, $referencia, $montoMinor, $moneda): ?ReembolsoTenant {
+            $bloqueado = $this->bloquearOrdenYPago((int) $pago->getKey());
+            $registrada = ReembolsoTenant::query()->where('referencia_externa', $referencia)->first();
+            if ($registrada instanceof ReembolsoTenant) {
+                return $registrada;
+            }
+            $pasarela = self::nombrePasarela((string) $bloqueado->proveedor);
+            $dinero = DatosDeOrden::dinero($montoMinor, strtoupper($moneda));
+
+            // Una que pidió la plataforma y quedó sin confirmar, por el mismo monto: es esta.
+            $propia = $bloqueado->reembolsos()
+                ->whereIn('estado', [EstadoReembolso::Solicitado->value, EstadoReembolso::Pendiente->value, EstadoReembolso::Incierto->value])
+                ->whereNull('referencia_externa')
+                ->where('monto_minor', $montoMinor)
+                ->orderBy('id')
+                ->first();
+            if ($propia instanceof ReembolsoTenant) {
+                $this->resolver($propia, EstadoReembolso::Aprobado, $referencia, null, null);
+
+                return $propia->refresh();
+            }
+
+            if (strtoupper($moneda) !== strtoupper((string) $bloqueado->moneda)
+                || ! in_array($bloqueado->estado, [EstadoPago::Aprobado, EstadoPago::ParcialmenteReembolsado, EstadoPago::Reembolsado], true)) {
+                $this->incidencias->porPago(
+                    IncidenciaCobroTenant::DEVOLUCION_EXTERNA,
+                    $bloqueado,
+                    "{$pasarela} avisó una devolución de {$dinero} hecha en su panel que no cuadra con este pago (otra moneda o un pago sin cobrar). Revísala en {$pasarela}.",
+                    ['referencia' => $referencia, 'monto_minor' => $montoMinor, 'moneda' => strtoupper($moneda)],
+                );
+
+                return null;
+            }
+
+            $comprometido = (int) $bloqueado->reembolsos()->whereIn('estado', EstadoReembolso::comprometidos())->sum('monto_minor');
+            $restante = (int) $bloqueado->monto_minor - $comprometido;
+            $orden = $bloqueado->orden;
+            // Como el panel: una renovación o un cobro doble solo devuelven dinero.
+            $soloDinero = $orden === null || $orden->renueva_acuerdo_id !== null
+                || PagoTenant::query()->where('orden_id', $orden->getKey())->whereKeyNot($bloqueado->getKey())
+                    ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+                    ->exists();
+            $completa = $montoMinor >= $restante;
+            $porque = match (true) {
+                $montoMinor > $restante => 'devolvió más de lo que quedaba por devolver de este pago',
+                $soloDinero || ! $completa => null,
+                $this->derechos->algunoUsado($orden) => 'lo que compró ya se usó',
+                $this->citaVigente($orden) => 'su cita sigue en pie',
+                default => null,
+            };
+            $revertir = ! $soloDinero && $porque === null;
+
+            $reembolso = $bloqueado->reembolsos()->create([
+                'monto_minor' => $montoMinor,
+                'moneda' => $bloqueado->moneda,
+                'estado' => EstadoReembolso::Solicitado->value,
+                'proveedor' => $bloqueado->proveedor,
+                'motivo' => "Devuelta desde el panel de {$pasarela}.",
+                'revirtio_creditos' => false,
+                'referencia_externa' => $referencia,
+                'actor_nombre' => $pasarela,
+                'metadata' => [
+                    'parcial' => ! $completa,
+                    'total' => $montoMinor === (int) $bloqueado->monto_minor && $comprometido === 0,
+                    'via' => 'pasarela_externa',
+                    'revertir_creditos' => $revertir,
+                    'revertir_pedido' => $revertir,
+                ],
+            ]);
+            $this->aplicarAprobado($bloqueado, $reembolso, null);
+            app(RegistrarAuditoria::class)->registrar(null, 'pago.reembolso_externo', 'pago', (string) $bloqueado->ulid, null, [
+                'reembolso' => $reembolso->ulid, 'monto_minor' => $montoMinor, 'moneda' => $bloqueado->moneda,
+                'referencia' => $referencia, 'revertir_creditos' => $revertir,
+            ], "Devuelta desde el panel de {$pasarela}.");
+
+            if ($porque !== null) {
+                $this->incidencias->porReembolso(
+                    IncidenciaCobroTenant::DEVOLUCION_EXTERNA,
+                    $reembolso,
+                    "Se devolvieron {$dinero} desde el panel de {$pasarela}, pero {$porque}: lo que compró sigue vigente. Decide si lo cancelas o si le cobras la diferencia.",
+                    ['referencia' => $referencia, 'monto_minor' => $montoMinor],
+                );
+            }
+
+            return $reembolso->refresh();
+        });
+    }
+
+    /**
      * ¿Se puede volver a pedir a la pasarela sin riesgo de devolver dos veces?
      */
     public function reintentable(ReembolsoTenant $reembolso): bool
@@ -586,16 +710,31 @@ class ReembolsarPagoTenant
      */
     private function exigirCitaCancelada(OrdenTenant $orden): void
     {
-        $vigente = ReservaTenant::query()
-            ->where(fn ($q) => $q->where('orden_id', $orden->getKey())->orWhere('saldo_orden_id', $orden->getKey()))
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
-            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
-            ->exists();
-        if ($vigente) {
+        if ($this->citaVigente($orden)) {
             throw new PagoNoReembolsable(app(ModalidadNegocioTenant::class)->esCitas()
                 ? 'Cancela la cita primero; después devuelve el pago.'
                 : 'Cancela la reserva de la clase primero; después devuelve el pago.');
         }
+    }
+
+    /** ¿La orden es de una cita (o clase de pago suelto) confirmada o apartada que no ha empezado? */
+    private function citaVigente(OrdenTenant $orden): bool
+    {
+        return ReservaTenant::query()
+            ->where(fn ($q) => $q->where('orden_id', $orden->getKey())->orWhere('saldo_orden_id', $orden->getKey()))
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
+            ->exists();
+    }
+
+    private static function nombrePasarela(string $proveedor): string
+    {
+        return match ($proveedor) {
+            'stripe' => 'Stripe',
+            'mercadopago' => 'Mercado Pago',
+            'openpay' => 'OpenPay',
+            default => 'la pasarela',
+        };
     }
 
     private function contexto(PagoTenant $pago, ?Usuario $actor): ContextoMovimiento
