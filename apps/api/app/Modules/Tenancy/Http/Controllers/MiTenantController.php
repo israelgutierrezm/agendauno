@@ -437,7 +437,11 @@ class MiTenantController
             throw new SesionNoReservable('Esta cita es privada.');
         }
 
-        return response()->json(['data' => $antes->deClase($sesion, $persona)]);
+        return response()->json(['data' => [
+            ...$antes->deClase($sesion, $persona),
+            // Clase en línea: la app no la vende (ADR 0211).
+            'en_linea' => trim((string) $sesion->oferta?->enlace_en_linea) !== '',
+        ]]);
     }
 
     public function reservar(Request $request): JsonResponse
@@ -1145,6 +1149,11 @@ class MiTenantController
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
         abort_unless($this->ordenesDe($request, $persona)->whereKey($orden->getKey())->exists(), 403, 'Esta orden no es tuya.');
 
+        // Lo digital (una clase en línea) no se paga desde la app de las tiendas (ADR 0211).
+        if ($request->hasHeader('X-App-Producto') && self::esDigital($orden)) {
+            throw ValidationException::withMessages(['orden' => ['Este pago no se hace desde la app.']]);
+        }
+
         // El resto de una cita se paga después del anticipo: con el anticipo se aparta.
         if (self::restosConAnticipoSinPagar([(int) $orden->getKey()]) !== []) {
             throw ValidationException::withMessages([
@@ -1158,6 +1167,9 @@ class MiTenantController
             'metodo' => ['nullable', Rule::in([MetodoPago::Tarjeta->value, MetodoPago::Oxxo->value, MetodoPago::Spei->value])],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
             'domiciliar' => ['sometimes', 'boolean'],
+            // Desde la app (ADR 0211): el esquema propio con el que la página de regreso
+            // devuelve a la app (`agendauno`, `turnouno` o el de una marca blanca).
+            'volver_app' => ['nullable', 'string', 'regex:/^[a-z][a-z0-9.+-]{2,40}$/', Rule::notIn(['http', 'https', 'javascript', 'data', 'file', 'mailto', 'tel', 'intent', 'blob', 'about'])],
         ]);
         // Sin proveedor, la pasarela en línea con la que cobra el estudio.
         $validado['proveedor'] = ($validado['proveedor'] ?? '') !== '' ? $validado['proveedor'] : $this->pasarelas->enLinea();
@@ -1196,7 +1208,13 @@ class MiTenantController
 
         // El propio alumno paga en línea: queda como quien registró el cobro.
         $alumno = $request->attributes->get('usuario_tenant');
-        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/mi-cuenta/pagos', $alumno instanceof Usuario ? $alumno : null);
+        // Desde la app se vuelve a una página pública (en el navegador no hay sesión) que
+        // confirma el pago y ofrece regresar a la app.
+        $volverApp = (string) ($validado['volver_app'] ?? '');
+        $retorno = $volverApp !== ''
+            ? '/pago-app?'.http_build_query(['estudio' => $this->estudioDe($request)->slug, 'app' => $volverApp])
+            : '/mi-cuenta/pagos';
+        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, $retorno, $alumno instanceof Usuario ? $alumno : null);
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,
@@ -1205,6 +1223,15 @@ class MiTenantController
             'checkout' => $pago->checkout,
             'orden' => $this->presentarOrden($orden->refresh()),
         ]], 201);
+    }
+
+    /** ¿Es el pago de una clase en línea (contenido digital para las tiendas)? */
+    private static function esDigital(OrdenTenant $orden): bool
+    {
+        $sesion = $orden->sesion;
+
+        return $sesion instanceof SesionTenant && ! $sesion->esCita()
+            && trim((string) $sesion->oferta?->enlace_en_linea) !== '';
     }
 
     /**
@@ -1239,6 +1266,8 @@ class MiTenantController
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
             // Se renueva (membresía o su renovación): se puede pagar con pago automático.
             'recurrente' => self::seRenueva($orden),
+            // Una clase en línea: la app no la cobra (ADR 0211).
+            'digital' => self::esDigital($orden),
             // Ya inició un pago en línea que espera confirmación (p. ej. OXXO): se dice
             // para no pagar dos veces (M07).
             'pago_en_proceso' => $orden->estado === EstadoOrden::Pendiente ? self::pagoEnProceso($orden) : null,

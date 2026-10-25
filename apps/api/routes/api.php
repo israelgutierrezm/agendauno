@@ -404,6 +404,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/activar', [AuthTenantController::class, 'activar'])->middleware('throttle:login')->name('activar');
         // Reenvío del correo de activación (público: el dueño aún no puede entrar).
         Route::post('/reenviar-activacion', [AuthTenantController::class, 'reenviarActivacion'])->middleware('throttle:login')->name('reenviar-activacion');
+        // Abrir la web con la sesión de la app (ADR 0211): canjea el enlace de un solo uso.
+        Route::post('/enlace-web/canjear', [AuthTenantController::class, 'canjearEnlaceWeb'])->middleware('throttle:login')->name('enlace-web.canjear');
         Route::post('/recuperar-contrasena', [AuthTenantController::class, 'recuperarContrasena'])->middleware('throttle:recuperacion')->name('recuperar-contrasena');
         Route::post('/restablecer-contrasena', [AuthTenantController::class, 'restablecerContrasena'])->middleware('throttle:recuperacion')->name('restablecer-contrasena');
         Route::post('/confirmar-correo', [AuthTenantController::class, 'confirmarCorreo'])->middleware('throttle:login')->name('confirmar-correo');
@@ -479,6 +481,9 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
             Route::put('/yo/rol-activo', [AuthTenantController::class, 'rolActivo'])->name('yo.rol-activo');
+            // Eliminar la cuenta propia (ADR 0211) y abrir la web desde la app.
+            Route::post('/yo/eliminar-cuenta', [AuthTenantController::class, 'eliminarCuenta'])->middleware('throttle:confirmar-contrasena')->name('yo.eliminar-cuenta');
+            Route::post('/yo/enlace-web', [AuthTenantController::class, 'enlaceWeb'])->middleware('throttle:10,1,enlace-web')->name('yo.enlace-web');
             // Conectar o quitar Google para entrar con él (ADR 0093: Google no registra).
             Route::put('/yo/google', [AuthTenantController::class, 'conectarGoogle'])->middleware('throttle:login')->name('yo.google.conectar');
             Route::delete('/yo/google', [AuthTenantController::class, 'desconectarGoogle'])->name('yo.google.desconectar');

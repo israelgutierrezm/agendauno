@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\ActivacionPropietario;
 use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
+use App\Modules\Tenancy\Application\EliminarCuentaPropiaTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
@@ -26,6 +27,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -228,6 +230,79 @@ class AuthTenantController
         return response()->json(['data' => [
             'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($this->estudioDe($request)),
+        ]]);
+    }
+
+    /**
+     * Elimina la cuenta propia (ADR 0211), confirmando con la contraseña: la piden
+     * Apple y Google para cualquier rol. Quien entra solo con Google crea antes una
+     * contraseña con «¿Olvidaste tu contraseña?».
+     */
+    public function eliminarCuenta(Request $request, EliminarCuentaPropiaTenant $eliminar): JsonResponse
+    {
+        $usuario = $this->usuarioTenant($request);
+        abort_unless($usuario instanceof Usuario, 401);
+        $validado = $request->validate([
+            'password' => ['required', 'string', 'max:255'],
+            'motivo' => ['nullable', 'string', 'max:500'],
+        ]);
+        if ($usuario->password === null) {
+            throw ValidationException::withMessages(['password' => ['Entras con Google y aún no tienes contraseña: créala con «¿Olvidaste tu contraseña?» y vuelve a intentarlo.']]);
+        }
+        if (! Hash::check((string) $validado['password'], (string) $usuario->password)) {
+            throw ValidationException::withMessages(['password' => ['La contraseña no coincide.']]);
+        }
+        $motivo = trim((string) ($validado['motivo'] ?? ''));
+        $estado = $eliminar->ejecutar($usuario, $motivo !== '' ? $motivo : null);
+
+        return response()->json(['data' => [
+            'estado' => $estado,
+            'mensaje' => $estado === EliminarCuentaPropiaTenant::SOLICITADA
+                ? 'Tu cuenta quedó eliminada y ya no puedes entrar. El negocio borra tus datos en el plazo que marca la ley y solo conserva lo que está obligado a guardar (pagos y facturas).'
+                : 'Tu cuenta quedó eliminada y ya no puedes entrar.',
+        ]]);
+    }
+
+    /**
+     * Un enlace de un solo uso para abrir la web con esta sesión (ADR 0211): desde la
+     * app, lo que se hace en la web sin volver a escribir la contraseña. El destino es
+     * una ruta de la web (nunca otro sitio).
+     */
+    public function enlaceWeb(Request $request): JsonResponse
+    {
+        $usuario = $this->usuarioTenant($request);
+        abort_unless($usuario instanceof Usuario, 401);
+        $validado = $request->validate([
+            // Una ruta de la web: empieza con una sola «/» (no «//otro.sitio» ni «/\»).
+            'destino' => ['required', 'string', 'max:300', 'regex:#^/(?![/\\\\])\S*$#'],
+        ]);
+        $estudio = $this->estudioDe($request);
+        $codigo = $this->auth->crearEnlaceWeb((string) $estudio->slug, $usuario, (string) $validado['destino']);
+
+        return response()->json(['data' => [
+            'url' => MarcaProducto::urlWeb($estudio).'/entrar?'.http_build_query(['estudio' => $estudio->slug, 'enlace' => $codigo]),
+            'vence_en' => now()->addMinutes(AutenticacionTenant::MINUTOS_ENLACE_WEB)->toIso8601String(),
+        ]], 201);
+    }
+
+    /**
+     * Canjea el enlace de un solo uso por una sesión de la web, con el rol con que
+     * estaba en la app y a dónde iba.
+     */
+    public function canjearEnlaceWeb(Request $request): JsonResponse
+    {
+        $estudio = $this->estudioDe($request);
+        $validado = $request->validate(['codigo' => ['required', 'string', 'max:100']]);
+        $canje = $this->auth->canjearEnlaceWeb((string) $estudio->slug, (string) $validado['codigo']);
+        if ($canje === null) {
+            throw ValidationException::withMessages(['codigo' => ['El enlace ya se usó o venció. Ábrelo otra vez desde la app.']]);
+        }
+
+        return response()->json(['data' => [
+            'token' => $this->auth->emitir($canje['usuario'], 'web', $canje['rol']),
+            'usuario' => UsuarioTenantPresenter::datos($canje['usuario']),
+            'estudio' => $this->presentarEstudio($estudio),
+            'destino' => $canje['destino'],
         ]]);
     }
 

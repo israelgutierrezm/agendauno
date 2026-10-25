@@ -94,3 +94,23 @@ it('en producción solo admite los sitios del negocio con https y en el puerto d
     'un dominio que termina igual' => ['https://falsoagendauno.mx', 'https://agendauno.mx'],
     'dos niveles de subdominio' => ['https://a.b.agendauno.mx', 'https://agendauno.mx'],
 ]);
+
+it('desde la app vuelve a la página pública de regreso con el negocio y el esquema de la app', function (): void {
+    $c = compraDelClienteParaRetorno();
+
+    test()->postJson("/api/v1/app/{$c['slug']}/mi/ordenes/{$c['orden']}/cobrar", [
+        'proveedor' => 'stripe', 'metodo' => 'tarjeta', 'volver_app' => 'agendauno',
+    ], conBearer($c['cliente']))->assertCreated();
+
+    Http::assertSent(fn (PeticionSaliente $r): bool => str_ends_with($r->url(), '/checkout/sessions')
+        && str_starts_with((string) $r['success_url'], 'https://agendauno.mx/pago-app?estudio=estudio-a&app=agendauno&pago=exito&ref_pago=')
+        && $r['cancel_url'] === 'https://agendauno.mx/pago-app?estudio=estudio-a&app=agendauno&pago=cancelado');
+});
+
+it('no acepta un esquema de regreso que no sea el de una app', function (string $esquema): void {
+    $c = compraDelClienteParaRetorno();
+
+    test()->postJson("/api/v1/app/{$c['slug']}/mi/ordenes/{$c['orden']}/cobrar", [
+        'proveedor' => 'stripe', 'metodo' => 'tarjeta', 'volver_app' => $esquema,
+    ], conBearer($c['cliente']))->assertUnprocessable()->assertJsonValidationErrors(['volver_app'], 'meta.errors');
+})->with(['javascript', 'https', 'Agenda Uno', 'x']);

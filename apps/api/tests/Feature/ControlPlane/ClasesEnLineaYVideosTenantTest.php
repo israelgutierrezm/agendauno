@@ -69,3 +69,23 @@ it('los videos se ven con el plan que los incluye; de los demás, solo el títul
     $recep = conBearer(personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista'));
     $this->postJson("{$app}/videos", ['titulo' => 'X', 'url' => 'https://x.mx'], $recep)->assertForbidden();
 });
+
+it('una clase en línea de pago se marca digital y no se cobra desde la app de las tiendas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    activarCobroEnLinea($e);
+    $semilla = agendaSemilla($e);
+    $app = "/api/v1/app/{$e['slug']}";
+    $this->putJson("{$app}/ofertas/{$semilla['oferta']}", [
+        'lugares' => 0, 'enlace_en_linea' => 'https://zoom.us/j/123', 'politica_reserva' => 'pago', 'precio_clase_minor' => 15000,
+    ], conBearer($e['bearer']))->assertOk();
+    $clase = crearSesionTenant($e, $semilla, 10, '2026-10-02 08:00:00');
+    $alumna = alumnoConSesion($e);
+
+    $this->getJson("{$app}/mi/sesiones/{$clase}/antes-de-reservar", conBearer($alumna['bearer']))->assertOk()->assertJsonPath('data.en_linea', true);
+    $this->postJson("{$app}/mi/reservas", ['sesion_id' => $clase], conBearer($alumna['bearer']))->assertCreated();
+    $orden = collect($this->getJson("{$app}/mi/ordenes/pendientes", conBearer($alumna['bearer']))->assertOk()->json('data'))->first();
+    expect($orden['digital'])->toBeTrue();
+
+    $this->postJson("{$app}/mi/ordenes/{$orden['id']}/cobrar", ['proveedor' => 'stripe', 'metodo' => 'tarjeta'], [...conBearer($alumna['bearer']), 'X-App-Producto' => 'agendauno'])
+        ->assertUnprocessable()->assertJsonPath('meta.errors.orden.0', 'Este pago no se hace desde la app.');
+});

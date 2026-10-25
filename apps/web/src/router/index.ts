@@ -89,6 +89,18 @@ const router = createRouter({
       component: () => import("@/views/PoliticaCookiesView.vue"),
     },
     {
+      // Cómo eliminar la cuenta (ADR 0211): la página pública que piden las tiendas.
+      path: "/eliminar-cuenta",
+      name: "eliminar-cuenta",
+      component: () => import("@/views/EliminarCuentaView.vue"),
+    },
+    {
+      // Regreso de un pago iniciado en la app (ADR 0211): pública, ofrece volver.
+      path: "/pago-app",
+      name: "pago-app",
+      component: () => import("@/views/PagoAppView.vue"),
+    },
+    {
       // Un widget en la web del negocio (calendario o planes; ADR 0141): sin encabezado.
       path: "/w/:slug/:widget",
       name: "widget",

@@ -389,6 +389,49 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   }
 
   /**
+   * Entra con el enlace de un solo uso que abrió la app (ADR 0211): la sesión de la
+   * app, con su rol (no se vuelve a elegir). Devuelve a dónde iba.
+   */
+  async function iniciarSesionConEnlace(
+    slugEstudio: string,
+    codigo: string,
+  ): Promise<string> {
+    cargando.value = true;
+    error.value = null;
+    try {
+      const { data } = await api.post<{
+        data: RespuestaAuth & { destino: string };
+      }>(`/api/v1/app/${slugEstudio}/enlace-web/canjear`, { codigo });
+      establecer(data.data);
+      confirmarRolInicial();
+      return data.data.destino;
+    } catch (e) {
+      error.value = mensajeDeError(
+        e,
+        i18n.global.t("validacion.sesion.entrar"),
+      );
+      throw e;
+    } finally {
+      cargando.value = false;
+    }
+  }
+
+  /**
+   * Elimina la cuenta propia (ADR 0211), confirmando con la contraseña; la sesión
+   * se olvida aquí. Devuelve el mensaje para la persona.
+   */
+  async function eliminarCuenta(
+    password: string,
+    motivo: string | null,
+  ): Promise<string> {
+    const { data } = await api.post<{
+      data: { estado: string; mensaje: string };
+    }>(`/api/v1/app/${slug.value}/yo/eliminar-cuenta`, { password, motivo });
+    olvidarSesion();
+    return data.data.mensaje;
+  }
+
+  /**
    * Conecta (o quita) Google a la cuenta con la que se entró: desde entonces puede
    * entrar con Google. Google no crea cuentas (ADR 0093).
    */
@@ -610,6 +653,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     terminologia,
     iniciarSesion,
     iniciarSesionConGoogle,
+    iniciarSesionConEnlace,
+    eliminarCuenta,
     activar,
     restablecerContrasena,
     cargarYo,

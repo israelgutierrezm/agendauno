@@ -6,6 +6,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
+import EliminarMiCuenta from "@/components/EliminarMiCuenta.vue";
 import ComprasMostrador from "@/components/ComprasMostrador.vue";
 import ConectarCalendarios from "@/components/ConectarCalendarios.vue";
 import DatosFacturacionCliente from "@/components/DatosFacturacionCliente.vue";
@@ -981,6 +982,15 @@ const aparienciaAbierta = ref(false);
 
       <!-- Lo que compró en el mostrador (ADR 0145); el alumno lo ve en Pagos. -->
       <ComprasMostrador v-if="!mostrarPrivacidad" class="mp-bloque" />
+
+      <!-- Eliminar la cuenta propia (ADR 0211): cualquier rol. -->
+      <section
+        id="mp-eliminar-cuenta"
+        class="tu-card mp-bloque"
+        aria-label="Eliminar mi cuenta"
+      >
+        <EliminarMiCuenta />
+      </section>
     </template>
 
     <PanelApariencia

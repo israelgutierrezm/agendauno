@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     avisoSinConfirmar: null as string | null,
     volverTrasConfirmar: null as string | null,
     iniciarSesion: vi.fn(),
+    iniciarSesionConEnlace: vi.fn(),
     reintentarSesion: vi.fn(),
   },
   // El subdominio del negocio (`barberia.agendauno.mx`) o el dominio raíz.
@@ -303,6 +304,34 @@ describe("acceso por negocio", () => {
 
     expect(mocks.push).toHaveBeenCalledWith({ name: "panel" });
     expect(wrapper.findComponent(PanelRoles).props("abierto")).toBe(false);
+  });
+
+  it("abierto desde la app con un enlace de un solo uso entra y va a lo que se pidió (ADR 0211)", async () => {
+    mocks.route.query = { estudio: "pilates", enlace: "codigo-1" };
+    mocks.sesion.iniciarSesionConEnlace.mockResolvedValueOnce(
+      "/mi-cuenta/pago-automatico",
+    );
+    montar();
+    await flushPromises();
+    expect(mocks.sesion.iniciarSesionConEnlace).toHaveBeenCalledWith(
+      "pilates",
+      "codigo-1",
+    );
+    expect(mocks.replace).toHaveBeenCalledWith("/mi-cuenta/pago-automatico");
+  });
+
+  it("con un enlace vencido se queda en el formulario del negocio", async () => {
+    mocks.route.query = { estudio: "pilates", enlace: "usado" };
+    mocks.sesion.iniciarSesionConEnlace.mockRejectedValueOnce(
+      new Error("vencido"),
+    );
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Pilates Centro", logo_url: null } },
+    });
+    const wrapper = montar();
+    await flushPromises();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(wrapper.find("#email").exists()).toBe(true);
   });
 
   it("un enlace directo abre el formulario con la identidad del negocio", async () => {

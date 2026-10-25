@@ -134,6 +134,7 @@ import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
 import comunicacionPantalla from "./locales/comunicacionPantalla.es-MX";
 import datosFiscalesSat from "./locales/datosFiscalesSat.es-MX";
+import eliminarCuenta from "./locales/eliminarCuenta.es-MX";
 
 export const mensajesPanel = {
   adminUsabilidad,
@@ -257,4 +258,5 @@ export const mensajesPanel = {
   comunicacionesVisual,
   comunicacionPantalla,
   datosFiscalesSat,
+  eliminarCuenta,
 };

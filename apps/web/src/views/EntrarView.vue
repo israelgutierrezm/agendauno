@@ -345,7 +345,35 @@ async function entrarConGoogle(credential: string): Promise<void> {
   }
 }
 
+// Abierto desde la app con un enlace de un solo uso (ADR 0211): entra con esa sesión
+// y va a la pantalla que se pidió (solo una ruta de este negocio).
+async function entrarConEnlace(codigo: string): Promise<boolean> {
+  try {
+    const pedido = await sesion.iniciarSesionConEnlace(
+      slug.value.trim(),
+      codigo,
+    );
+    const seguro = volverSeguro(pedido, slug.value.trim() || null, (r) =>
+      router.resolve(r),
+    );
+    await router.replace(seguro ?? { name: sesion.rutaInicio });
+    return true;
+  } catch {
+    // El aviso del enlace vencido o usado queda en `sesion.error`.
+    return false;
+  }
+}
+
 onMounted(async () => {
+  const enlace = route.query.enlace;
+  if (
+    typeof enlace === "string" &&
+    enlace !== "" &&
+    slug.value.trim() !== "" &&
+    (await entrarConEnlace(enlace))
+  ) {
+    return;
+  }
   if (slug.value.trim() !== "") {
     await cargarMarca(slug.value, true);
     return;

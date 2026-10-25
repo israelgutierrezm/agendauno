@@ -97,6 +97,8 @@ class SesionTenantPresenter
             'lugares' => (int) ($sesion->oferta->lugares ?? 0),
             'de_pago' => $dePago,
             'precio_minor' => $dePago ? (int) ($sesion->oferta->precio_clase_minor ?? 0) : null,
+            // Clase en línea (con enlace): la app no la vende (ADR 0211).
+            'en_linea' => trim((string) $sesion->oferta?->enlace_en_linea) !== '',
         ];
     }
 

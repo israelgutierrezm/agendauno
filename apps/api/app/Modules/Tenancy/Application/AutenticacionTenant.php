@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Models\TokenAccesoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -96,6 +97,50 @@ class AutenticacionTenant
             ->where('tokenable_type', Usuario::class)
             ->where('tokenable_id', $usuario->getKey())
             ->delete();
+    }
+
+    /** Minutos que vale un enlace para abrir la web desde la app (ADR 0211). */
+    public const MINUTOS_ENLACE_WEB = 2;
+
+    /**
+     * Un código de un solo uso para abrir la web con la sesión de la app (ADR 0211):
+     * lo que se hace en la web (pago automático con OpenPay, conectar un calendario)
+     * sin volver a escribir la contraseña. Vale pocos minutos y solo se guarda su hash.
+     */
+    public function crearEnlaceWeb(string $estudio, Usuario $usuario, string $destino): string
+    {
+        $codigo = Str::random(48);
+        Cache::put(self::claveEnlace($estudio, $codigo), [
+            'usuario' => $usuario->getKey(),
+            'rol' => $usuario->rolActivo(),
+            'destino' => $destino,
+        ], now()->addMinutes(self::MINUTOS_ENLACE_WEB));
+
+        return $codigo;
+    }
+
+    /**
+     * Canjea el código (una sola vez): el usuario, el rol con que estaba y a dónde iba.
+     *
+     * @return array{usuario: Usuario, rol: string|null, destino: string}|null
+     */
+    public function canjearEnlaceWeb(string $estudio, #[\SensitiveParameter] string $codigo): ?array
+    {
+        $datos = Cache::pull(self::claveEnlace($estudio, $codigo));
+        if (! is_array($datos)) {
+            return null;
+        }
+        $usuario = Usuario::query()->find($datos['usuario'] ?? null);
+        if (! $usuario instanceof Usuario || ! $usuario->activo) {
+            return null;
+        }
+
+        return ['usuario' => $usuario, 'rol' => isset($datos['rol']) ? (string) $datos['rol'] : null, 'destino' => (string) ($datos['destino'] ?? '/')];
+    }
+
+    private static function claveEnlace(string $estudio, string $codigo): string
+    {
+        return 'enlace-web:'.$estudio.':'.hash('sha256', $codigo);
     }
 
     /** El token vigente que corresponde al valor en claro, o null. */
