@@ -233,9 +233,25 @@ const enLista = computed(() =>
   }
 }
 @media (max-width: 480px) {
+  /* La frase va centrada en dos renglones y la pausa, centrada debajo. */
+  .negocios-animados {
+    flex-direction: column;
+  }
   .negocios-frase {
     flex-direction: column;
     align-items: center;
+  }
+  .negocios-escenario {
+    padding-right: 0;
+  }
+  .negocios-texto {
+    justify-self: center;
+  }
+  .negocios-control {
+    order: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: 0.15rem 0 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
