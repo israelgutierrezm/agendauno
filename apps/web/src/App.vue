@@ -555,7 +555,10 @@ onMounted(() => {
   <!-- Confirmaciones dentro de la app (lib/confirmar.ts). -->
   <DialogoConfirmar />
   <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />
+  <!-- En una página comercial solo si toca abrirlo: sus textos son del panel y la
+       landing no los descarga (ADR 0210). -->
   <PanelRoles
+    v-if="route.meta.marketing !== true || menuRoles || rolPorElegir"
     :abierto="menuRoles || rolPorElegir"
     :al-entrar="rolPorElegir && !menuRoles"
     @cerrar="menuRoles = false"

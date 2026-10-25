@@ -5,6 +5,7 @@ import {
 } from "vue-router";
 
 import ModalidadView from "@/views/ModalidadView.vue";
+import { cargarMensajesPanel } from "@/i18n";
 import { analyticsPath, trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
 import {
@@ -719,6 +720,14 @@ router.beforeEach((to) => {
     );
   }
   referrerDeLaCarga = "";
+});
+
+// Los textos del panel llegan aparte (ADR 0210): las páginas comerciales no los
+// necesitan; cualquier otra pantalla los espera antes de pintarse.
+router.beforeEach(async (to) => {
+  if (to.meta.marketing !== true) {
+    await cargarMensajesPanel();
+  }
 });
 
 router.beforeEach(async (to) => {

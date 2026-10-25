@@ -9,7 +9,8 @@ import { estadoConfirmar, responderConfirmar } from "@/lib/confirmar";
  * "Cancelar" y el botón que confirma. Con el contrato de botones (style.css) solo hay
  * dos formas de confirmar: el primario del tema o, si la acción es destructiva, el
  * sólido de peligro. Los demás tonos (completar, regresar) confirman con el primario.
- * Se monta una sola vez.
+ * Se monta una sola vez. Su título se pide solo abierto: cerrado, en una página
+ * comercial, no pide los textos del panel (ADR 0210).
  */
 onMounted(() => (estadoConfirmar.montado = true));
 onUnmounted(() => {
@@ -21,7 +22,7 @@ onUnmounted(() => {
 <template>
   <ModalDialogo
     :abierto="estadoConfirmar.abierto"
-    :titulo="$t('operacion.confirmar.titulo')"
+    :titulo="estadoConfirmar.abierto ? $t('operacion.confirmar.titulo') : ''"
     tam="md"
     @cerrar="responderConfirmar(false)"
   >
