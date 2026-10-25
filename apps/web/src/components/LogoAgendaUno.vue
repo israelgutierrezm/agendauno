@@ -31,6 +31,17 @@ const archivo = computed(() =>
       ? "logo"
       : "logo-slogan",
 );
+// Medidas de cada archivo (px): con ellas el navegador aparta su lugar antes de
+// descargarlo y la página no salta al cargar.
+const MEDIDAS: Record<string, [number, number]> = {
+  isotipo: [192, 170],
+  logo: [1275, 250],
+  "logo-slogan": [1375, 380],
+};
+const alto = computed(() => {
+  const [w, h] = MEDIDAS[archivo.value]!;
+  return Math.round((props.ancho * h) / w);
+});
 // El logo horizontal tiene versión blanca: en modo oscuro se usa esa, sin placa.
 const conVersionOscura = computed(
   () => props.adaptable && props.variante === "horizontal",
@@ -52,12 +63,18 @@ const conVersionOscura = computed(
       :class="{ 'agendauno-logo__imagen--clara': conVersionOscura }"
       :src="`${RUTA}/${archivo}.png`"
       :alt="alt"
+      :width="ancho"
+      :height="alto"
+      decoding="async"
     />
     <img
       v-if="conVersionOscura"
       class="agendauno-logo__imagen agendauno-logo__imagen--oscura"
       :src="`${RUTA}/logo-blanco.png`"
       :alt="alt"
+      :width="ancho"
+      :height="alto"
+      decoding="async"
     />
   </span>
 </template>
