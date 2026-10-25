@@ -22,10 +22,11 @@ real_ip_header ${CABECERA_IP_REAL};
 real_ip_recursive on;
 
 # La aplicación con la marca del dominio (ADR 0108): en TurnoUno y sus negocios, la de
-# su ícono y su nombre (app-turnouno.html); en lo demás, la de AgendaUno.
+# su ícono y su nombre (app-turnouno.html); en lo demás, la de AgendaUno. Con
+# `hostnames`, «.dominio» abarca el dominio y sus subdominios (repetir el dominio solo
+# es un error de nginx).
 map $host $app_html {
     hostnames;
-    ${DOMINIO_TURNOUNO} /app-turnouno.html;
     .${DOMINIO_TURNOUNO} /app-turnouno.html;
     default /app.html;
 }
