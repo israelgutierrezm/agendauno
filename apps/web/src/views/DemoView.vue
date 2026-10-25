@@ -31,7 +31,7 @@ const registro = computed(() => ({
 </script>
 
 <template>
-  <main class="dv-pagina" data-prueba="pagina-demo">
+  <section class="dv-pagina" data-prueba="pagina-demo">
     <section class="dv-texto">
       <h1 class="dv-titulo">{{ t("demoAgendable.pagina.titulo") }}</h1>
       <p class="mt-3 text-lg" :style="{ color: 'var(--texto-suave)' }">
@@ -72,7 +72,7 @@ const registro = computed(() => ({
         @minutos="(n) => (minutos = n)"
       />
     </section>
-  </main>
+  </section>
 </template>
 
 <style scoped>

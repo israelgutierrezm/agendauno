@@ -148,7 +148,7 @@ describe("precios públicos (ADR 0107)", () => {
       .find((b) => b.text().startsWith("Anual"))!;
     await anual.trigger("click");
     expect(vista.get('[data-prueba="anual-adelantado"]').text()).toBe(
-      "El plan anual se paga completo por adelantado: 10 meses por 12 de servicio.",
+      "El plan anual se paga completo por adelantado: 10 meses por 12 de servicio. Si cancelas, lo pagado no se reembolsa: el servicio sigue hasta el fin del año.",
     );
     expect(
       vista.findAll(".precio-importe strong").map((n) => n.text()),

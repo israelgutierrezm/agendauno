@@ -32,7 +32,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="mx-auto max-w-xl px-4 py-24 text-center">
+  <section class="mx-auto max-w-xl px-4 py-24 text-center">
     <h1 class="text-2xl font-semibold" data-prueba="demo-cancelar">
       {{ t(`demoAgendable.cancelar.${estado}`) }}
     </h1>
@@ -46,5 +46,5 @@ onMounted(async () => {
     <RouterLink to="/" class="tu-btn tu-btn-primario mt-8 inline-block">
       {{ t("demoAgendable.cancelar.volver") }}
     </RouterLink>
-  </main>
+  </section>
 </template>

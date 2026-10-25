@@ -34,7 +34,7 @@ describe("escritura de negocios del hero", () => {
     const vista = montar();
     expect(vista.get(".negocios-texto").text()).toBe("Pilates|");
     expect(vista.get(".sr-only").text()).toBe(
-      "Una agenda para Pilates, barberías.",
+      "Una agenda para Pilates y barberías.",
     );
     expect(vista.get(".negocios-frase").attributes("aria-hidden")).toBe("true");
     expect(vista.findAll(".negocios-medida")).toHaveLength(2);

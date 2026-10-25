@@ -113,6 +113,14 @@ const otra = computed(() => ({
 const nombreOtro = computed(
   () => PRODUCTOS[productoDeModalidad(contenido.value.otra)].nombre,
 );
+// Publicada, el enlace va a la portada del otro dominio (sin JavaScript y para los
+// buscadores, `/citas` en agendauno.mx caería en la aplicación sin indexar). En
+// desarrollo se queda en la misma, para verla.
+const otraUrl = computed(() =>
+  import.meta.env.PROD
+    ? `https://${PRODUCTOS[productoDeModalidad(contenido.value.otra)].dominio}/`
+    : null,
+);
 const conAsterisco = (textos: readonly string[]): boolean =>
   textos.some((texto) => texto.includes("*"));
 
@@ -587,7 +595,7 @@ function medirOtra(): void {
         </div>
         <!-- Cada tarjeta ya lleva su «Probar» y «Sin tarjeta»: sin repetirlo aquí. -->
         <PreciosLanding :modo="modo" />
-        <!-- Lo que reemplaza con un solo pago y lo que nadie más da (comparativo). -->
+        <!-- Lo que reemplaza con un solo pago y lo que incluye la suscripción. -->
         <h3 class="mt-14 text-xl font-semibold reveal">
           {{ t("landing.porQue.titulo") }}
         </h3>
@@ -729,7 +737,16 @@ function medirOtra(): void {
         <!-- Enlace discreto a la otra modalidad: cada negocio es de una sola. -->
         <p class="tu-modalidad-otra">
           {{ t(k("final.otra")) }}
+          <a
+            v-if="otraUrl"
+            :href="otraUrl"
+            class="inline-flex items-center gap-1"
+            @click="medirOtra"
+            >{{ t(k("final.otraEnlace"), { otro: nombreOtro }) }}
+            <IconoNav nombre="flecha" :tam="16"
+          /></a>
           <RouterLink
+            v-else
             :to="otra"
             class="inline-flex items-center gap-1"
             @click="medirOtra"

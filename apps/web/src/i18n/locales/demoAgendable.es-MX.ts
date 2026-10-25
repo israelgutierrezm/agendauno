@@ -102,7 +102,7 @@ export default {
     subtituloSinMinutos:
       "Una videollamada corta, gratis y sin compromiso. Cuéntanos de tu negocio y elige el horario.",
     puntos: {
-      uno: "Vemos tu operación: clases o citas, cobros y lo que hoy te quita tiempo.",
+      uno: "Vemos tu operación: tu agenda, tus cobros y lo que hoy te quita tiempo.",
       dos: "Te mostramos el sistema con tus casos, no una presentación genérica.",
       tres: "Resolvemos tus dudas de precio, migración y arranque.",
     },
@@ -147,10 +147,10 @@ export default {
       "1": "1",
       "2-4": "2 a 4",
       "5+": "5 o más",
-      en_linea: "Sin local (en línea o en varios estudios)",
+      en_linea: "Sin local propio (en línea o en otros espacios)",
     },
     objetivos: {
-      reservas: "Reservas en línea",
+      reservas: "Agenda en línea",
       cobros: "Cobros y pagos en línea",
       app: "App para mi público",
       asistencia: "Asistencia y acceso",

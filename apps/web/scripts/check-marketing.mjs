@@ -337,6 +337,17 @@ for (const { path: route, vista, modo, name, giro } of paginasMarketing) {
 assert.equal(titles.size, routes.length, "un título propio por página");
 // La aplicación (registro, entrar, panel…) nunca se indexa.
 const app = await readFile(resolve(root, "dist/app/app.html"), "utf8");
+// La de TurnoUno: su ícono y su nombre, nada de AgendaUno en la cabecera.
+const appTurnouno = await readFile(
+  resolve(root, "dist/app/app-turnouno.html"),
+  "utf8",
+);
+assert.ok(
+  appTurnouno.includes("<title>TurnoUno</title>") &&
+    appTurnouno.includes("/assets/pwa/turnouno-192.png") &&
+    !appTurnouno.includes("favicon.ico"),
+  "app-turnouno.html con el ícono y el nombre de TurnoUno",
+);
 assert.ok(app.includes('content="noindex,follow"'), "app.html sin indexar");
 assert.ok(!app.includes('rel="canonical"'), "app.html sin canonical");
 assert.ok(!app.includes("application/ld+json"), "app.html sin JSON-LD");

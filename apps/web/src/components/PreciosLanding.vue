@@ -280,7 +280,8 @@ function elegirModo(valor: Modo) {
           data-prueba="anual-adelantado"
         >
           El plan anual se paga completo por adelantado: {{ mesesAnual }} meses
-          por 12 de servicio.
+          por 12 de servicio. Si cancelas, lo pagado no se reembolsa: el
+          servicio sigue hasta el fin del año.
         </p>
       </template>
     </div>

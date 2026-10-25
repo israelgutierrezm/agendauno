@@ -305,10 +305,18 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
     "/entrar": "Iniciar sesión | AgendaUno",
     "/negocios": "Encuentra tu negocio | AgendaUno",
     "/activar": "Activa tu cuenta | AgendaUno",
+    // Adonde llevan los botones de demo de la landing (ADR 0204).
+    "/demo": "Agenda una demo | AgendaUno",
+  };
+  const descripciones: Record<string, string> = {
+    "/demo":
+      "Agenda una videollamada gratis para ver AgendaUno con los casos de tu negocio.",
   };
   return {
     title: titulos[ruta] ?? "AgendaUno",
-    description: "Accede a tu negocio y gestiona tu operación en AgendaUno.",
+    description:
+      descripciones[ruta] ??
+      "Accede a tu negocio y gestiona tu operación en AgendaUno.",
     index: false,
   };
 }

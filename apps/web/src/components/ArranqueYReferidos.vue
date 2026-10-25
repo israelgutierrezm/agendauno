@@ -7,14 +7,18 @@ import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 
 /**
  * Lo que se cobra aparte, con precio publicado (ADR 0188): el arranque acompañado
- * (gratis con el plan anual), la app en tiendas con tu marca y los referidos. Los
- * precios salen de `GET /api/v1/precios` (los fija el superadmin); sin respuesta, los
- * de respaldo.
+ * (gratis con el plan anual), la app con tu marca (solo en clases: la marca blanca es
+ * de AgendaUno, ADR 0111, y hoy solo en Google Play) y los referidos. Los precios salen
+ * de `GET /api/v1/precios` (los fija el superadmin); sin respuesta, los de respaldo.
  */
 const props = defineProps<{ modo: Modo }>();
 const precios = usePreciosPublicos();
 // El plan anual es de citas (por adelantado); en clases se paga mes vencido.
 const conAnual = computed(() => props.modo === "citas");
+// En citas no hay membresías: se migran los bonos (ADR 0130).
+const queMigramos = computed(() =>
+  props.modo === "citas" ? "saldos y bonos" : "saldos y membresías",
+);
 const queDejamos = computed(() =>
   props.modo === "citas"
     ? "listos tus servicios, tu equipo y su horario"
@@ -42,7 +46,7 @@ const meses = computed(() => precios.datos.referidos?.meses_gratis ?? 1);
         {{ pesosRedondos(s.arranque_minor) }} MXN + IVA, un solo pago
       </p>
       <p class="arranque-nota">
-        Con migración de tus clientes, saldos y membresías:
+        Con migración de tus clientes, {{ queMigramos }}:
         {{ pesosRedondos(s.arranque_migracion_minor) }} MXN + IVA.<template
           v-if="conAnual"
         >
@@ -51,11 +55,11 @@ const meses = computed(() => precios.datos.referidos?.meses_gratis ?? 1);
         Darte de alta tú mismo sigue sin costo.
       </p>
     </article>
-    <article>
+    <article v-if="modo !== 'citas'" data-prueba="app-con-tu-marca">
       <h3>Tu app con tu marca</h3>
       <p>
-        Tu propia app en Google Play y App Store, con tu nombre, tu logo y tus
-        colores. La app y la web de siempre siguen incluidas.
+        Tu propia app en Google Play, con tu nombre, tu logo y tus colores. Por
+        ahora solo para Android. La app y la web de siempre siguen incluidas.
       </p>
       <p class="arranque-precio">
         {{ pesosRedondos(s.app_marca_alta_minor) }} MXN de alta y

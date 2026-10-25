@@ -39,6 +39,30 @@ if (conCuerpo === app) {
   throw new Error('index.html no trae <div id="app"></div>.');
 }
 await writeFile(resolve(root, "dist/app/app.html"), conCuerpo);
+// La misma, con el ícono y el nombre de TurnoUno: nginx la sirve en turnouno.mx y en
+// sus negocios. Sin ella, la pestaña y la vista previa al compartir /registro o /demo
+// dirían AgendaUno. TurnoUno aún no tiene logotipo: usa sus íconos de la PWA, como su
+// landing (build-marketing.mjs).
+const ICONOS_TURNOUNO = [
+  '<link rel="icon" type="image/png" sizes="192x192" href="/assets/pwa/turnouno-192.png" />',
+  '<link rel="icon" type="image/png" sizes="512x512" href="/assets/pwa/turnouno-512.png" />',
+  '<link rel="apple-touch-icon" href="/assets/pwa/turnouno-192.png" />',
+];
+const sinIconos = conCuerpo.replace(
+  /\s*<link\b[^>]*\brel="(?:icon|apple-touch-icon)"[^>]*>/g,
+  "",
+);
+const charset = /<meta charset="[^"]*"\s*\/?>/i;
+if (!charset.test(sinIconos)) {
+  throw new Error("index.html sin <meta charset>: ¿dónde van los íconos?");
+}
+const turnouno = sinIconos
+  .replace(charset, (meta) => `${meta}\n    ${ICONOS_TURNOUNO.join("\n    ")}`)
+  .replace("<title>AgendaUno</title>", "<title>TurnoUno</title>");
+if (!turnouno.includes("<title>TurnoUno</title>")) {
+  throw new Error("index.html no trae <title>AgendaUno</title> que cambiar.");
+}
+await writeFile(resolve(root, "dist/app/app-turnouno.html"), turnouno);
 // El de la vista previa local. En producción, el subdominio de cada negocio tiene el
 // suyo, con su sitemap, que da la API (ADR 0128); el dominio principal, el de su landing.
 await writeFile(
@@ -46,5 +70,5 @@ await writeFile(
   "User-agent: *\nAllow: /\n",
 );
 console.log(
-  "Aplicación: dist/app (app.html para las rutas que no son landing).",
+  "Aplicación: dist/app (app.html y app-turnouno.html para las rutas que no son landing).",
 );

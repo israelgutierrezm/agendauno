@@ -93,6 +93,11 @@ onBeforeUnmount(() => {
   preferencia?.removeEventListener("change", actualizarPreferencia);
   document.removeEventListener("visibilitychange", actualizarVisibilidad);
 });
+
+// «barberías, salones y spas»: con su «y», no solo comas.
+const enLista = computed(() =>
+  new Intl.ListFormat("es-MX", { type: "conjunction" }).format(props.negocios),
+);
 </script>
 
 <template>
@@ -102,7 +107,7 @@ onBeforeUnmount(() => {
     :class="{ 'esta-animando': animando }"
   >
     <!-- Texto completo y estable: el lector de pantalla no anuncia cada tecla. -->
-    <p class="sr-only">{{ prefijo }} {{ negocios.join(", ") }}.</p>
+    <p class="sr-only">{{ prefijo }} {{ enLista }}.</p>
     <div class="negocios-frase" aria-hidden="true">
       <span class="negocios-prefijo">{{ prefijo }}</span>
       <span class="negocios-escenario">

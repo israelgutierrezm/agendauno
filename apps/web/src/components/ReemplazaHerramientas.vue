@@ -4,10 +4,11 @@ import { computed } from "vue";
 import type { Modo } from "@/marketing/modalidades";
 
 /**
- * «Reemplaza estas herramientas» y lo que nadie más te da (comparativo del
- * 2026-10-20): lo que un negocio paga hoy por separado contra un solo pago, y lo que ya
- * hacemos y la competencia no. Sin cifras inventadas ni nombres de competidores. El
- * título de la sección (`landing.porQue.titulo`) dice cuántas filas hay.
+ * «Reemplaza estas herramientas» y lo que incluye la suscripción (comparativo del
+ * 2026-10-20): lo que un negocio paga hoy por separado contra un solo pago. Sin cifras
+ * inventadas, sin nombres de competidores y sin decir que nadie más lo da (no se puede
+ * sostener). Cada modalidad dice solo lo que su plan incluye. El título de la sección
+ * (`landing.porQue.titulo`) dice cuántas filas hay.
  */
 const props = defineProps<{ modo: Modo }>();
 
@@ -26,7 +27,7 @@ const HERRAMIENTAS = [
   },
   {
     hoy: "CALENDARIOS",
-    con: "Una agenda con sedes, salas y equipo",
+    con: "AGENDA_SEDES",
   },
   {
     hoy: "Correo masivo aparte",
@@ -46,6 +47,7 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
   clases: {
     AGENDA_SALDOS: "Agenda, cupos y créditos con su historial",
     CALENDARIOS: "Un calendario por instructor o por sala",
+    AGENDA_SEDES: "Una agenda con sedes, salas y equipo",
     // Wellhub, TotalPass y Fitpass (ADR 0202); Fitpass, solo en México.
     EXTRA_HOY: "El portal de cada app de bienestar, por separado",
     EXTRA_CON: "Wellhub, TotalPass y Fitpass* en tu misma agenda",
@@ -53,6 +55,7 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
   citas: {
     AGENDA_SALDOS: "Agenda, bonos y saldos con su historial",
     CALENDARIOS: "Un calendario por profesional o por cabina",
+    AGENDA_SEDES: "Una agenda con sedes, cabinas y equipo",
     // Presupuestos en línea (ADR 0127).
     EXTRA_HOY: "Cotizaciones en un documento aparte",
     EXTRA_CON: "Presupuestos que se aceptan y pagan en línea*",
@@ -65,15 +68,26 @@ const herramientas = computed(() =>
   })),
 );
 
-const SOLO_AQUI = [
-  "0% de comisión por tus ventas y pagos",
-  "Todas tus sedes sin costo extra",
-  "CFDI a tus clientes, con cancelación y notas de crédito*",
-  "Caja con arqueo a ciegas y cierre revisado",
-  "Tu política visible antes de reservar",
-  "App en tiendas con tu marca, si la quieres",
-  "Tus datos son tuyos: los descargas cuando quieras",
-];
+// Lo que incluye la suscripción, por modalidad: en citas, varias sedes y el CFDI van
+// en los planes que los incluyen. La app con tu marca se cobra aparte (ArranqueYReferidos).
+const INCLUIDO: Record<Modo, string[]> = {
+  clases: [
+    "0% de comisión por tus ventas y pagos",
+    "Todas tus sedes sin costo extra",
+    "CFDI a tus clientes, con cancelación y notas de crédito*",
+    "Caja con arqueo a ciegas y cierre revisado",
+    "Tu política visible antes de reservar",
+    "Tus datos son tuyos: los descargas cuando quieras",
+  ],
+  citas: [
+    "0% de comisión por tus ventas y pagos",
+    "Caja con arqueo a ciegas y cierre revisado",
+    "Tu política visible antes de agendar",
+    "Anticipo al agendar, si lo pides",
+    "Tus datos son tuyos: los descargas cuando quieras",
+  ],
+};
+const incluido = computed(() => INCLUIDO[props.modo]);
 </script>
 
 <template>
@@ -94,9 +108,9 @@ const SOLO_AQUI = [
       </div>
     </div>
     <div class="solo-aqui">
-      <h3>Lo que nadie más te da</h3>
+      <h3>Incluido en tu suscripción</h3>
       <ul>
-        <li v-for="x in SOLO_AQUI" :key="x">{{ x }}</li>
+        <li v-for="x in incluido" :key="x">{{ x }}</li>
       </ul>
     </div>
   </div>

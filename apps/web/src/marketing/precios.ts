@@ -102,6 +102,10 @@ export const PRECIOS_POR_OMISION: PreciosPublicos = (() => {
         timbres: { ...base.timbres, ...publicados.timbres },
         registro: { ...base.registro, ...publicados.registro },
         tipo_cambio: publicados.tipo_cambio ?? null,
+        // Lo que se cobra aparte y los referidos: también lo publicado, para que el
+        // HTML pre-generado no diga los precios viejos.
+        servicios: publicados.servicios ?? base.servicios,
+        referidos: publicados.referidos ?? base.referidos,
       };
 })();
 
