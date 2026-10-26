@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AvisoRentaTenant;
+use App\Modules\Tenancy\Application\BajaDeNegocio;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
@@ -50,7 +51,7 @@ class FacturacionController
 
         return response()->json(['data' => [
             'plan' => $estudio->plan,
-            'estado_facturacion' => $estudio->estado_facturacion->value,
+            'estado_facturacion' => $estudio->estadoDeFacturacion()->value,
             'trial_termina_en' => $estudio->trial_termina_en?->toDateString(),
             'modalidad' => $estudio->modalidad()->value,
             'modo_cobro' => $pactado['modo_cobro']->value,
@@ -100,6 +101,8 @@ class FacturacionController
                 'cuota_fija_moneda' => $proximo['cuota_fija_moneda'],
             ],
             'trial_termina_en' => $estudio->trial_termina_en?->toDateString(),
+            // Si se da de baja, en cuántos días se borran sus datos (ADR 0213).
+            'dias_para_borrar_baja' => app(BajaDeNegocio::class)->dias(),
             // Cómo se cobra: por plan contratado, por adelantado (citas), o por uso, mes vencido.
             'cobro' => $porPlan ? 'plan' : 'uso',
             'plan' => $porPlan ? $this->planes->resumen($estudio) : null,

@@ -549,6 +549,34 @@ class DomiciliacionesTenant
     }
 
     /**
+     * El negocio se dio de baja (ADR 0213): se quitan todos los pagos automáticos de
+     * sus clientes. Uno que la pasarela no deja cancelar se reporta y se sigue con los
+     * demás (el trabajo se reintenta y solo quedan los que faltan). Cuántos se quitaron.
+     */
+    public function desactivarTodas(): int
+    {
+        $quitadas = 0;
+        $fallo = null;
+        $vigentes = DomiciliacionTenant::query()
+            ->whereIn('estado', [DomiciliacionTenant::ACTIVA, DomiciliacionTenant::PENDIENTE])
+            ->get();
+        foreach ($vigentes as $domiciliacion) {
+            try {
+                $this->cerrar($domiciliacion);
+                $quitadas++;
+            } catch (Throwable $e) {
+                report($e);
+                $fallo = $e;
+            }
+        }
+        if ($fallo !== null) {
+            throw $fallo;
+        }
+
+        return $quitadas;
+    }
+
+    /**
      * Resultado del último cargo automático: si falló, el motivo se muestra al
      * cliente y al negocio hasta que un cargo pase.
      */

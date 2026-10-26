@@ -14,6 +14,7 @@ use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\ProductoComercial;
 use App\Modules\Tenancy\TerminologiaNegocio;
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -34,6 +35,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $primera_operacion_en su primera operación real (C02/C08)
  * @property bool $es_demo negocio de demostración: no cuenta en el embudo de la plataforma
  * @property Carbon|null $reactivado_en cuándo volvió a abrir tras una suspensión (ADR 0166)
+ * @property Carbon|null $dado_de_baja_en cuándo se dio de baja (ADR 0213)
+ * @property string|null $baja_por quién la pidió: `dueno` o `plataforma`
+ * @property string|null $baja_motivo
+ * @property Carbon|null $datos_borrar_en el día en que se borran sus datos (hasta entonces se revierte)
+ * @property Carbon|null $datos_borrados_en cuándo se borraron
  * @property array<string, mixed>|null $seo_sitio el SEO de su sitio publicado (ADR 0146), para la cabecera del servidor
  * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
  * @property int|null $plan_profesionales los profesionales contratados
@@ -85,6 +91,11 @@ class Estudio extends Model
         'suspendido_en',
         'sin_suspension_hasta',
         'reactivado_en',
+        'dado_de_baja_en',
+        'baja_por',
+        'baja_motivo',
+        'datos_borrar_en',
+        'datos_borrados_en',
         'trial_inicia_en',
         'trial_termina_en',
         'prueba_termino_antes',
@@ -152,6 +163,9 @@ class Estudio extends Model
         'suspendido_en' => 'datetime',
         'sin_suspension_hasta' => 'date',
         'reactivado_en' => 'datetime',
+        'dado_de_baja_en' => 'datetime',
+        'datos_borrar_en' => 'date',
+        'datos_borrados_en' => 'datetime',
     ];
 
     /**
@@ -174,6 +188,53 @@ class Estudio extends Model
     public function suspendidoPorRenta(): bool
     {
         return $this->estado === EstadoEstudio::Suspended && $this->suspendido_por === 'renta';
+    }
+
+    /**
+     * ¿Está dado de baja y sus datos aún no se borran (ADR 0213)? En ese plazo su dueño
+     * entra a descargar sus datos, pagar lo pendiente o revertir la baja.
+     */
+    public function enPlazoDeBaja(): bool
+    {
+        return $this->estado === EstadoEstudio::Cancelled && $this->dado_de_baja_en !== null && $this->datos_borrados_en === null;
+    }
+
+    /**
+     * Cómo va su suscripción, según su estado y su renta: en prueba, al corriente, con
+     * renta vencida, suspendido o dado de baja. Se deriva (no la captura nadie).
+     * `$rentaVencida` se pasa cuando ya se consultó para varios negocios a la vez.
+     */
+    public function estadoDeFacturacion(?bool $rentaVencida = null): EstadoFacturacion
+    {
+        return match ($this->estado) {
+            EstadoEstudio::Provisioning, EstadoEstudio::Trialing => EstadoFacturacion::Trial,
+            EstadoEstudio::Suspended => EstadoFacturacion::Suspended,
+            EstadoEstudio::Cancelled => EstadoFacturacion::Cancelled,
+            EstadoEstudio::Active => ($rentaVencida ?? $this->tieneRentaVencida()) ? EstadoFacturacion::PastDue : EstadoFacturacion::Active,
+        };
+    }
+
+    /**
+     * Los que aún atienden el dinero en curso (avisos de las pasarelas, devoluciones,
+     * cancelaciones y su conciliación): operativos, suspendidos y dados de baja que aún
+     * tienen sus datos (ADR 0213).
+     *
+     * @param  Builder<self>  $consulta
+     */
+    public function scopeConPagosEnCurso(Builder $consulta): void
+    {
+        $consulta->where(static fn (Builder $q) => $q
+            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+            ->orWhere(static fn (Builder $b) => $b
+                ->where('estado', EstadoEstudio::Cancelled->value)
+                ->whereNotNull('dado_de_baja_en')
+                ->whereNull('datos_borrados_en')));
+    }
+
+    /** ¿Debe una renta que ya venció? */
+    public function tieneRentaVencida(): bool
+    {
+        return CargoRenta::query()->vencidos()->where('estudio_id', $this->getKey())->exists();
     }
 
     /**

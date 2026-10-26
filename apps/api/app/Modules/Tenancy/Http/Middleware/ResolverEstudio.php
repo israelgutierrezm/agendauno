@@ -45,6 +45,17 @@ class ResolverEstudio
         'avisos-plataforma.cambio.codigo', 'avisos-plataforma.cambio',
     ];
 
+    /**
+     * Las que siguen abiertas con el negocio dado de baja, hasta que se borran sus datos
+     * (ADR 0213). Solo entra su dueño (lo revisa el acceso).
+     */
+    private const ABIERTAS_DADO_DE_BAJA = [
+        'login', 'auth.google', 'logout', 'marca', 'recuperar-contrasena', 'restablecer-contrasena',
+        'yo', 'apariencia',
+        'renta', 'renta.cargos', 'renta.quien-cuenta', 'renta.pagar', 'renta.confirmacion', 'renta.factura', 'renta.factura.descargar', 'renta.recibo',
+        'negocio.revertir-baja', 'negocio.exportar', 'negocio.exportar.pedir', 'negocio.exportar.descargar',
+    ];
+
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -57,11 +68,14 @@ class ResolverEstudio
         // esta disponible (aprovisionamiento pendiente/incompleto): nunca un 500.
         if (! $estudio instanceof Estudio
             || ! ($estudio->estado->operativo()
-                || ($estudio->suspendidoPorRenta() && self::abiertaSuspendido($request))
+                || ($estudio->suspendidoPorRenta() && self::abierta($request, self::ABIERTAS_SUSPENDIDO_POR_RENTA))
                 // El aviso de una pasarela llega aunque el negocio esté suspendido: el
                 // dinero ya se movió y hay que registrarlo. Igual la visita de alguien de
                 // Wellhub o TotalPass: ya está en la clase.
-                || ($estudio->estado === EstadoEstudio::Suspended && self::esAvisoDePago($request)))
+                || (($estudio->estado === EstadoEstudio::Suspended || $estudio->enPlazoDeBaja()) && self::esAvisoDePago($request))
+                // Dado de baja (ADR 0213): su dueño entra a descargar sus datos, pagar lo
+                // pendiente o revertir la baja, hasta que se borran.
+                || ($estudio->enPlazoDeBaja() && self::abierta($request, self::ABIERTAS_DADO_DE_BAJA)))
             || ! self::enSuProducto($request, $estudio)
             || ! self::desdeSuApp($request, $estudio)
             || ! $this->gestor->baseDeDatosExiste($estudio)) {
@@ -122,11 +136,14 @@ class ResolverEstudio
         return in_array($request->route()?->getName(), ['api.v1.webhooks.tenant', 'api.v1.webhooks.bienestar'], true);
     }
 
-    private static function abiertaSuspendido(Request $request): bool
+    /**
+     * @param  list<string>  $abiertas
+     */
+    private static function abierta(Request $request, array $abiertas): bool
     {
         $nombre = (string) $request->route()?->getName();
         $ruta = (string) preg_replace('/^api\.v1\.(app|sub|sub-[a-z]+)\./', '', $nombre);
 
-        return in_array($ruta, self::ABIERTAS_SUSPENDIDO_POR_RENTA, true);
+        return in_array($ruta, $abiertas, true);
     }
 }

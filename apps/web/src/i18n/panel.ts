@@ -136,6 +136,8 @@ import comunicacionPantalla from "./locales/comunicacionPantalla.es-MX";
 import datosFiscalesSat from "./locales/datosFiscalesSat.es-MX";
 import eliminarCuenta from "./locales/eliminarCuenta.es-MX";
 import cfdi from "./locales/cfdi.es-MX";
+import bajaNegocio from "./locales/bajaNegocio.es-MX";
+import datosNegocio from "./locales/datosNegocio.es-MX";
 
 export const mensajesPanel = {
   adminUsabilidad,
@@ -261,4 +263,6 @@ export const mensajesPanel = {
   datosFiscalesSat,
   eliminarCuenta,
   cfdi,
+  bajaNegocio,
+  datosNegocio,
 };

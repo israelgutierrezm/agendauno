@@ -209,6 +209,6 @@ it('la factura de un presupuesto con impuestos desglosados va en un concepto, si
         ->assertJsonPath('data.total_minor', 116000)
         ->assertJsonPath('data.conceptos', [[
             'descripcion' => 'Tratamiento facial', 'cantidad' => 1, 'precio_unitario_minor' => 100000,
-            'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48',
+            'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48', 'iva' => 'general',
         ]]);
 });

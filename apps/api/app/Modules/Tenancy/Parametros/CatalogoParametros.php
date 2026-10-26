@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Parametros;
 
 use App\Modules\Platform\Operacion\LimpiezaDeAltasSinActivar;
 use App\Modules\Tenancy\Application\ActivacionPropietario;
+use App\Modules\Tenancy\Application\BajaDeNegocio;
 
 /**
  * Todos los límites y datos de negocio que se pueden configurar (ADR 0042). Nada de
@@ -243,6 +244,9 @@ final class CatalogoParametros
             // plataforma). Al menos 3 días: el correo de activación puede leerse tarde.
             new DefinicionParametro(LimpiezaDeAltasSinActivar::CLAVE_DIAS, 'Cuentas', 'Días para activar un negocio recién registrado',
                 'Si el dueño no activa su cuenta en este plazo y el negocio no tiene nada, se borra y su nombre queda libre.', $e, 14, 3, 365, 'días', porNegocio: false),
+            // Baja de un negocio (ADR 0213, solo la plataforma): el plazo para revertirla.
+            new DefinicionParametro(BajaDeNegocio::CLAVE_DIAS, 'Cuentas', 'Días para borrar los datos de un negocio dado de baja',
+                'Hasta entonces su dueño entra a descargar sus datos y pagar lo pendiente, y la baja se puede revertir. Ese día se borran su base, sus archivos y sus respaldos.', $e, 30, 7, 365, 'días', porNegocio: false),
 
             // Suspensión automática por renta vencida (ADR 0073, solo la plataforma).
             new DefinicionParametro('renta.dias_gracia_suspension', 'Renta', 'Días de gracia antes de suspender por renta vencida',

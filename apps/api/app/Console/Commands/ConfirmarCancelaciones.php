@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\CancelacionSuscripcionesTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
@@ -28,7 +27,7 @@ class ConfirmarCancelaciones extends Command
 
         Estudio::query()
             // También los suspendidos: su pasarela podría seguir cobrando.
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+            ->conPagosEnCurso()
             ->chunkById(100, function (Collection $estudios) use (&$confirmadas, $cancelaciones, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {

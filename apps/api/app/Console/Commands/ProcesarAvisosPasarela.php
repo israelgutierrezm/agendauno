@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\AvisosPasarelaTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\AvisoPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Console\Command;
@@ -28,7 +27,7 @@ class ProcesarAvisosPasarela extends Command
     {
         $terminados = 0;
         Estudio::query()
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+            ->conPagosEnCurso()
             ->chunkById(100, function (Collection $estudios) use (&$terminados, $avisos, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {

@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\ConciliarReembolsosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
@@ -28,7 +27,7 @@ class ConciliarReembolsos extends Command
         Estudio::query()
             // También los suspendidos: un cobro o una devolución en la pasarela se
             // registra aunque el negocio esté suspendido.
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+            ->conPagosEnCurso()
             ->chunkById(100, function (Collection $estudios) use (&$aclaradas, $conciliar, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {

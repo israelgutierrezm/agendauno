@@ -45,7 +45,12 @@ class GenerarCargosRenta extends Command
         $fallidos = 0;
 
         Estudio::query()
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
+            // También el dado de baja que aún tiene sus datos: su último mes se cobra
+            // (hasta el de la baja, ADR 0213).
+            ->where(static fn ($q) => $q
+                ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
+                ->orWhere(static fn ($b) => $b->where('estado', EstadoEstudio::Cancelled->value)
+                    ->whereNotNull('dado_de_baja_en')->whereNull('datos_borrados_en')))
             ->chunkById(100, function (Collection $estudios) use (&$emitidos, &$abiertos, &$sinTipoCambio, &$fallidos, $generar, $planes, $gestor, $alertas, $condiciones, $complementos, $pedido): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
@@ -74,7 +79,8 @@ class GenerarCargosRenta extends Command
                             }
                         }
 
-                        if ($planes->aplica($estudio)) {
+                        // Dado de baja, su plan por adelantado ya no se renueva.
+                        if ($estudio->estado !== EstadoEstudio::Cancelled && $planes->aplica($estudio)) {
                             $emitidos += count($planes->emitirPendientes($estudio));
                         }
                     } catch (TipoCambioNoDisponible) {

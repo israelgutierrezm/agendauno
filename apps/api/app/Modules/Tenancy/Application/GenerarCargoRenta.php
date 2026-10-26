@@ -57,6 +57,13 @@ class GenerarCargoRenta
     {
         $zona = self::zona($estudio);
         $ultimo = CarbonImmutable::now($zona)->subMonthNoOverflow()->startOfMonth();
+        // Dado de baja (ADR 0213): hasta el mes de la baja; después ya no usó el servicio.
+        if ($estudio->dado_de_baja_en !== null) {
+            $mesDeBaja = CarbonImmutable::parse($estudio->dado_de_baja_en)->setTimezone($zona)->startOfMonth();
+            if ($mesDeBaja->lessThan($ultimo)) {
+                $ultimo = $mesDeBaja;
+            }
+        }
         $desde = $ultimo->subMonthsNoOverflow(self::MESES_ATRAS - 1);
         $alta = $estudio->created_at !== null ? CarbonImmutable::parse($estudio->created_at)->setTimezone($zona)->startOfMonth() : $desde;
         if ($alta->greaterThan($desde)) {

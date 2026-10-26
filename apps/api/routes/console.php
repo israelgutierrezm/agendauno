@@ -168,6 +168,11 @@ Schedule::command('queue:prune-failed', ['--hours' => 720])->dailyAt('09:45')->w
 // registro. Nunca uno activado, con pagos o con más usuarios. 03:50 de CDMX.
 Schedule::command('agendauno:limpiar-altas-sin-activar')->dailyAt('09:50')->withoutOverlapping();
 
+// Ciclo de vida del negocio (ADR 0213): la prueba que terminó pasa a activo y los
+// negocios dados de baja cuyo plazo venció se borran (base, archivos y respaldos).
+// 03:55 de CDMX.
+Schedule::command('agendauno:ciclo-de-negocios')->dailyAt('09:55')->withoutOverlapping();
+
 // Simulacro de restauración (domingos a las 04:30 de CDMX, después de los respaldos de
 // ese día): prueba que los respaldos se pueden restaurar.
 Schedule::command('agendauno:simulacro-restauracion')->weeklyOn(0, '10:30')->withoutOverlapping();

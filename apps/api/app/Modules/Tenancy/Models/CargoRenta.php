@@ -7,8 +7,10 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\ModoCobroSaas;
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Cargo de renta del SaaS a un estudio por periodo (control plane). Es el cobro de
@@ -83,5 +85,18 @@ class CargoRenta extends Model
     public function estudio(): BelongsTo
     {
         return $this->belongsTo(Estudio::class, 'estudio_id');
+    }
+
+    /**
+     * Pendientes, con algo que pagar, cuyo vencimiento ya pasó.
+     *
+     * @param  Builder<self>  $consulta
+     */
+    public function scopeVencidos(Builder $consulta): void
+    {
+        $consulta->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->where('monto_minor', '>', 0)
+            ->whereNotNull('vence_en')
+            ->whereDate('vence_en', '<', Carbon::today()->toDateString());
     }
 }

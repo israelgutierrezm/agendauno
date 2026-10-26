@@ -919,6 +919,22 @@ export const plataformaAdmin = {
     suspendido: "Negocio suspendido.",
     reactivar: "Reactivar negocio",
     reactivado: "Negocio reactivado.",
+    // Baja del negocio (ADR 0213).
+    darDeBaja: "Dar de baja",
+    motivoBaja: "Motivo de la baja",
+    motivoBajaRequerido: "Escribe el motivo de la baja.",
+    confirmarBaja:
+      "¿Dar de baja {estudio}? Nadie más entra, se quitan los pagos automáticos de sus clientes y sus datos se borran pasado el plazo. Mientras tanto se puede revertir.",
+    dadoDeBaja: "Negocio dado de baja.",
+    bajaDetalle: "Dado de baja el {fecha} por {quien}.",
+    bajaPorDueno: "su dueño",
+    bajaPorPlataforma: "la plataforma",
+    bajaBorraEn: "Sus datos se borran el {fecha}.",
+    bajaBorrados: "Sus datos se borraron el {fecha}.",
+    revertirBaja: "Revertir la baja",
+    confirmarRevertirBaja:
+      "¿Revertir la baja de {estudio}? Vuelve a abrir; los pagos automáticos de sus clientes no vuelven solos.",
+    bajaRevertida: "Baja revertida.",
     // La última suspensión hecha por la plataforma (ADR 0132).
     ultimaSuspension: "Última suspensión",
     ultimaSuspensionDetalle: "{fecha}, por {operador}",

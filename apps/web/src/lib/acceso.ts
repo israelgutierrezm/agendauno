@@ -150,6 +150,8 @@ export const POLITICAS: Record<string, Politica> = {
 
   // ---- Mi suscripción (lo que el negocio paga a AgendaUno) ----
   renta: { permiso: "facturacion.ver" },
+  // Solo con el negocio dado de baja (ADR 0213; la regla de arriba lo abre).
+  "negocio-dado-de-baja": { permiso: "facturacion.ver" },
   timbres: { permiso: "facturacion.ver" },
   // En citas se cobra por profesional (ver Renta → quién cuenta).
   padron: { permiso: "facturacion.ver", modalidad: "clases" },
@@ -209,7 +211,8 @@ export function esAlumno(sesion: Sesion): boolean {
 
 /**
  * ¿Puede entrar a esta pantalla? Sin regla registrada, no. Suspendido por renta
- * vencida, solo a la renta, para pagarla (ADR 0073). Todo se evalúa junto: el rol
+ * vencida, solo a la renta, para pagarla (ADR 0073); dado de baja, a la baja y a la
+ * renta (ADR 0213). Todo se evalúa junto: el rol
  * activo (alumno, instructor), la modalidad del negocio, las funciones de su perfil,
  * lo que incluye su plan y los permisos. El rol no basta: un cliente de citas no entra
  * a «Mis videos» aunque sea un portal de alumno.
@@ -219,6 +222,9 @@ export function puedeEntrar(
   sesion: Sesion,
   vistas: Set<string> = new Set(),
 ): boolean {
+  if (sesion.dadoDeBaja) {
+    return nombreRuta === "negocio-dado-de-baja" || nombreRuta === "renta";
+  }
   if (sesion.suspendido) {
     return nombreRuta === "renta";
   }

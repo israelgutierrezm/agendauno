@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ActivacionPropietario;
 use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
+use App\Modules\Tenancy\Application\BajaDeNegocio;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EliminarCuentaPropiaTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
@@ -319,9 +320,19 @@ class AuthTenantController
     /**
      * Suspendido por renta (ADR 0073): solo entra quien puede ver la facturación, para
      * pagarla, y entra con ese rol. Los demás ven que el negocio está suspendido.
+     *
+     * Dado de baja (ADR 0213): solo entra su dueño, como dueño, a descargar sus datos,
+     * pagar lo pendiente o revertir la baja.
      */
     private function rolSiSuspendido(Estudio $estudio, Usuario $usuario): ?string
     {
+        if ($estudio->enPlazoDeBaja()) {
+            if ($usuario->tieneRol('propietario')) {
+                return 'propietario';
+            }
+
+            throw ValidationException::withMessages(['email' => ['Este negocio ya no está disponible.']]);
+        }
         if (! $estudio->suspendidoPorRenta()) {
             return null;
         }
@@ -376,8 +387,15 @@ class AuthTenantController
             // El color de su marca (su app instalada, ADR 0110).
             'color_marca' => $estudio->color_marca,
             'estado' => $estudio->estado->value,
-            'estado_facturacion' => $estudio->estado_facturacion->value,
+            'estado_facturacion' => $estudio->estadoDeFacturacion()->value,
             'trial_termina_en' => $estudio->trial_termina_en?->toDateString(),
+            // Dado de baja (ADR 0213): hasta cuándo están sus datos y si su dueño la revierte.
+            'baja' => $estudio->enPlazoDeBaja() ? [
+                'dado_de_baja_en' => $estudio->dado_de_baja_en?->toIso8601String(),
+                'datos_borrar_en' => $estudio->datos_borrar_en?->toDateString(),
+                'por' => $estudio->baja_por,
+                'puede_revertir' => $estudio->baja_por === BajaDeNegocio::POR_DUENO,
+            ] : null,
             'publicado' => $estudio->publicado,
             'en_directorio' => $estudio->enDirectorio(),
             // Perfil de negocio (R35): el frontend adapta terminologia/flags sin forks.

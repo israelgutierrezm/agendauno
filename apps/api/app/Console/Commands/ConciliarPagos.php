@@ -7,7 +7,6 @@ namespace App\Console\Commands;
 use App\Modules\Tenancy\Application\ConciliarPagosTenant;
 use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Pasarelas\Stripe\ConciliarTarjetasStripe;
 use Illuminate\Console\Command;
@@ -33,7 +32,7 @@ class ConciliarPagos extends Command
         Estudio::query()
             // También los suspendidos: un cobro o una devolución en la pasarela se
             // registra aunque el negocio esté suspendido.
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+            ->conPagosEnCurso()
             ->when(is_string($slug), fn ($q) => $q->where('slug', $slug))
             ->chunkById(100, function (Collection $estudios) use (&$total, $conciliar, $tarjetas, $incidencias, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */

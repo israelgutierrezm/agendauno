@@ -47,7 +47,10 @@ describe("ayuda para empezar", () => {
   it("dice qué se trae y qué no se traslada en cada modalidad", () => {
     const clases = mount(AyudaParaEmpezar, { props: { modo: "clases" } });
     expect(clases.text()).toContain("Tus clases y los horarios que se repiten");
-    expect(clases.text()).toContain("Las reservas futuras");
+    // Las reservas futuras se importan (ADR 0176).
+    expect(clases.text()).toContain(
+      "Las reservas que ya tenían en tus próximas clases",
+    );
     expect(clases.get('a[href^="mailto:"]').attributes("href")).toContain(
       "mailto:",
     );

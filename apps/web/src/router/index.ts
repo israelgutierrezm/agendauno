@@ -365,6 +365,13 @@ const router = createRouter({
       component: () => import("@/views/RentaView.vue"),
       meta: { requiereSesion: true },
     },
+    // El negocio dado de baja (ADR 0213): solo su dueño entra, hasta que se borra.
+    {
+      path: "/negocio-dado-de-baja",
+      name: "negocio-dado-de-baja",
+      component: () => import("@/views/NegocioDadoDeBajaView.vue"),
+      meta: { requiereSesion: true },
+    },
     {
       path: "/renta/timbres",
       name: "timbres",

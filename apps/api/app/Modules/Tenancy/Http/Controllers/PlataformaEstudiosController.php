@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Acceso\BitacoraPlataforma;
+use App\Modules\Tenancy\Application\BajaDeNegocio;
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
@@ -245,6 +246,27 @@ class PlataformaEstudiosController
     }
 
     /**
+     * Da de baja el negocio (ADR 0213): se corta el acceso y sus datos se borran pasado el
+     * plazo de la plataforma. El motivo queda en la bitácora y en su ficha.
+     */
+    public function darDeBaja(Request $request, string $estudio, BajaDeNegocio $bajas): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $validado = $request->validate(['motivo' => ['required', 'string', 'max:500']]);
+        $modelo = $bajas->dar($modelo, BajaDeNegocio::POR_PLATAFORMA, trim((string) $validado['motivo']));
+
+        return response()->json(['data' => self::resumen($modelo)]);
+    }
+
+    /** Revierte la baja mientras sus datos sigan ahí (la haya pedido quien sea). */
+    public function revertirBaja(string $estudio, BajaDeNegocio $bajas): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+
+        return response()->json(['data' => self::resumen($bajas->revertir($modelo))]);
+    }
+
+    /**
      * Extiende la prueba gratis N días (desde hoy si ya había terminado). Los días
      * cubiertos por la prueba no generan cargo de renta; si ya había terminado, los que
      * corrieron entre su fin y hoy sí (se guarda ese hueco).
@@ -463,7 +485,7 @@ class PlataformaEstudiosController
      *
      * @return array<string, mixed>
      */
-    public static function resumen(Estudio $e): array
+    public static function resumen(Estudio $e, ?bool $rentaVencida = null): array
     {
         return [
             'slug' => $e->slug,
@@ -471,7 +493,17 @@ class PlataformaEstudiosController
             'estado' => $e->estado->value,
             // Suspendido solo por renta vencida o por la plataforma (ADR 0073).
             'suspendido_por' => $e->estado === EstadoEstudio::Suspended ? $e->suspendido_por : null,
-            'estado_facturacion' => $e->estado_facturacion->value,
+            // Se deriva de su estado y su renta (ADR 0213): nadie lo captura.
+            'estado_facturacion' => $e->estadoDeFacturacion($rentaVencida)->value,
+            // Dado de baja (ADR 0213): quién la pidió, por qué y el día en que se borran
+            // sus datos (o cuándo se borraron).
+            'baja' => $e->estado === EstadoEstudio::Cancelled && $e->dado_de_baja_en !== null ? [
+                'dado_de_baja_en' => $e->dado_de_baja_en->toIso8601String(),
+                'por' => $e->baja_por,
+                'motivo' => $e->baja_motivo,
+                'datos_borrar_en' => $e->datos_borrar_en?->toDateString(),
+                'datos_borrados_en' => $e->datos_borrados_en?->toIso8601String(),
+            ] : null,
             'perfil' => $e->perfil_negocio->value,
             'modalidad' => $e->modalidad()->value,
             'modo_cobro' => $e->modo_cobro->value,

@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\AvisoPrivacidadNegocioController;
 use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
+use App\Modules\Tenancy\Http\Controllers\BajaNegocioController;
 use App\Modules\Tenancy\Http\Controllers\BajaPromocionesController;
 use App\Modules\Tenancy\Http\Controllers\BajasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BandejaTenantController;
@@ -331,6 +332,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
         Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
         Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
+        // Dar de baja un negocio o revertir su baja (ADR 0213).
+        Route::post('/estudios/{estudio}/baja', [PlataformaEstudiosController::class, 'darDeBaja'])->name('estudios.baja');
+        Route::post('/estudios/{estudio}/revertir-baja', [PlataformaEstudiosController::class, 'revertirBaja'])->name('estudios.revertir-baja');
         // Plan de un negocio de citas desde soporte (ADR 0107): mismas reglas que el dueño.
         Route::put('/estudios/{estudio}/plan', [PlataformaEstudiosController::class, 'plan'])->name('estudios.plan');
         // Avisos por WhatsApp del negocio a sus clientes: solo los activa la plataforma (ADR 0083).
@@ -747,6 +751,13 @@ Route::prefix('v1')->group(function (): void {
             // Facturación SaaS del estudio (control plane; separada de pagos de alumnos).
             Route::get('/facturacion', [FacturacionController::class, 'show'])->middleware('puede:facturacion.ver')->name('facturacion');
             Route::get('/renta', [FacturacionController::class, 'renta'])->middleware('puede:facturacion.ver')->name('renta');
+            // Dar de baja el negocio o revertir la baja (ADR 0213): solo su dueño.
+            Route::post('/negocio/baja', [BajaNegocioController::class, 'dar'])->middleware(['puede:facturacion.ver', 'throttle:confirmar-contrasena'])->name('negocio.baja');
+            Route::post('/negocio/revertir-baja', [BajaNegocioController::class, 'revertir'])->middleware('puede:facturacion.ver')->name('negocio.revertir-baja');
+            // Descargar todos los datos del negocio (ADR 0213): solo su dueño.
+            Route::get('/negocio/exportar', [BajaNegocioController::class, 'exportacion'])->middleware('puede:facturacion.ver')->name('negocio.exportar');
+            Route::post('/negocio/exportar', [BajaNegocioController::class, 'exportar'])->middleware(['puede:facturacion.ver', 'throttle:6,60,exportar-negocio'])->name('negocio.exportar.pedir');
+            Route::get('/negocio/exportar/{exportacion}/descargar', [BajaNegocioController::class, 'descargarExportacion'])->middleware('puede:facturacion.ver')->name('negocio.exportar.descargar');
             // Avisos de AgendaUno al dueño: correo y WhatsApp, y verificar su número (ADR 0072).
             Route::get('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'mostrar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma');
             Route::put('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'guardar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('avisos-plataforma.guardar');

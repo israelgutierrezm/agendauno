@@ -7,7 +7,6 @@ namespace App\Console\Commands;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Console\Command;
 use Throwable;
@@ -28,7 +27,7 @@ class RespaldarEstudios extends Command
         $fallas = 0;
 
         $estudios = Estudio::query()
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+            ->conPagosEnCurso()
             ->when($this->option('estudio'), fn ($q, $slug) => $q->where('slug', $slug))
             ->orderBy('id')
             ->get();

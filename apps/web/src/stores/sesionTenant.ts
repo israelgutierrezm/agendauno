@@ -101,6 +101,13 @@ export interface EstudioSesion {
   estado: string;
   estado_facturacion?: string;
   trial_termina_en?: string | null;
+  /** Dado de baja (ADR 0213): hasta cuándo están sus datos y si su dueño la revierte. */
+  baja?: {
+    dado_de_baja_en: string | null;
+    datos_borrar_en: string | null;
+    por: "dueno" | "plataforma" | null;
+    puede_revertir: boolean;
+  } | null;
   publicado?: boolean;
   en_directorio?: boolean;
   perfil?: string;
@@ -211,11 +218,19 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
    */
   // Suspendido por renta vencida (ADR 0073): solo se entra a pagarla.
   const suspendido = computed(() => estudio.value?.estado === "suspended");
+  // Dado de baja (ADR 0213): su dueño solo entra a descargar sus datos, pagar lo
+  // pendiente o revertirla, hasta que se borran.
+  const dadoDeBaja = computed(
+    () => estudio.value?.estado === "cancelled" && !!estudio.value?.baja,
+  );
 
   const rutaInicio = computed<string>(() => {
     const u = usuario.value;
     if (u === null) {
       return "entrar";
+    }
+    if (dadoDeBaja.value) {
+      return "negocio-dado-de-baja";
     }
     if (suspendido.value) {
       return "renta";
@@ -432,6 +447,29 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   }
 
   /**
+   * Da de baja el negocio (ADR 0213): solo su dueño, con su contraseña y escribiendo
+   * la dirección del negocio. La sesión sigue, ya solo para lo de la baja.
+   */
+  async function darDeBajaNegocio(
+    password: string,
+    confirmacion: string,
+    motivo: string | null,
+  ): Promise<void> {
+    await api.post(`/api/v1/app/${slug.value}/negocio/baja`, {
+      password,
+      confirmacion,
+      motivo,
+    });
+    await cargarYo();
+  }
+
+  /** Revierte la baja que pidió el dueño mientras sus datos sigan ahí. */
+  async function revertirBajaNegocio(): Promise<void> {
+    await api.post(`/api/v1/app/${slug.value}/negocio/revertir-baja`, {});
+    await cargarYo();
+  }
+
+  /**
    * Conecta (o quita) Google a la cuenta con la que se entró: desde entonces puede
    * entrar con Google. Google no crea cuentas (ADR 0093).
    */
@@ -637,6 +675,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     puede,
     rutaInicio,
     suspendido,
+    dadoDeBaja,
+    darDeBajaNegocio,
+    revertirBajaNegocio,
     tieneVariosRoles,
     destinoAlEntrar,
     requiereElegirRol,

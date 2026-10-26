@@ -15,10 +15,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 use Throwable;
 
 /**
@@ -179,24 +177,7 @@ class LimpiezaDeAltasSinActivar
 
         $this->volcado->disco()->deleteDirectory($this->volcado->carpeta($slug));
 
-        $this->gestor->desconectar();
-        if ($estudio->db_driver === 'sqlite') {
-            $ruta = (string) $this->gestor->configuracion($estudio)['database'];
-            if ($nombre === '' || basename($ruta) !== $nombre) {
-                throw new RuntimeException("El archivo «{$nombre}» no es el de una base de negocio: no se borra.");
-            }
-            foreach ([$ruta, $ruta.'-wal', $ruta.'-shm', $ruta.'-journal'] as $archivo) {
-                if (File::exists($archivo)) {
-                    File::delete($archivo);
-                }
-            }
-        } else {
-            // Solo una base con nombre de negocio (`tenant_…`, ver RegistrarEstudio).
-            if (preg_match('/^tenant_[a-z0-9_]+$/', $nombre) !== 1 || strlen($nombre) > 64) {
-                throw new RuntimeException("La base «{$nombre}» no tiene el nombre de una base de negocio: no se borra.");
-            }
-            DB::statement("DROP DATABASE IF EXISTS `{$nombre}`");
-        }
+        $this->gestor->borrarBaseDeDatos($estudio);
 
         $registrado = $estudio->created_at?->toIso8601String();
         $estudio->delete();

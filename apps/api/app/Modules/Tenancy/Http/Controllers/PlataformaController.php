@@ -10,7 +10,6 @@ use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoEstudio;
-use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Exceptions\CambioDeModoSinConfirmar;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
@@ -70,6 +69,9 @@ class PlataformaController
             : null;
         $estudios = $pagina !== null ? $pagina->getCollection() : $consulta->get();
         $ids = $estudios->modelKeys();
+        // Quién debe una renta vencida, en una sola consulta (su estado de facturación).
+        $conRentaVencida = array_flip(CargoRenta::query()->vencidos()->whereIn('estudio_id', $ids)
+            ->distinct()->pluck('estudio_id')->map(static fn (mixed $id): int => (int) $id)->all());
 
         // Uso del último periodo medido y adeudo (cargos pendientes) por estudio,
         // en dos consultas agregadas (sin una por fila).
@@ -94,7 +96,7 @@ class PlataformaController
 
         return response()->json([
             'data' => $estudios->map(static fn (Estudio $e): array => [
-                ...PlataformaEstudiosController::resumen($e),
+                ...PlataformaEstudiosController::resumen($e, isset($conRentaVencida[$e->getKey()])),
                 'uso' => $uso->has($e->getKey())
                     ? ['cantidad' => (int) $uso[$e->getKey()]->cantidad, 'metrica' => $uso[$e->getKey()]->metrica]
                     : null,
@@ -132,7 +134,6 @@ class PlataformaController
             // La cuota pactada puede ser en dólares (en México se cobra en pesos, ADR 0107).
             'cuota_fija_moneda' => ['nullable', Rule::in(['MXN', 'USD'])],
             'vigente_desde' => ['nullable', 'date_format:Y-m'],
-            'estado_facturacion' => ['nullable', Rule::enum(EstadoFacturacion::class)],
         ]);
 
         try {
@@ -147,16 +148,13 @@ class PlataformaController
             throw ValidationException::withMessages(['vigente_desde' => $e->getMessage()]);
         }
         $modelo->refresh();
-        if (isset($validado['estado_facturacion'])) {
-            $modelo->update(['estado_facturacion' => $validado['estado_facturacion']]);
-        }
 
         return response()->json(['data' => [
             'slug' => $modelo->slug,
             'modo_cobro' => $modelo->modo_cobro->value,
             'cuota_fija_minor' => $modelo->cuota_fija_minor,
             'cuota_fija_moneda' => $modelo->cuota_fija_moneda,
-            'estado_facturacion' => $modelo->estado_facturacion->value,
+            'estado_facturacion' => $modelo->estadoDeFacturacion()->value,
             'cobro' => PlataformaEstudiosController::cobroPactado($modelo, $condiciones),
         ]]);
     }

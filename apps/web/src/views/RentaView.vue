@@ -7,6 +7,8 @@ import AvisoRetornoPago from "@/components/AvisoRetornoPago.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
+import DarDeBajaNegocio from "@/components/DarDeBajaNegocio.vue";
+import DescargarDatosNegocio from "@/components/DescargarDatosNegocio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import EstadoVencimiento from "@/components/EstadoVencimiento.vue";
@@ -92,6 +94,8 @@ interface Renta {
   cuota_fija_minor: number;
   cuota_fija_moneda?: string;
   trial_termina_en: string | null;
+  /** Si se da de baja, en cuántos días se borran sus datos (ADR 0213). */
+  dias_para_borrar_baja?: number;
   /** Por plan contratado, por adelantado (citas), o por uso, mes vencido (ADR 0107). */
   cobro?: "plan" | "uso";
   plan?: PlanCitas | null;
@@ -707,9 +711,10 @@ onMounted(() => {
       </div>
 
       <!-- Cobro automático y timbres para facturar (ADR 0107). Sin cobro automático
-           posible (ni tarjeta guardada) no se ofrece: no se promete lo que no hay. -->
+           posible (ni tarjeta guardada) no se ofrece: no se promete lo que no hay.
+           Dado de baja (ADR 0213) solo se paga lo pendiente. -->
       <div
-        v-if="conTarjeta || conTimbres"
+        v-if="!sesion.dadoDeBaja && (conTarjeta || conTimbres)"
         class="mt-4 grid gap-4"
         :class="{ 'md:grid-cols-2': conTarjeta && conTimbres }"
       >
@@ -731,17 +736,19 @@ onMounted(() => {
 
       <!-- Mensajes de WhatsApp (ADR 0186): solo si está activo en el negocio. -->
       <WhatsAppRenta
-        v-if="sesion.estudio?.whatsapp_clientes === true"
+        v-if="!sesion.dadoDeBaja && sesion.estudio?.whatsapp_clientes === true"
         :base="base"
         :puede-gestionar="puedeGestionar"
       />
 
       <!-- Referidos entre negocios (ADR 0188). -->
-      <ReferidosRenta :base="base" />
+      <template v-if="!sesion.dadoDeBaja">
+        <ReferidosRenta :base="base" />
+        <!-- Complementos que se piden (ADR 0140): p. ej. Familias. -->
+        <ComplementosNegocio />
+      </template>
 
       <!-- Historial de cargos -->
-      <!-- Complementos que se piden (ADR 0140): p. ej. Familias. -->
-      <ComplementosNegocio />
 
       <h2 class="tu-titulo-seccion mt-8">{{ $t("renta.historial") }}</h2>
       <!-- Con qué se paga, si la plataforma tiene más de una pasarela (ADR 0192). -->
@@ -1013,8 +1020,19 @@ onMounted(() => {
         {{ facturaPosible ? $t("renta.pagoNota") : $t("renta.recibo.nota") }}
       </p>
 
-      <!-- Avisos de AgendaUno al dueño: correo y WhatsApp (ADR 0072). -->
-      <AvisosAgendaUno class="mt-8" />
+      <template v-if="!sesion.dadoDeBaja">
+        <!-- Avisos de AgendaUno al dueño: correo y WhatsApp (ADR 0072). -->
+        <AvisosAgendaUno class="mt-8" />
+
+        <!-- Sus datos y dar de baja el negocio (ADR 0213): solo su dueño. -->
+        <div
+          v-if="sesion.usuario?.rol === 'propietario'"
+          class="tu-card mt-8 space-y-6 p-5"
+        >
+          <DescargarDatosNegocio />
+          <DarDeBajaNegocio :dias="renta.dias_para_borrar_baja ?? 30" />
+        </div>
+      </template>
     </template>
   </section>
 </template>

@@ -67,6 +67,14 @@ interface Estudio {
   pais?: string;
   // Suspendido solo por renta (se reactiva al pagar) o por la plataforma (ADR 0073).
   suspendido_por?: string | null;
+  // Dado de baja (ADR 0213): quién, por qué y cuándo se borran (o se borraron) sus datos.
+  baja?: {
+    dado_de_baja_en: string;
+    por: "dueno" | "plataforma" | null;
+    motivo: string | null;
+    datos_borrar_en: string | null;
+    datos_borrados_en: string | null;
+  } | null;
   estado_facturacion: string;
   perfil: string;
   modalidad: "clases" | "citas";
@@ -421,11 +429,14 @@ const edit = ref({
 const diasPrueba = ref(15);
 // Por qué se suspende (opcional): se escribe en la ficha, junto a las acciones.
 const motivoSuspension = ref("");
+// Por qué se da de baja (obligatorio, ADR 0213).
+const motivoBaja = ref("");
 
 async function abrirFicha(e: Pick<Estudio, "slug">): Promise<void> {
   fichaAbierta.value = true;
   if (ficha.value?.slug !== e.slug) {
     motivoSuspension.value = "";
+    motivoBaja.value = "";
   }
   ficha.value = null;
   try {
@@ -628,6 +639,61 @@ function reactivar(): void {
         encabezados(),
       ),
     t("plataformaAdmin.ficha.reactivado"),
+  );
+}
+
+// Dar de baja el negocio (ADR 0213): con motivo; sus datos se borran pasado el plazo.
+async function darDeBaja(): Promise<void> {
+  const f = ficha.value;
+  const motivo = motivoBaja.value.trim();
+  if (f === null) {
+    return;
+  }
+  if (motivo === "") {
+    toast.error(t("plataformaAdmin.ficha.motivoBajaRequerido"));
+    return;
+  }
+  if (
+    !(await confirmar(
+      t("plataformaAdmin.ficha.confirmarBaja", { estudio: f.nombre }),
+      { peligro: true },
+    ))
+  ) {
+    return;
+  }
+  const listo = await accion(
+    () =>
+      cliente.post(
+        `/api/v1/plataforma/estudios/${f.slug}/baja`,
+        { motivo },
+        encabezados(),
+      ),
+    t("plataformaAdmin.ficha.dadoDeBaja"),
+  );
+  if (listo) {
+    motivoBaja.value = "";
+  }
+}
+
+async function revertirBaja(): Promise<void> {
+  const f = ficha.value;
+  if (
+    f === null ||
+    !(await confirmar(
+      t("plataformaAdmin.ficha.confirmarRevertirBaja", { estudio: f.nombre }),
+      { tono: "aviso" },
+    ))
+  ) {
+    return;
+  }
+  void accion(
+    () =>
+      cliente.post(
+        `/api/v1/plataforma/estudios/${f.slug}/revertir-baja`,
+        {},
+        encabezados(),
+      ),
+    t("plataformaAdmin.ficha.bajaRevertida"),
   );
 }
 
@@ -3025,6 +3091,79 @@ function borrar(): void {
             >
               {{ $t("plataformaAdmin.ficha.reactivar") }}
             </button>
+
+            <!-- Baja del negocio (ADR 0213) -->
+            <div
+              v-if="ficha.baja"
+              class="space-y-2 text-sm"
+              data-prueba="baja-negocio"
+            >
+              <p>
+                {{
+                  $t("plataformaAdmin.ficha.bajaDetalle", {
+                    fecha: fecha(ficha.baja.dado_de_baja_en),
+                    quien:
+                      ficha.baja.por === "dueno"
+                        ? $t("plataformaAdmin.ficha.bajaPorDueno")
+                        : $t("plataformaAdmin.ficha.bajaPorPlataforma"),
+                  })
+                }}
+                <span v-if="ficha.baja.motivo">«{{ ficha.baja.motivo }}»</span>
+              </p>
+              <p v-if="ficha.baja.datos_borrados_en">
+                {{
+                  $t("plataformaAdmin.ficha.bajaBorrados", {
+                    fecha: fecha(ficha.baja.datos_borrados_en),
+                  })
+                }}
+              </p>
+              <template v-else>
+                <p>
+                  {{
+                    $t("plataformaAdmin.ficha.bajaBorraEn", {
+                      fecha: fecha(ficha.baja.datos_borrar_en),
+                    })
+                  }}
+                </p>
+                <button
+                  class="tu-btn tu-btn-secundario"
+                  type="button"
+                  :disabled="accionando"
+                  data-prueba="revertir-baja"
+                  @click="revertirBaja"
+                >
+                  {{ $t("plataformaAdmin.ficha.revertirBaja") }}
+                </button>
+              </template>
+            </div>
+            <div
+              v-else-if="
+                ficha.estado !== 'provisioning' && ficha.estado !== 'cancelled'
+              "
+              class="flex flex-wrap items-end gap-2"
+              data-prueba="dar-de-baja"
+            >
+              <div class="min-w-0 flex-1 basis-48">
+                <label class="tu-label" for="motivo-baja">{{
+                  $t("plataformaAdmin.ficha.motivoBaja")
+                }}</label>
+                <input
+                  id="motivo-baja"
+                  v-model="motivoBaja"
+                  class="tu-input"
+                  maxlength="500"
+                  autocomplete="off"
+                />
+              </div>
+              <button
+                class="tu-btn tu-btn-peligro"
+                type="button"
+                :disabled="accionando"
+                @click="darDeBaja"
+              >
+                {{ $t("plataformaAdmin.ficha.darDeBaja") }}
+              </button>
+            </div>
           </section>
 
           <!-- Cómo se llaman las cosas en este negocio -->

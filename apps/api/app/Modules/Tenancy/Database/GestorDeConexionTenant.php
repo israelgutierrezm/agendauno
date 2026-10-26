@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -150,6 +151,35 @@ class GestorDeConexionTenant
         }
 
         $this->migrar($estudio);
+    }
+
+    /**
+     * Borra la BD del negocio: su archivo SQLite (con sus diarios) o su base de MySQL.
+     * Solo una con nombre de base de negocio (`tenant_…`, o el archivo que le toca); si
+     * no lo tiene, no la toca y lo dice. Sin vuelta atrás: la usan la limpieza de altas
+     * sin activar y el borrado tras una baja (ADR 0213).
+     */
+    public function borrarBaseDeDatos(Estudio $estudio): void
+    {
+        $nombre = (string) $estudio->db_database;
+        $this->desconectar();
+        if ($estudio->db_driver === 'sqlite') {
+            $ruta = (string) $this->configuracion($estudio)['database'];
+            if ($nombre === '' || basename($ruta) !== $nombre) {
+                throw new RuntimeException("El archivo «{$nombre}» no es el de una base de negocio: no se borra.");
+            }
+            foreach ([$ruta, $ruta.'-wal', $ruta.'-shm', $ruta.'-journal'] as $archivo) {
+                if (File::exists($archivo)) {
+                    File::delete($archivo);
+                }
+            }
+
+            return;
+        }
+        if (preg_match('/^tenant_[a-z0-9_]+$/', $nombre) !== 1 || strlen($nombre) > 64) {
+            throw new RuntimeException("La base «{$nombre}» no tiene el nombre de una base de negocio: no se borra.");
+        }
+        DB::statement("DROP DATABASE IF EXISTS `{$nombre}`");
     }
 
     /**
