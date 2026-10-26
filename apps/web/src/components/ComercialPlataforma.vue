@@ -31,6 +31,8 @@ interface Comercial {
   ventas_whatsapp: string | null;
   banxico_configurado: boolean;
   timbres_paquetes: number[];
+  // Mensajes de WhatsApp por paquete (ADR 0186).
+  whatsapp_paquetes?: number[];
 }
 
 const CAMPOS = [
@@ -39,6 +41,7 @@ const CAMPOS = [
   "ventas_whatsapp",
   "banxico_token",
   "timbres_paquetes",
+  "whatsapp_paquetes",
 ] as const;
 type Campo = (typeof CAMPOS)[number];
 
@@ -48,6 +51,7 @@ const whatsapp = ref("");
 const tokenBanxico = ref("");
 const banxico = ref(false);
 const paquetes = ref("");
+const paquetesWhatsApp = ref("");
 const cargando = ref(true);
 const cargado = ref(false);
 const errorCarga = ref<string | null>(null);
@@ -71,6 +75,15 @@ function aplicar(datos: Comercial): void {
   whatsapp.value = datos.ventas_whatsapp ?? "";
   banxico.value = datos.banxico_configurado;
   paquetes.value = datos.timbres_paquetes.join(", ");
+  paquetesWhatsApp.value = (datos.whatsapp_paquetes ?? []).join(", ");
+}
+
+/** «100, 500 1000» → [100, 500, 1000]. */
+function numeros(texto: string): number[] {
+  return texto
+    .split(/[,\s]+/)
+    .filter((p) => p !== "")
+    .map(Number);
 }
 
 async function cargar(): Promise<void> {
@@ -116,10 +129,8 @@ async function guardar(): Promise<void> {
     ventas_correo: correo.value.trim() || null,
     ventas_correo_turnouno: correoTurnoUno.value.trim() || null,
     ventas_whatsapp: whatsapp.value.trim() || null,
-    timbres_paquetes: paquetes.value
-      .split(/[,\s]+/)
-      .filter((p) => p !== "")
-      .map(Number),
+    timbres_paquetes: numeros(paquetes.value),
+    whatsapp_paquetes: numeros(paquetesWhatsApp.value),
   };
   // El token solo se manda si se escribe uno (vacío lo deja como está).
   if (tokenBanxico.value.trim() !== "") {
@@ -320,6 +331,26 @@ onMounted(cargar);
           :style="{ color: 'var(--texto-suave)' }"
         >
           {{ $t("suscripcion.plataforma.comercial.paquetesAyuda") }}
+        </span>
+      </label>
+      <label class="block">
+        <span class="tu-label">{{ $t("cfdi.whatsappPaquetes.etiqueta") }}</span>
+        <input
+          v-model="paquetesWhatsApp"
+          class="tu-input"
+          inputmode="numeric"
+          placeholder="100, 500, 1000, 2500"
+          data-prueba="paquetes-whatsapp"
+          :aria-invalid="errores.whatsapp_paquetes ? 'true' : undefined"
+        />
+        <span v-if="errores.whatsapp_paquetes" class="tu-hint tu-error-campo">{{
+          errores.whatsapp_paquetes
+        }}</span>
+        <span
+          class="mt-1 block text-xs"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("cfdi.whatsappPaquetes.ayuda") }}
         </span>
       </label>
     </fieldset>

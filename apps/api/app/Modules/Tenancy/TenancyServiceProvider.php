@@ -24,6 +24,14 @@ use Illuminate\Support\ServiceProvider;
 
 class TenancyServiceProvider extends ServiceProvider
 {
+    /**
+     * El negocio conectado antes de cada trabajo en curso (por trabajo), para dejarlo
+     * igual al terminar.
+     *
+     * @var array<int, Estudio|null>
+     */
+    private array $antesDelTrabajo = [];
+
     public function register(): void
     {
         // Gestor de conexión del data plane: un estado activo por request/job para
@@ -57,22 +65,39 @@ class TenancyServiceProvider extends ServiceProvider
         // ...y al correr el job se reconecta a la base de ese estudio.
         Event::listen(JobProcessing::class, function (JobProcessing $event): void {
             $payload = $event->job->payload();
+            $gestor = $this->app->make(GestorDeConexionTenant::class);
+            $this->antesDelTrabajo[spl_object_id($event->job)] = $gestor->actual();
 
-            // Reconecta la BD del estudio (data plane) y etiqueta los logs del job.
+            // Reconecta la BD del estudio (data plane) y etiqueta los logs del job. Si ya
+            // es la conectada (la cola síncrona corre el trabajo dentro de quien lo
+            // despachó), la deja: reconectar cortaría lo que ese tiene abierto.
             $estudioId = $payload['estudio_id'] ?? null;
-            if (is_int($estudioId)) {
+            if (is_int($estudioId) && $gestor->actual()?->getKey() !== $estudioId) {
                 $estudio = Estudio::query()->find($estudioId);
                 if ($estudio instanceof Estudio) {
-                    $this->app->make(GestorDeConexionTenant::class)->conectar($estudio);
+                    $gestor->conectar($estudio);
                     Log::withContext(['estudio' => $estudio->slug]);
                 }
             }
         });
 
-        // También si el trabajo falló y se reintentará: el siguiente trabajo no debe
-        // quedar apuntando a este negocio.
-        Event::listen([JobProcessed::class, JobFailed::class, JobExceptionOccurred::class], function (): void {
-            $this->app->make(GestorDeConexionTenant::class)->desconectar();
+        // Al terminar, también si falló y se reintentará, vuelve al negocio de antes: en
+        // un worker, a ninguno (el siguiente trabajo no debe quedar apuntando a este); con
+        // la cola síncrona, al de quien lo despachó (el despacho del outbox sigue con los
+        // demás eventos de ese negocio).
+        Event::listen([JobProcessed::class, JobFailed::class, JobExceptionOccurred::class], function (JobProcessed|JobFailed|JobExceptionOccurred $event): void {
+            $clave = spl_object_id($event->job);
+            if (! array_key_exists($clave, $this->antesDelTrabajo)) {
+                return;
+            }
+            $antes = $this->antesDelTrabajo[$clave];
+            unset($this->antesDelTrabajo[$clave]);
+            $gestor = $this->app->make(GestorDeConexionTenant::class);
+            if (! $antes instanceof Estudio) {
+                $gestor->desconectar();
+            } elseif ($gestor->actual()?->getKey() !== $antes->getKey()) {
+                $gestor->conectar($antes);
+            }
         });
     }
 }

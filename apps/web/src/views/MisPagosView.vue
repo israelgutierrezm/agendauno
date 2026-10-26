@@ -10,6 +10,7 @@ import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import HistorialCompras from "@/components/HistorialCompras.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import MisFacturas from "@/components/MisFacturas.vue";
 import MisPresupuestos from "@/components/MisPresupuestos.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -651,6 +652,8 @@ onMounted(() => void cuenta.asegurar());
 
       <!-- Lo que compró en el mostrador (ADR 0145); sin compras, no aparece. -->
       <ComprasMostrador class="order-7" />
+      <!-- Sus facturas (ADR 0212); sin facturas, no aparece. -->
+      <MisFacturas class="order-8" />
     </div>
   </section>
 </template>

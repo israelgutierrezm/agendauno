@@ -55,6 +55,6 @@ un Traefik que atiende otros sitios: no se instala otro. El DNS está en Cloudfl
 
 ## Pendiente
 
-- Registro de imágenes (GHCR) y despliegue automático desde el CI (fase de CI/CD).
+- Registro de imágenes (GHCR) y despliegue desde el CI: hechos (ADR 0113).
 - Traefik 2: las reglas cambian (`HostRegexp(`{sub:[a-z0-9-]+}.dominio`)`,
   `ipwhitelist`); documentado, no automatizado.

@@ -191,7 +191,7 @@ Nada del modelo comercial vive fijo en el código:
   niveles, anual, domiciliación y timbres.
 - La app móvil guarda el nivel y las funciones que no incluye el plan (de `/yo`) y no
   ofrece lo que falta (compra en línea, pago automático).
-- Pendiente: Mercado Pago y OpenPay para la renta.
+- Mercado Pago y OpenPay para la renta: hechos (ADR 0192).
 
 ## Ajuste (2026-10-21)
 

@@ -98,9 +98,9 @@ export default {
   pagina: {
     titulo: "Agenda tu demo",
     subtitulo:
-      "{minutos} minutos por videollamada, gratis y sin compromiso. Cuéntanos de tu negocio y elige el horario.",
+      "{minutos} minutos por llamada, gratis y sin compromiso. Cuéntanos de tu negocio y elige el horario: te llamamos a tu número.",
     subtituloSinMinutos:
-      "Una videollamada corta, gratis y sin compromiso. Cuéntanos de tu negocio y elige el horario.",
+      "Una llamada corta, gratis y sin compromiso. Cuéntanos de tu negocio y elige el horario: te llamamos a tu número.",
     puntos: {
       uno: "Vemos tu operación: tu agenda, tus cobros y lo que hoy te quita tiempo.",
       dos: "Te mostramos el sistema con tus casos, no una presentación genérica.",

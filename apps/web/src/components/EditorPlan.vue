@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import { RouterLink } from "vue-router";
 
+import CamposFacturacion from "@/components/CamposFacturacion.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import SelectorOpciones from "@/components/SelectorOpciones.vue";
 import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
@@ -93,6 +94,9 @@ const form = reactive({
   descripcion: p?.descripcion ?? "",
   destacado: p?.destacado ?? false,
   primeraVez: p?.primera_vez ?? false,
+  // Cómo se factura (ADR 0212).
+  iva: p?.iva ?? "general",
+  claveSat: p?.clave_sat ?? "",
   // Cuotas del negocio (B04): si al venderlo se suma la inscripción y si quien lo
   // tiene paga la anualidad.
   cobraInscripcion: p?.cobra_inscripcion ?? false,
@@ -441,6 +445,9 @@ async function guardar(): Promise<void> {
     descripcion: form.descripcion.trim() || null,
     destacado: form.destacado,
     primera_vez: admitePrimeraVez.value && form.primeraVez,
+    ...(sesion.estudio?.factura_posible
+      ? { iva: form.iva, clave_sat: form.claveSat.trim() || null }
+      : {}),
     ...(esCitas.value || esExtra.value
       ? {}
       : {
@@ -891,6 +898,12 @@ onMounted(async () => {
               </span>
             </label>
           </fieldset>
+
+          <CamposFacturacion
+            id="plan-factura"
+            v-model:iva="form.iva"
+            v-model:clave-sat="form.claveSat"
+          />
 
           <!-- Planes «socio» (ADR 0182): topes, acceso anticipado e invitados. -->
           <fieldset

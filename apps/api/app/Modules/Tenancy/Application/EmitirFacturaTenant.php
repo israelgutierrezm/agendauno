@@ -9,6 +9,8 @@ use App\Modules\Tenancy\Facturacion\CatalogosSat;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
+use App\Modules\Tenancy\Facturacion\TratamientoIva;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -53,7 +55,7 @@ class EmitirFacturaTenant
 
     /**
      * @param  array{nombre: string, rfc: string, email?: string|null, codigo_postal: string, regimen_fiscal?: string|null}  $receptor
-     * @param  list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}>  $items
+     * @param  list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string, iva?: string|null}>  $items
      * @param  list<string>  $anticipos  ULID de las facturas de anticipo que aplica
      * @param  int|null  $ordenId  la orden que factura
      * @param  int|null  $ventaPosId  la venta del mostrador que factura
@@ -77,7 +79,7 @@ class EmitirFacturaTenant
         bool $conEgreso = false,
     ): FacturaTenant {
         if ($anticipo) {
-            $items = [['cantidad' => 1, 'precio_unitario_minor' => (int) $items[0]['precio_unitario_minor']] + CatalogosSat::ANTICIPO];
+            $items = [['cantidad' => 1, 'precio_unitario_minor' => (int) $items[0]['precio_unitario_minor'], 'iva' => $items[0]['iva'] ?? TratamientoIva::General->value] + CatalogosSat::ANTICIPO];
         } elseif ($anticipos !== [] && ! $conEgreso) {
             $items = array_map(static fn (array $i): array => [
                 ...$i,
@@ -92,7 +94,7 @@ class EmitirFacturaTenant
         $impuesto = self::ivaDe($items, $ivaBps);
         $total = $subtotal + $impuesto;
 
-        $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
+        $llave = self::llaveDe($emisor);
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
@@ -192,7 +194,7 @@ class EmitirFacturaTenant
     public function aplicarAnticipo(DatosFiscalesTenant $emisor, FacturaTenant $operacion, FacturaTenant $anticipo): FacturaTenant
     {
         $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
-        $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
+        $llave = self::llaveDe($emisor);
 
         return DB::connection('tenant')->transaction(function () use ($operacion, $anticipo, $ivaBps, $llave): FacturaTenant {
             $anticipo = FacturaTenant::query()->whereKey($anticipo->getKey())->lockForUpdate()->firstOrFail();
@@ -204,8 +206,9 @@ class EmitirFacturaTenant
                 throw ValidationException::withMessages(['factura' => ['El anticipo se aplica a una factura de venta timbrada del mismo RFC.']]);
             }
             $subtotal = (int) $anticipo->subtotal_minor;
-            $items = [['cantidad' => 1, 'precio_unitario_minor' => $subtotal] + CatalogosSat::APLICACION_ANTICIPO];
-            $impuesto = self::ivaDeImporte($subtotal, $ivaBps);
+            $tratamiento = self::tratamientoDe($anticipo);
+            $items = [['cantidad' => 1, 'precio_unitario_minor' => $subtotal, 'iva' => $tratamiento->value] + CatalogosSat::APLICACION_ANTICIPO];
+            $impuesto = self::ivaDeImporte($subtotal, $tratamiento->bps($ivaBps));
             $regimen = $operacion->receptor_regimen ?? $anticipo->receptor_regimen;
             $receptor = [
                 'nombre' => $operacion->receptor_nombre,
@@ -260,16 +263,19 @@ class EmitirFacturaTenant
         ?string $regimenReceptor,
     ): FacturaTenant {
         $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
+        // Con el IVA de la factura que acredita (exenta, tasa cero o el general).
+        $tratamiento = self::tratamientoDe($original);
+        $tasa = $tratamiento->bps($ivaBps);
         // El importe sin IVA más grande cuyo total (con el IVA redondeado, como el CFDI)
         // no pasa del monto: así una nota por el total acredita el total.
-        $subtotal = intdiv($montoMinor * 10000, 10000 + $ivaBps) + 1;
-        while ($subtotal > 1 && $subtotal + self::ivaDeImporte($subtotal, $ivaBps) > $montoMinor) {
+        $subtotal = intdiv($montoMinor * 10000, 10000 + $tasa) + 1;
+        while ($subtotal > 1 && $subtotal + self::ivaDeImporte($subtotal, $tasa) > $montoMinor) {
             $subtotal--;
         }
-        $impuesto = self::ivaDeImporte($subtotal, $ivaBps);
+        $impuesto = self::ivaDeImporte($subtotal, $tasa);
         $total = $subtotal + $impuesto;
-        $items = [['descripcion' => mb_substr($descripcion, 0, 1000), 'cantidad' => 1, 'precio_unitario_minor' => $subtotal] + CatalogosSat::NOTA_DE_CREDITO];
-        $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
+        $items = [['descripcion' => mb_substr($descripcion, 0, 1000), 'cantidad' => 1, 'precio_unitario_minor' => $subtotal, 'iva' => $tratamiento->value] + CatalogosSat::NOTA_DE_CREDITO];
+        $llave = self::llaveDe($emisor);
 
         return DB::connection('tenant')->transaction(function () use ($original, $items, $subtotal, $impuesto, $total, $formaPago, $regimenReceptor, $llave, $ivaBps): FacturaTenant {
             $original = FacturaTenant::query()->whereKey($original->getKey())->lockForUpdate()->firstOrFail();
@@ -336,14 +342,44 @@ class EmitirFacturaTenant
      * El IVA como lo calcula el CFDI: el de cada concepto, redondeado al centavo, y su
      * suma (no el del subtotal truncado, que podía diferir por un centavo).
      *
-     * @param  list<array{cantidad: int, precio_unitario_minor: int}>  $items
+     * @param  list<array{cantidad: int, precio_unitario_minor: int, iva?: string|null}>  $items
      */
     private static function ivaDe(array $items, int $ivaBps): int
     {
         return array_sum(array_map(
-            static fn (array $i): int => self::ivaDeImporte($i['cantidad'] * $i['precio_unitario_minor'], $ivaBps),
+            static fn (array $i): int => self::ivaDeImporte($i['cantidad'] * $i['precio_unitario_minor'], TratamientoIva::de($i['iva'] ?? null)->bps($ivaBps)),
             $items,
         ));
+    }
+
+    /**
+     * La llave de FacturAPI del negocio (ADR 0212): la de su propia organización. Sin
+     * ella no se timbra con la de la plataforma (sería otro emisor): en producción, o
+     * con FacturAPI de verdad, hay que terminar el alta. En desarrollo y pruebas, el
+     * proveedor falso no la necesita.
+     */
+    public static function llaveDe(DatosFiscalesTenant $emisor): string
+    {
+        $llave = (string) ($emisor->facturapi_llave ?? '');
+        if ($llave === '' && (app()->environment('production') || ConfiguracionPlataforma::llaveUsuarioFacturapi() !== null)) {
+            throw ValidationException::withMessages(['facturacion' => ['Tu negocio aún no termina su alta para facturar: sube tu sello digital (CSD) en Facturación.']]);
+        }
+
+        return $llave;
+    }
+
+    /**
+     * El IVA de los conceptos de una factura, si todos llevan el mismo (sus notas de
+     * crédito y la aplicación de su anticipo van igual); si mezcla, el general.
+     */
+    private static function tratamientoDe(FacturaTenant $factura): TratamientoIva
+    {
+        $tratamientos = array_values(array_unique(array_map(
+            static fn (mixed $c): string => TratamientoIva::de(is_array($c) ? ($c['iva'] ?? null) : null)->value,
+            is_array($factura->conceptos) ? $factura->conceptos : [],
+        )));
+
+        return count($tratamientos) === 1 ? TratamientoIva::from($tratamientos[0]) : TratamientoIva::General;
     }
 
     /** El IVA de un importe, redondeado al centavo (la mitad hacia arriba). */
@@ -454,7 +490,7 @@ class EmitirFacturaTenant
                     'unit_key' => $i['clave_unidad'],
                     'price' => $i['precio_unitario_minor'] / 100,
                     'tax_included' => false,
-                    'taxes' => [['type' => 'IVA', 'rate' => $ivaBps / 10000]],
+                    'taxes' => TratamientoIva::de($i['iva'] ?? null)->impuestos($ivaBps),
                 ],
             ], $items),
             'use' => $usoCfdi,

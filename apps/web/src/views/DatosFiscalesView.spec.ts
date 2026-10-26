@@ -198,3 +198,44 @@ describe("datos fiscales", () => {
     expect(regimenCorresponde("601", null)).toBe(true);
   });
 });
+
+describe("alta en FacturAPI (ADR 0212)", () => {
+  it("con el sello cargado dice lo que falta, enlaza la carta manifiesto y vuelve a revisar", async () => {
+    const pendiente = {
+      ...guardados,
+      sellos_cargados: true,
+      facturacion_lista: false,
+      pendientes: ["Firma la carta manifiesto"],
+      error: null,
+      portal_manifiesto: "https://www.facturapi.io/manifiesto",
+    };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/timbres")
+          ? { data: { disponibles: 0 } }
+          : { data: pendiente, meta: { disponible: true } },
+      }),
+    );
+    api.post.mockResolvedValueOnce({
+      data: { data: { ...pendiente, facturacion_lista: true, pendientes: [] } },
+    });
+    const w = montar();
+    await flushPromises();
+    const alta = w.get('[data-prueba="alta-facturapi"]');
+    expect(alta.text()).toContain("Firma la carta manifiesto");
+    expect(alta.get("a").attributes("href")).toBe(
+      "https://www.facturapi.io/manifiesto",
+    );
+
+    await w.get('[data-prueba="revisar-alta"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/datos-fiscales/revisar",
+      {},
+    );
+    expect(w.get('[data-prueba="alta-facturapi"]').text()).toContain(
+      "Tu negocio ya factura con su propio sello.",
+    );
+    w.unmount();
+  });
+});

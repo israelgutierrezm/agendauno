@@ -310,7 +310,7 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
   };
   const descripciones: Record<string, string> = {
     "/demo":
-      "Agenda una videollamada gratis para ver AgendaUno con los casos de tu negocio.",
+      "Agenda una llamada gratis para ver AgendaUno con los casos de tu negocio.",
   };
   return {
     title: titulos[ruta] ?? "AgendaUno",

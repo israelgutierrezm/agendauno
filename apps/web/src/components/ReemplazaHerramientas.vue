@@ -31,12 +31,12 @@ const HERRAMIENTAS = [
   },
   {
     hoy: "Correo masivo aparte",
-    con: "Campañas y segmentos con tus propios clientes",
+    con: "CAMPANAS",
   },
-  { hoy: "Facturación por fuera", con: "CFDI a tus clientes desde la venta*" },
+  { hoy: "Facturación por fuera", con: "CFDI" },
   {
     hoy: "WhatsApp e Instagram en el celular de alguien",
-    con: "Una bandeja de mensajes para todo tu equipo",
+    con: "BANDEJA",
   },
   { hoy: "EXTRA_HOY", con: "EXTRA_CON" },
 ];
@@ -51,6 +51,9 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
     // Wellhub, TotalPass y Fitpass (ADR 0202); Fitpass, solo en México.
     EXTRA_HOY: "El portal de cada app de bienestar, por separado",
     EXTRA_CON: "Wellhub, TotalPass y Fitpass* en tu misma agenda",
+    CAMPANAS: "Campañas y segmentos con tus propios clientes",
+    CFDI: "CFDI a tus clientes desde la venta*",
+    BANDEJA: "Una bandeja de mensajes para todo tu equipo",
   },
   citas: {
     AGENDA_SALDOS: "Agenda, bonos y saldos con su historial",
@@ -59,6 +62,10 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
     // Presupuestos en línea (ADR 0127).
     EXTRA_HOY: "Cotizaciones en un documento aparte",
     EXTRA_CON: "Presupuestos que se aceptan y pagan en línea*",
+    // En citas, del plan que las incluye (FuncionesPlan, ADR 0107).
+    CAMPANAS: "Campañas y segmentos con tus propios clientes (Pro)",
+    CFDI: "CFDI a tus clientes desde la venta* (Pro)",
+    BANDEJA: "Una bandeja de mensajes para todo tu equipo (Pro)",
   },
 };
 const herramientas = computed(() =>

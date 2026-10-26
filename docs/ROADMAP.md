@@ -81,8 +81,9 @@
 
 ## Después
 
-- WhatsApp: mostrar al negocio lo que le contestan sus clientes (hoy se les responde
-  solo, ADR 0083). No habrá número propio por negocio (ADR 0069).
-- Despliegue automático desde el CI.
 - Marketplace a partir del directorio.
-- Opciones empresariales: marca blanca, OAuth para terceros.
+- OAuth para terceros.
+
+Hechos desde la última revisión de esta lista: la bandeja de WhatsApp, Instagram y
+Messenger (ADR 0200), el despliegue desde el CI (ADR 0113) y la marca blanca de la app
+(ADR 0111, 0208).

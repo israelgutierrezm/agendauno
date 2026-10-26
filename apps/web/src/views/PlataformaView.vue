@@ -199,14 +199,6 @@ type Pestana =
   | "equipo"
   | "bitacora";
 
-const ESTADOS_FACT = [
-  "trial",
-  "active",
-  "past_due",
-  "grace_period",
-  "suspended",
-  "cancelled",
-];
 const LLAVES_PASARELA: Record<string, string[]> = {
   stripe: ["secret_key", "webhook_secret"],
   mercadopago: ["access_token", "webhook_secret"],
@@ -423,7 +415,6 @@ const edit = ref({
   modo_cobro: "activos",
   cuota: "0",
   moneda: "MXN",
-  estado_facturacion: "",
   // Desde qué mes rige (AAAA-MM; ADR 0181): por omisión, el primero sin cobrar.
   desde: "",
 });
@@ -447,7 +438,6 @@ async function abrirFicha(e: Pick<Estudio, "slug">): Promise<void> {
       modo_cobro: data.data.modo_cobro,
       cuota: String(data.data.cuota_fija_minor / 100),
       moneda: data.data.cuota_fija_moneda ?? "MXN",
-      estado_facturacion: data.data.estado_facturacion,
       desde: data.data.cobro?.primer_periodo_abierto ?? "",
     };
   } catch (err) {
@@ -523,7 +513,6 @@ function guardarCobro(): void {
           cuota_fija_minor: cuota ?? f.cuota_fija_minor,
           cuota_fija_moneda: edit.value.moneda,
           vigente_desde: edit.value.desde || undefined,
-          estado_facturacion: edit.value.estado_facturacion,
         },
         encabezados(),
       ),
@@ -824,6 +813,9 @@ const opcionesConfig = computed(() =>
 );
 const facturapiConfigurada = ref(false);
 const llaveInput = ref("");
+// La de usuario (sk_user_…): da de alta a cada negocio (ADR 0212).
+const facturapiUsuarioConfigurada = ref(false);
+const llaveUsuarioInput = ref("");
 // A dónde llegan las alertas y las rentas vencidas (ADR 0072).
 const correoAlertas = ref("");
 // En qué países se ofrecen Wellhub y TotalPass (ADR 0202): códigos de dos letras.
@@ -909,6 +901,7 @@ async function cargarConfiguracion(): Promise<void> {
     cliente.get<{
       data: {
         facturapi_configurada: boolean;
+        facturapi_usuario_configurada?: boolean;
         correo_alertas?: string | null;
         paises_bienestar?: { wellhub: string[]; totalpass: string[] };
       };
@@ -933,6 +926,8 @@ async function cargarConfiguracion(): Promise<void> {
     }>("/api/v1/plataforma/legales", encabezados()),
   ]);
   facturapiConfigurada.value = cfg.data.data.facturapi_configurada;
+  facturapiUsuarioConfigurada.value =
+    cfg.data.data.facturapi_usuario_configurada === true;
   correoAlertas.value = cfg.data.data.correo_alertas ?? "";
   const paises = cfg.data.data.paises_bienestar;
   if (paises) {
@@ -971,31 +966,45 @@ async function cargarConfiguracion(): Promise<void> {
   }
 }
 
-async function guardarLlave(quitar = false): Promise<void> {
-  // Guardar vacío la borraba sin avisar; quitarla detiene la facturación de todos
-  // (ADR 0132).
-  if (!quitar && llaveInput.value.trim() === "") {
+async function guardarLlave(quitar = false, deUsuario = false): Promise<void> {
+  // Guardar vacío la borraba sin avisar; quitarla detiene la facturación (ADR 0132).
+  const entrada = deUsuario ? llaveUsuarioInput : llaveInput;
+  if (!quitar && entrada.value.trim() === "") {
     return;
   }
   if (
     quitar &&
-    !(await confirmar(t("plataforma.facturapi.confirmarQuitar"), {
-      peligro: true,
-    }))
+    !(await confirmar(
+      t(
+        deUsuario
+          ? "cfdi.usuario.confirmarQuitar"
+          : "plataforma.facturapi.confirmarQuitar",
+      ),
+      { peligro: true },
+    ))
   ) {
     return;
   }
-  guardando.value = "facturapi";
+  guardando.value = deUsuario ? "facturapi-usuario" : "facturapi";
   try {
     const { data } = await cliente.put<{
-      data: { facturapi_configurada: boolean };
+      data: {
+        facturapi_configurada: boolean;
+        facturapi_usuario_configurada?: boolean;
+      };
     }>(
       "/api/v1/plataforma/configuracion",
-      { facturapi_llave: quitar ? null : llaveInput.value.trim() },
+      {
+        [deUsuario ? "facturapi_llave_usuario" : "facturapi_llave"]: quitar
+          ? null
+          : entrada.value.trim(),
+      },
       encabezados(),
     );
     facturapiConfigurada.value = data.data.facturapi_configurada;
-    llaveInput.value = "";
+    facturapiUsuarioConfigurada.value =
+      data.data.facturapi_usuario_configurada === true;
+    entrada.value = "";
     toast.exito(
       quitar
         ? t("plataforma.facturapi.quitada")
@@ -1994,6 +2003,74 @@ function borrar(): void {
             class="mt-5 space-y-5"
             data-prueba="config-facturacion"
           >
+            <!-- La llave de usuario: da de alta a cada negocio (ADR 0212). -->
+            <div class="tu-card p-5" data-prueba="config-facturapi-usuario">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h2 class="tu-titulo-seccion">
+                    {{ $t("cfdi.usuario.titulo") }}
+                  </h2>
+                  <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                    {{ $t("cfdi.usuario.subtitulo") }}
+                  </p>
+                </div>
+                <span
+                  class="tu-estado text-sm shrink-0"
+                  :style="{
+                    '--tono': facturapiUsuarioConfigurada
+                      ? 'var(--exito)'
+                      : 'var(--texto-suave)',
+                  }"
+                >
+                  {{
+                    facturapiUsuarioConfigurada
+                      ? $t("plataforma.facturapi.configurada")
+                      : $t("plataforma.facturapi.noConfigurada")
+                  }}
+                </span>
+              </div>
+              <form
+                class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
+                @submit.prevent="guardarLlave(false, true)"
+              >
+                <div class="flex-1">
+                  <label class="tu-label" for="lk-usuario">{{
+                    $t("cfdi.usuario.llave")
+                  }}</label>
+                  <input
+                    id="lk-usuario"
+                    v-model="llaveUsuarioInput"
+                    class="tu-input"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="sk_user_…"
+                  />
+                </div>
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="
+                    guardando === 'facturapi-usuario' ||
+                    llaveUsuarioInput.trim() === ''
+                  "
+                >
+                  {{ $t("plataforma.facturapi.guardar") }}
+                </button>
+                <button
+                  v-if="facturapiUsuarioConfigurada"
+                  class="tu-btn tu-btn-peligro"
+                  type="button"
+                  :disabled="guardando === 'facturapi-usuario'"
+                  @click="guardarLlave(true, true)"
+                >
+                  {{ $t("plataforma.facturapi.quitar") }}
+                </button>
+              </form>
+              <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("plataforma.facturapi.ayuda") }}
+              </p>
+            </div>
+
             <div class="tu-card p-5">
               <div class="flex items-center justify-between gap-3">
                 <div>
@@ -2785,20 +2862,6 @@ function borrar(): void {
                   </option>
                   <option value="fijo">
                     {{ $t("plataforma.estudios.modo.fijo") }}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="tu-label" for="ef">{{
-                  $t("plataforma.estudios.colFacturacion")
-                }}</label>
-                <select
-                  id="ef"
-                  v-model="edit.estado_facturacion"
-                  class="tu-input"
-                >
-                  <option v-for="s in ESTADOS_FACT" :key="s" :value="s">
-                    {{ $t(`panel.estados.${s}`) }}
                   </option>
                 </select>
               </div>

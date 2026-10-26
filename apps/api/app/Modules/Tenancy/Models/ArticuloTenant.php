@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $categoria_id
  * @property string|null $foto_ruta
  * @property bool $ofrecer_al_reservar
+ * @property string $iva cómo se factura: general, exento o cero (ADR 0212)
+ * @property string|null $clave_sat su clave de producto o servicio del SAT (ADR 0212)
  */
 class ArticuloTenant extends Model
 {
@@ -30,7 +32,7 @@ class ArticuloTenant extends Model
 
     protected $table = 'articulos';
 
-    protected $fillable = ['nombre', 'sku', 'precio_minor', 'moneda', 'activo', 'categoria_id', 'foto_ruta', 'ofrecer_al_reservar'];
+    protected $fillable = ['nombre', 'sku', 'precio_minor', 'moneda', 'activo', 'categoria_id', 'foto_ruta', 'ofrecer_al_reservar', 'iva', 'clave_sat'];
 
     /**
      * @var array<string, string>

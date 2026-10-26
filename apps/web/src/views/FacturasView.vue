@@ -24,14 +24,16 @@ import {
   type TipoPersona,
 } from "@/lib/catalogosSat";
 import { confirmar } from "@/lib/confirmar";
+import { descargarDeApi } from "@/lib/descargas";
 import { fechaEnUrl, opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 interface Factura {
   id: string;
   estado: string;
-  receptor: { nombre: string; rfc: string };
+  receptor: { nombre: string; rfc: string; email?: string | null };
   moneda: string;
   total_minor: number;
   uuid: string | null;
@@ -94,6 +96,7 @@ interface Concepto {
 }
 
 const { t } = useI18n();
+const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
@@ -416,6 +419,39 @@ function tonoFactura(estado: unknown): string | undefined {
 
 function dinero(minor: number, moneda: string): string {
   return dineroDelPais(minor, moneda, sesion.pais);
+}
+
+// El PDF y el XML con la llave del negocio (ADR 0212): FacturAPI no los da sin ella.
+async function descargarCfdi(
+  f: Factura,
+  formato: "pdf" | "xml",
+): Promise<void> {
+  try {
+    await descargarDeApi(
+      `${base.value}/facturas/${f.id}/${formato}`,
+      `factura-${f.uuid ?? f.id}.${formato}`,
+    );
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
+
+async function enviarCfdi(f: Factura): Promise<void> {
+  const correo = f.receptor.email ?? "";
+  if (
+    correo === "" ||
+    !(await confirmar(t("cfdi.confirmarEnvio", { correo }), {
+      aceptar: t("cfdi.confirmarEnvioAceptar"),
+    }))
+  ) {
+    return;
+  }
+  try {
+    await api.post(`${base.value}/facturas/${f.id}/enviar`, {});
+    toast.exito(t("cfdi.enviada", { correo }));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
 }
 
 async function cargar(): Promise<void> {
@@ -803,14 +839,39 @@ onMounted(async () => {
             <span class="text-xs font-mono truncate max-w-[12rem]">{{
               (fila as Factura).uuid
             }}</span>
-            <a
-              v-if="(fila as Factura).pdf_url"
-              class="tu-enlace text-xs whitespace-nowrap"
-              :href="(fila as Factura).pdf_url ?? '#'"
-              target="_blank"
-              rel="noopener"
-              >{{ $t("facturas.verPdf") }}</a
-            >
+            <template v-if="(fila as Factura).estado === 'timbrada'">
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
+                :aria-label="
+                  $t('cfdi.descargarPdf', { uuid: (fila as Factura).uuid })
+                "
+                data-prueba="descargar-pdf"
+                @click="descargarCfdi(fila as Factura, 'pdf')"
+              >
+                {{ $t("cfdi.pdf") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
+                :aria-label="
+                  $t('cfdi.descargarXml', { uuid: (fila as Factura).uuid })
+                "
+                data-prueba="descargar-xml"
+                @click="descargarCfdi(fila as Factura, 'xml')"
+              >
+                {{ $t("cfdi.xml") }}
+              </button>
+              <button
+                v-if="(fila as Factura).receptor.email"
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico"
+                data-prueba="enviar-factura"
+                @click="enviarCfdi(fila as Factura)"
+              >
+                {{ $t("cfdi.enviar") }}
+              </button>
+            </template>
           </div>
           <span v-else class="text-xs" style="color: var(--error)">{{
             (fila as Factura).motivo_error

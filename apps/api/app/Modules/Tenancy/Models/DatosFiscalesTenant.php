@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property string|null $facturapi_organizacion_id
  * @property string|null $facturapi_llave
+ * @property bool $facturapi_lista
+ * @property list<string>|null $facturapi_pendientes
+ * @property string|null $facturapi_error
  * @property string|null $sello_cer
  * @property string|null $sello_key
  * @property string|null $sello_password
@@ -29,7 +32,7 @@ class DatosFiscalesTenant extends Model
 
     protected $fillable = [
         'razon_social', 'rfc', 'regimen_fiscal', 'codigo_postal',
-        'facturapi_organizacion_id', 'facturapi_llave',
+        'facturapi_organizacion_id', 'facturapi_llave', 'facturapi_lista', 'facturapi_pendientes', 'facturapi_error',
         'sello_cer', 'sello_key', 'sello_password',
     ];
 
@@ -43,6 +46,8 @@ class DatosFiscalesTenant extends Model
      */
     protected $casts = [
         'facturapi_llave' => 'encrypted',
+        'facturapi_lista' => 'boolean',
+        'facturapi_pendientes' => 'array',
         'sello_cer' => 'encrypted',
         'sello_key' => 'encrypted',
         'sello_password' => 'encrypted',

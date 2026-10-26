@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AltaFacturacionNegocioTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  */
 class DatosFiscalesTenantController
 {
+    public function __construct(private readonly AltaFacturacionNegocioTenant $alta) {}
+
     public function show(): JsonResponse
     {
         $datos = DatosFiscalesTenant::query()->first();
@@ -55,14 +59,27 @@ class DatosFiscalesTenantController
         ]);
 
         $datos = DatosFiscalesTenant::query()->firstOrNew([]);
+        $rfcAntes = $datos->exists ? $datos->rfc : null;
         $datos->fill([
             'razon_social' => $validado['razon_social'],
             'rfc' => mb_strtoupper((string) $validado['rfc']),
             'regimen_fiscal' => $validado['regimen_fiscal'],
             'codigo_postal' => $validado['codigo_postal'],
-        ])->save();
+        ]);
+        // Otro RFC es otro emisor: su sello y su alta en FacturAPI empiezan de nuevo.
+        if (is_string($rfcAntes) && $rfcAntes !== $datos->rfc) {
+            $datos->fill([
+                'facturapi_organizacion_id' => null, 'facturapi_llave' => null, 'facturapi_lista' => false,
+                'facturapi_pendientes' => null, 'sello_cer' => null, 'sello_key' => null, 'sello_password' => null,
+            ]);
+        }
+        $datos->save();
+        // Con su organización ya creada, sus datos se actualizan allá también (ADR 0212).
+        if (($datos->facturapi_organizacion_id ?? '') !== '') {
+            $this->alta->datosLegales($datos, $this->estudio($request));
+        }
 
-        return response()->json(['data' => $this->presentar($datos)]);
+        return response()->json(['data' => $this->presentar($datos->refresh())]);
     }
 
     /**
@@ -85,13 +102,36 @@ class DatosFiscalesTenantController
             ]);
         }
 
+        $certificado = (string) $request->file('certificado')?->get();
+        $llave = (string) $request->file('llave')?->get();
+        $contrasena = (string) $request->input('password');
+        // Primero en FacturAPI (ADR 0212): un sello que rechaza no se guarda.
+        $this->alta->sello($datos, $this->estudio($request), $certificado, $llave, $contrasena);
         $datos->fill([
-            'sello_cer' => base64_encode((string) $request->file('certificado')?->get()),
-            'sello_key' => base64_encode((string) $request->file('llave')?->get()),
-            'sello_password' => (string) $request->input('password'),
+            'sello_cer' => base64_encode($certificado),
+            'sello_key' => base64_encode($llave),
+            'sello_password' => $contrasena,
         ])->save();
 
-        return response()->json(['data' => $this->presentar($datos)]);
+        return response()->json(['data' => $this->presentar($datos->refresh())]);
+    }
+
+    /** Vuelve a preguntar a FacturAPI si ya puede facturar (tras firmar la carta). */
+    public function revisar(): JsonResponse
+    {
+        $this->exigirFacturacion();
+        $datos = DatosFiscalesTenant::query()->firstOrFail();
+        $this->alta->revisar($datos);
+
+        return response()->json(['data' => $this->presentar($datos->refresh())]);
+    }
+
+    private function estudio(Request $request): Estudio
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+
+        return $estudio;
     }
 
     /**
@@ -107,6 +147,12 @@ class DatosFiscalesTenantController
             'codigo_postal' => $datos->codigo_postal,
             // Estado del propio sello del tenant (no se expone nada del proveedor).
             'sellos_cargados' => $datos->sellosCargados(),
+            // Su alta en FacturAPI (ADR 0212): si ya factura, lo que le falta y dónde
+            // firmar la carta manifiesto. Nunca la llave.
+            'facturacion_lista' => (bool) $datos->facturapi_lista,
+            'pendientes' => $datos->facturapi_pendientes ?? [],
+            'error' => $datos->facturapi_error,
+            'portal_manifiesto' => AltaFacturacionNegocioTenant::PORTAL_MANIFIESTO,
         ];
     }
 }

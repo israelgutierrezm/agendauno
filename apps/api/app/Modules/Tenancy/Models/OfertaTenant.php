@@ -27,6 +27,8 @@ use Illuminate\Validation\ValidationException;
  * @property string|null $que_llevar qué llevar a la clase
  * @property Carbon|null $archivado_en retirado del catálogo (ADR 0154)
  * @property int|null $regreso_dias cada cuántos días suele regresar un cliente (ADR 0159)
+ * @property string $iva cómo se factura: general, exento o cero (ADR 0212)
+ * @property string|null $clave_sat su clave de producto o servicio del SAT (ADR 0212)
  */
 class OfertaTenant extends Model
 {
@@ -36,7 +38,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias', 'anticipo_minor', 'anticipo_pct', 'enlace_en_linea', 'nivel_id', 'practica_libre'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar', 'archivado_en', 'regreso_dias', 'anticipo_minor', 'anticipo_pct', 'enlace_en_linea', 'nivel_id', 'practica_libre', 'iva', 'clave_sat'];
 
     /**
      * @var array<string, string>

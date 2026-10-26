@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CamposFacturacion from "@/components/CamposFacturacion.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -58,6 +59,9 @@ interface Articulo {
   foto_url?: string | null;
   // Se ofrece para apartar al reservar una clase (ADR 0194).
   ofrecer_al_reservar?: boolean;
+  // Cómo se factura (ADR 0212).
+  iva?: string;
+  clave_sat?: string | null;
 }
 interface Categoria {
   id: string;
@@ -373,6 +377,8 @@ const form = ref({
   activo: true,
   categoria: "",
   ofrecer: false,
+  iva: "general",
+  claveSat: "",
 });
 // La foto de un producto nuevo: se elige aquí y se sube al crearlo.
 const fotoNueva = ref<File | null>(null);
@@ -439,6 +445,8 @@ function nuevoProducto(): void {
     // Con un filtro de categoría puesto, el nuevo nace en ella.
     categoria: filtroCategoria.value !== "-" ? filtroCategoria.value : "",
     ofrecer: false,
+    iva: "general",
+    claveSat: "",
   };
   extras.value = [];
   olvidarFotoNueva();
@@ -455,6 +463,8 @@ function editar(a: Articulo): void {
     activo: a.activo,
     categoria: a.categoria?.id ?? "",
     ofrecer: a.ofrecer_al_reservar === true,
+    iva: a.iva ?? "general",
+    claveSat: a.clave_sat ?? "",
   };
   extras.value = (a.extras ?? []).map((e) => ({
     id: e.id,
@@ -494,6 +504,10 @@ async function guardarProducto(): Promise<void> {
     categoria_id: form.value.categoria !== "" ? form.value.categoria : null,
     // Solo en un negocio de clases (ADR 0194).
     ...(sesion.esCitas ? {} : { ofrecer_al_reservar: form.value.ofrecer }),
+    // Cómo se factura (ADR 0212), si el negocio factura.
+    ...(sesion.estudio?.factura_posible
+      ? { iva: form.value.iva, clave_sat: form.value.claveSat.trim() || null }
+      : {}),
     extras: enviados.map(({ e }) => ({
       id: e.id,
       nombre: e.nombre.trim(),
@@ -1234,6 +1248,11 @@ onMounted(cargar);
             }}</span>
           </span>
         </label>
+        <CamposFacturacion
+          id="articulo-factura"
+          v-model:iva="form.iva"
+          v-model:clave-sat="form.claveSat"
+        />
         <p
           v-if="!editando"
           class="text-sm"

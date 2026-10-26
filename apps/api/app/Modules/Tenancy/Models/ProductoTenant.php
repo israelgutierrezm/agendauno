@@ -34,6 +34,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int|null $max_reservas_semana tope de reservas por semana (ADR 0182)
  * @property int|null $acceso_anticipado_horas reserva esas horas antes de que abran para todos (ADR 0182)
  * @property int|null $invitados_por_mes pases de invitado al mes (ADR 0182)
+ * @property string $iva cómo se factura: general, exento o cero (ADR 0212)
+ * @property string|null $clave_sat su clave de producto o servicio del SAT (ADR 0212)
  */
 class ProductoTenant extends Model
 {
@@ -58,6 +60,8 @@ class ProductoTenant extends Model
         'penalizacion_porcentaje',
         // Planes «socio» (ADR 0182).
         'max_reservas_dia', 'max_reservas_semana', 'acceso_anticipado_horas', 'invitados_por_mes',
+        // El IVA con que se factura y su clave del SAT (ADR 0212).
+        'iva', 'clave_sat',
     ];
 
     /**

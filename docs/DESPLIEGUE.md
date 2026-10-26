@@ -659,4 +659,4 @@ la lista llegue recortada a las 50 más recientes.
 ## Pendiente de decidir
 
 - Proveedor del servidor, de MySQL y del correo.
-- Despliegue automático desde el CI (hoy el CI solo prueba).
+- Despliegue desde el CI: hecho (`desplegar.yml`, manual y con aprobación; ADR 0113).

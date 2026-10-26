@@ -90,7 +90,7 @@ it('el borrador de una orden pagada trae sus conceptos sin IVA, a quién y la fo
         ->assertJsonPath('data.total_minor', 89900)
         ->assertJsonPath('data.conceptos', [[
             'descripcion' => 'Pack 8 clases', 'cantidad' => 1, 'precio_unitario_minor' => 77500,
-            'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48',
+            'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48', 'iva' => 'general',
         ]]);
 });
 
@@ -170,7 +170,7 @@ it('una venta del mostrador se factura una vez, sin la propina, y ya no se corri
         ->assertJsonPath('data.total_minor', 56000)
         ->assertJsonPath('data.conceptos', [[
             'descripcion' => 'Pomada mate', 'cantidad' => 2, 'precio_unitario_minor' => 24138,
-            'clave_prod_serv' => '01010101', 'clave_unidad' => 'H87',
+            'clave_prod_serv' => '01010101', 'clave_unidad' => 'H87', 'iva' => 'general',
         ]])
         ->json('data');
 

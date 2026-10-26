@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AltaRapidaCatalogoTenant;
 use App\Modules\Tenancy\Application\ArchivoDeServiciosTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Http\ImpuestoDeVenta;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ActividadTenant;
@@ -173,6 +174,8 @@ class CatalogoTenantController
             'anticipo_pct' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:99'],
             // Clase en línea (ADR 0184): el enlace que ve solo quien la reservó.
             'enlace_en_linea' => ['sometimes', 'nullable', 'string', 'max:500', 'url:https'],
+            // Cómo se factura (ADR 0212).
+            ...ImpuestoDeVenta::reglas(),
         ], [
             'modalidad.in' => $esCitas
                 ? 'En un negocio de citas cada servicio es individual.'
@@ -203,6 +206,7 @@ class CatalogoTenantController
             'limpieza_min' => (int) ($validado['limpieza_min'] ?? 0),
             'enlace_en_linea' => self::enlace($validado['enlace_en_linea'] ?? null),
             ...($anticipo ?? []),
+            ...ImpuestoDeVenta::cambios($request, $validado),
         ]);
 
         return response()->json(['data' => $this->presentarOferta($oferta)], 201);
@@ -250,6 +254,8 @@ class CatalogoTenantController
             // Nivel que pide la clase y práctica libre (ADR 0187).
             'nivel_id' => ['sometimes', 'nullable', 'string'],
             'practica_libre' => ['sometimes', 'boolean'],
+            // Cómo se factura (ADR 0212).
+            ...ImpuestoDeVenta::reglas(),
         ]);
 
         // Primero se valida todo; después se guarda todo junto (ver abajo).
@@ -277,6 +283,7 @@ class CatalogoTenantController
         if ($request->has('practica_libre')) {
             $cambios['practica_libre'] = (bool) $validado['practica_libre'];
         }
+        $cambios = [...$cambios, ...ImpuestoDeVenta::cambios($request, $validado)];
         if ($request->has('nivel_id')) {
             $nivel = ($validado['nivel_id'] ?? '') !== '' ? NivelTenant::query()->where('ulid', (string) $validado['nivel_id'])->first() : null;
             if (($validado['nivel_id'] ?? '') !== '' && (! $nivel instanceof NivelTenant || (int) $nivel->actividad_id !== (int) $oferta->actividad_id)) {
@@ -508,6 +515,7 @@ class CatalogoTenantController
             'requisitos' => $oferta->requisitos,
             'que_llevar' => $oferta->que_llevar,
             'enlace_en_linea' => $oferta->enlace_en_linea,
+            ...ImpuestoDeVenta::presentar($oferta->iva, $oferta->clave_sat),
             // El nivel que pide y si es práctica libre (ADR 0187).
             'nivel' => $oferta->nivel_id === null ? null : (($n = NivelTenant::query()->find((int) $oferta->nivel_id)) === null ? null : ['id' => $n->ulid, 'nombre' => $n->nombre]),
             'practica_libre' => (bool) $oferta->practica_libre,

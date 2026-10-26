@@ -17,6 +17,7 @@ import {
 } from "@/lib/catalogosSat";
 import { useEditorFormulario } from "@/lib/editorFormulario";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Datos fiscales del negocio (el emisor de sus facturas). El régimen se elige del
@@ -29,10 +30,16 @@ interface DatosFiscales {
   regimen_fiscal: string;
   codigo_postal: string;
   sellos_cargados: boolean;
+  // Su alta en FacturAPI (ADR 0212).
+  facturacion_lista?: boolean;
+  pendientes?: string[];
+  error?: string | null;
+  portal_manifiesto?: string;
 }
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const form = ref({
@@ -150,6 +157,24 @@ function aplicar(d: DatosFiscales): void {
   empezar();
 }
 
+// Vuelve a preguntar a FacturAPI si ya puede facturar (tras firmar la carta).
+const revisando = ref(false);
+async function revisarAlta(): Promise<void> {
+  revisando.value = true;
+  try {
+    const { data } = await api.post<{ data: DatosFiscales }>(
+      `${base.value}/datos-fiscales/revisar`,
+      {},
+    );
+    guardados.value = data.data;
+    toast.exito(t("cfdi.alta.revisado"));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    revisando.value = false;
+  }
+}
+
 async function cargarTimbres(): Promise<void> {
   if (!sesion.puede("facturacion.ver")) {
     return;
@@ -220,6 +245,7 @@ async function subirSello(): Promise<void> {
       fd,
     );
     sellosCargados.value = data.data.sellos_cargados;
+    guardados.value = data.data;
     selloPassword.value = "";
     cer.value = null;
     key.value = null;
@@ -540,6 +566,52 @@ onMounted(cargar);
             }}
           </button>
         </form>
+
+        <!-- Su alta en FacturAPI (ADR 0212): ya factura o lo que le falta. -->
+        <div
+          v-if="sellosCargados && guardados"
+          class="mt-5 space-y-3"
+          data-prueba="alta-facturapi"
+        >
+          <AvisoTono v-if="guardados.facturacion_lista" tono="exito">
+            {{ $t("cfdi.alta.lista") }}
+          </AvisoTono>
+          <template v-else>
+            <AvisoTono tono="aviso">
+              <p>{{ $t("cfdi.alta.pendiente") }}</p>
+              <ul class="mt-1 list-disc pl-5">
+                <li v-for="p in guardados.pendientes ?? []" :key="p">
+                  {{ p }}
+                </li>
+                <li v-if="(guardados.pendientes ?? []).length === 0">
+                  {{ $t("cfdi.alta.firmarCarta") }}
+                </li>
+              </ul>
+            </AvisoTono>
+            <AvisoTono v-if="guardados.error" tono="peligro" role="alert">
+              {{ $t("cfdi.alta.error", { motivo: guardados.error }) }}
+            </AvisoTono>
+            <div class="flex flex-wrap gap-2">
+              <a
+                v-if="guardados.portal_manifiesto"
+                class="tu-btn tu-btn-secundario"
+                :href="guardados.portal_manifiesto"
+                target="_blank"
+                rel="noopener"
+                >{{ $t("cfdi.alta.abrirPortal") }}</a
+              >
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario"
+                :disabled="revisando"
+                data-prueba="revisar-alta"
+                @click="revisarAlta"
+              >
+                {{ $t("cfdi.alta.revisar") }}
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
     </template>
   </section>

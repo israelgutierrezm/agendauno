@@ -242,7 +242,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-if="disponible && membresias.length > 0" class="tu-card p-6">
+  <!-- Con ancla: la app abre aquí la web para activarlo (ADR 0211). -->
+  <div
+    v-if="disponible && membresias.length > 0"
+    id="pago-automatico"
+    class="tu-card p-6"
+  >
     <h2 class="font-medium text-lg">{{ $t("pagoAutomatico.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("pagoAutomatico.ayuda") }}

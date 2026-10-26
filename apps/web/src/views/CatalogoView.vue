@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import CamposFacturacion from "@/components/CamposFacturacion.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -65,6 +66,9 @@ interface Oferta {
   que_llevar?: string | null;
   // Clase en línea (ADR 0184): el enlace que ve solo quien la reservó.
   enlace_en_linea?: string | null;
+  // Cómo se factura (ADR 0212).
+  iva?: string;
+  clave_sat?: string | null;
   // Nivel que pide, los de su actividad y si es práctica libre (ADR 0187).
   nivel?: { id: string; nombre: string } | null;
   niveles_actividad?: { id: string; nombre: string }[];
@@ -208,6 +212,8 @@ const form = ref<{
   enlace: string;
   nivel: string;
   practicaLibre: boolean;
+  iva: string;
+  claveSat: string;
   regreso: string;
   anticipoTipo: TipoAnticipo;
   anticipo: string;
@@ -229,6 +235,8 @@ const form = ref<{
   enlace: "",
   nivel: "",
   practicaLibre: false,
+  iva: "general",
+  claveSat: "",
   regreso: "",
   anticipoTipo: "ninguno",
   anticipo: "",
@@ -402,6 +410,8 @@ function configurar(o: Oferta): void {
     enlace: o.enlace_en_linea ?? "",
     nivel: o.nivel?.id ?? "",
     practicaLibre: o.practica_libre ?? false,
+    iva: o.iva ?? "general",
+    claveSat: o.clave_sat ?? "",
     regreso: o.regreso_dias ? String(o.regreso_dias) : "",
     anticipoTipo:
       o.anticipo_minor != null
@@ -658,6 +668,9 @@ async function guardar(o: Oferta): Promise<void> {
         : { para_principiantes: form.value.principiantes }),
       requisitos: form.value.requisitos.trim() || null,
       que_llevar: form.value.queLlevar.trim() || null,
+      ...(sesion.estudio?.factura_posible
+        ? { iva: form.value.iva, clave_sat: form.value.claveSat.trim() || null }
+        : {}),
       ...(esCitas.value
         ? {}
         : {
@@ -1402,6 +1415,11 @@ onMounted(cargar);
               </p>
             </div>
           </div>
+          <CamposFacturacion
+            :id="`c-factura-${o.id}`"
+            v-model:iva="form.iva"
+            v-model:clave-sat="form.claveSat"
+          />
           <div class="grid gap-3 sm:grid-cols-2">
             <!-- Preparación y limpieza (2.3): ocupan la agenda, no la cita. -->
             <div>

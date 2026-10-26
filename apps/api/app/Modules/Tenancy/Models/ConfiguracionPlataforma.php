@@ -60,7 +60,35 @@ class ConfiguracionPlataforma extends Model
      */
     public static function facturacionDisponible(): bool
     {
+        return static::llaveUsuarioFacturapi() !== null || ! app()->environment('production');
+    }
+
+    /** ¿Se factura la renta? Con la llave de la organización de la plataforma. */
+    public static function facturacionRentaDisponible(): bool
+    {
         return static::llaveFacturapi() !== null || ! app()->environment('production');
+    }
+
+    /**
+     * La llave de usuario de FacturAPI (`sk_user_…`, ADR 0212): con ella la plataforma
+     * da de alta la organización de cada negocio (sus datos fiscales, su sello y su
+     * llave). La de {@see llaveFacturapi()} es la de la organización de la plataforma,
+     * con la que se factura la renta.
+     */
+    public static function llaveUsuarioFacturapi(): ?string
+    {
+        try {
+            $valor = static::obtener('facturapi_llave_usuario');
+            if (is_string($valor) && $valor !== '') {
+                return $valor;
+            }
+        } catch (Throwable) {
+            // Tabla ausente (migraciones no corridas): usa el respaldo de entorno.
+        }
+
+        $env = config('agendauno.facturapi.llave_usuario');
+
+        return is_string($env) && $env !== '' ? $env : null;
     }
 
     public static function llaveFacturapi(): ?string

@@ -352,6 +352,8 @@ class PlataformaController
     {
         $validado = $request->validate([
             'facturapi_llave' => ['nullable', 'string', 'max:255'],
+            // La de usuario (sk_user_…): da de alta a cada negocio (ADR 0212).
+            'facturapi_llave_usuario' => ['nullable', 'string', 'max:255'],
             'correo_alertas' => ['nullable', 'email', 'max:255'],
             // Modelo comercial (ADR 0107): ventas, Banco de México y paquetes de timbres.
             'ventas_correo' => ['nullable', 'email', 'max:255'],
@@ -361,13 +363,16 @@ class PlataformaController
             'banxico_token' => ['nullable', 'string', 'max:255'],
             'timbres_paquetes' => ['nullable', 'array', 'min:1', 'max:10'],
             'timbres_paquetes.*' => ['integer', 'distinct', 'min:1', 'max:100000'],
+            // Paquetes de mensajes de WhatsApp que se venden (ADR 0186).
+            'whatsapp_paquetes' => ['nullable', 'array', 'min:1', 'max:10'],
+            'whatsapp_paquetes.*' => ['integer', 'distinct', 'min:1', 'max:1000000'],
             // En qué países se ofrecen Wellhub y TotalPass (ADR 0202).
             'paises_bienestar' => ['sometimes', 'array:wellhub,totalpass'],
             'paises_bienestar.*' => ['array', 'max:30'],
             'paises_bienestar.*.*' => ['string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
         ]);
 
-        foreach (['facturapi_llave', 'correo_alertas', 'ventas_correo', 'ventas_correo_turnouno', 'banxico_token'] as $clave) {
+        foreach (['facturapi_llave', 'facturapi_llave_usuario', 'correo_alertas', 'ventas_correo', 'ventas_correo_turnouno', 'banxico_token'] as $clave) {
             if ($request->exists($clave)) {
                 ConfiguracionPlataforma::establecer($clave, $validado[$clave] ?? null);
             }
@@ -382,9 +387,11 @@ class PlataformaController
                 'totalpass' => array_map('strtoupper', $validado['paises_bienestar']['totalpass'] ?? $actuales['totalpass']),
             ]));
         }
-        if ($request->exists('timbres_paquetes')) {
-            $paquetes = $validado['timbres_paquetes'] ?? null;
-            ConfiguracionPlataforma::establecer('timbres_paquetes', is_array($paquetes) ? (string) json_encode(array_map('intval', $paquetes)) : null);
+        foreach (['timbres_paquetes', 'whatsapp_paquetes'] as $clave) {
+            if ($request->exists($clave)) {
+                $paquetes = $validado[$clave] ?? null;
+                ConfiguracionPlataforma::establecer($clave, is_array($paquetes) ? (string) json_encode(array_map('intval', $paquetes)) : null);
+            }
         }
 
         return response()->json(['data' => $this->presentarConfiguracion()]);
@@ -398,6 +405,7 @@ class PlataformaController
         return [
             // Nunca se devuelve la llave; solo si está configurada.
             'facturapi_configurada' => ConfiguracionPlataforma::llaveFacturapi() !== null,
+            'facturapi_usuario_configurada' => ConfiguracionPlataforma::llaveUsuarioFacturapi() !== null,
             // A dónde llegan las alertas y las rentas vencidas (ADR 0072).
             'correo_alertas' => ConfiguracionPlataforma::correoAlertas(),
             // Modelo comercial (ADR 0107). El token del Banco de México nunca se devuelve.
@@ -406,6 +414,7 @@ class PlataformaController
             'ventas_whatsapp' => ConfiguracionPlataforma::ventasWhatsApp(),
             'banxico_configurado' => ConfiguracionPlataforma::tokenBanxico() !== null,
             'timbres_paquetes' => ConfiguracionPlataforma::paquetesTimbres(),
+            'whatsapp_paquetes' => ConfiguracionPlataforma::paquetesWhatsApp(),
             'paises_bienestar' => ConfiguracionPlataforma::paisesBienestar(),
         ];
     }

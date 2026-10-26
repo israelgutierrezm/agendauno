@@ -374,7 +374,8 @@ class VerificacionProduccion
     private function facturacion(bool $apertura): array
     {
         return [
-            $this->punto('Facturación', 'Llave de FacturAPI (CFDI)', ConfiguracionPlataforma::llaveFacturapi() !== null, 'Sin ella la facturación queda apagada: los negocios no emiten facturas a sus clientes ni reciben la de su renta. Captúrala en Configuración del superadmin o define FACTURAPI_LLAVE.', critico: $apertura),
+            $this->punto('Facturación', 'Llave de usuario de FacturAPI (alta de negocios)', ConfiguracionPlataforma::llaveUsuarioFacturapi() !== null, 'Sin ella los negocios no se dan de alta en FacturAPI y no facturan a sus clientes. Captúrala en Configuración del superadmin o define FACTURAPI_LLAVE_USUARIO.', critico: $apertura),
+            $this->punto('Facturación', 'Llave de FacturAPI de la plataforma (renta)', ConfiguracionPlataforma::llaveFacturapi() !== null, 'Sin ella los negocios no reciben la factura de su renta. Captúrala en Configuración del superadmin o define FACTURAPI_LLAVE.', critico: $apertura),
         ];
     }
 

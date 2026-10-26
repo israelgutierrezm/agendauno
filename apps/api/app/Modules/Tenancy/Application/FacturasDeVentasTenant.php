@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\TratamientoIva;
 use App\Modules\Tenancy\Models\DatosFiscalesPersonaTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
@@ -13,6 +14,7 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PresupuestoTenant;
+use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
@@ -38,7 +40,7 @@ use Illuminate\Validation\ValidationException;
  * A quién: la persona de la venta y, si ya se le facturó antes, con los datos fiscales
  * de su última factura (RFC, código postal y uso del CFDI), para no volver a pedirlos.
  *
- * @phpstan-type Concepto array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}
+ * @phpstan-type Concepto array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string, iva: string}
  * @phpstan-type Receptor array{nombre: string|null, email: string|null, rfc: string|null, codigo_postal: string|null, uso_cfdi: string|null, regimen_fiscal: string|null}
  */
 class FacturasDeVentasTenant
@@ -118,11 +120,26 @@ class FacturasDeVentasTenant
             ->where('impuestos', ModoImpuestos::Desglosados->value)
             ->exists();
         $suman = (int) $lineas->sum('subtotal_minor') === $total;
-        $conceptos = $lineas->isNotEmpty() && $suman && ! $desglosado
-            ? array_values($lineas->map(fn (LineaOrdenTenant $l): array => $this->concepto(
-                $l->nombre(), (int) $l->cantidad, (int) $l->precio_unitario_minor, self::SERVICIO,
-            ))->all())
-            : [$this->concepto($this->nombreDeOrden($orden, sinImpuestos: $desglosado), 1, $total, self::SERVICIO)];
+        // El IVA y la clave del SAT de lo vendido (ADR 0212): los del plan o producto de
+        // cada línea; una cita o clase, los de su servicio.
+        $oferta = $orden->sesion?->oferta;
+        $deLinea = static fn (LineaOrdenTenant $l): array => $l->producto instanceof ProductoTenant
+            ? [TratamientoIva::de($l->producto->iva), $l->producto->clave_sat]
+            : [TratamientoIva::de($oferta?->iva), $oferta?->clave_sat];
+        if ($lineas->isNotEmpty() && $suman && ! $desglosado) {
+            $conceptos = array_values($lineas->map(function (LineaOrdenTenant $l) use ($deLinea): array {
+                [$iva, $clave] = $deLinea($l);
+
+                return $this->concepto($l->nombre(), (int) $l->cantidad, (int) $l->precio_unitario_minor, self::SERVICIO, $iva, $clave);
+            })->all());
+        } else {
+            // Un solo concepto: con el IVA de todo lo vendido si es el mismo; si no, el general.
+            $tratamientos = $lineas->isNotEmpty()
+                ? $lineas->map(static fn (LineaOrdenTenant $l): string => $deLinea($l)[0]->value)->unique()->values()
+                : collect([TratamientoIva::de($oferta?->iva)->value]);
+            $iva = $tratamientos->count() === 1 ? TratamientoIva::from((string) $tratamientos->first()) : TratamientoIva::General;
+            $conceptos = [$this->concepto($this->nombreDeOrden($orden, sinImpuestos: $desglosado), 1, $total, self::SERVICIO, $iva)];
+        }
         $pago = PagoTenant::query()->where('orden_id', $orden->getKey())->whereNotNull('aprobado_en')->latest('id')->first();
 
         return [
@@ -169,7 +186,8 @@ class FacturasDeVentasTenant
             $extras = array_map(static fn (array $e): string => (string) $e['nombre'], $l->extras ?? []);
             $nombre = (string) ($l->articulo->nombre ?? 'Producto').($extras !== [] ? ' con '.implode(', ', $extras) : '');
 
-            return $this->concepto($nombre, self::piezasQueQuedan($l), intdiv((int) $l->subtotal_minor, max(1, (int) $l->cantidad)), self::ARTICULO);
+            return $this->concepto($nombre, self::piezasQueQuedan($l), intdiv((int) $l->subtotal_minor, max(1, (int) $l->cantidad)), self::ARTICULO,
+                TratamientoIva::de($l->articulo?->iva), $l->articulo?->clave_sat);
         })->all());
         $devuelto = (int) $venta->devoluciones()->sum('monto_minor');
 
@@ -272,20 +290,23 @@ class FacturasDeVentasTenant
     }
 
     /**
-     * Un concepto con su precio sin IVA (el de venta ya lo trae).
+     * Un concepto con su precio sin IVA (el de venta ya lo trae; exento o a tasa cero,
+     * no lleva). Con la clave del SAT del producto, si la tiene.
      *
      * @param  array{clave_prod_serv: string, clave_unidad: string}  $claves
      * @return Concepto
      */
-    private function concepto(string $descripcion, int $cantidad, int $precioConIva, array $claves): array
+    private function concepto(string $descripcion, int $cantidad, int $precioConIva, array $claves, TratamientoIva $tratamiento = TratamientoIva::General, ?string $claveSat = null): array
     {
-        $iva = $this->parametros->entero('facturacion.iva_porcentaje');
+        $iva = intdiv($tratamiento->bps($this->parametros->entero('facturacion.iva_porcentaje') * 100), 100);
 
         return [
             'descripcion' => mb_substr($descripcion, 0, 1000),
             'cantidad' => max(1, $cantidad),
             'precio_unitario_minor' => max(1, (int) round($precioConIva * 100 / (100 + $iva))),
             ...$claves,
+            ...($claveSat !== null && $claveSat !== '' ? ['clave_prod_serv' => $claveSat] : []),
+            'iva' => $tratamiento->value,
         ];
     }
 

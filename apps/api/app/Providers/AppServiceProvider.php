@@ -12,11 +12,13 @@ use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Facturacion\FacturApiHttp;
+use App\Modules\Tenancy\Facturacion\OrganizacionesCfdi;
 use App\Modules\Tenancy\Listeners\AcumularPuntos;
 use App\Modules\Tenancy\Listeners\AvisarCambiosAPlataformas;
 use App\Modules\Tenancy\Listeners\DevolverPagoAlCancelarNegocio;
 use App\Modules\Tenancy\Listeners\DevolverPagoDeCitaConAnticipo;
 use App\Modules\Tenancy\Listeners\EjecutarAutomatizaciones;
+use App\Modules\Tenancy\Listeners\EnviarFacturaAlTimbrarse;
 use App\Modules\Tenancy\Listeners\EnviarWebhooksSalientes;
 use App\Modules\Tenancy\Listeners\FacturarCitaAlPagarse;
 use App\Modules\Tenancy\Listeners\GenerarComunicaciones;
@@ -55,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ClienteFacturacion::class, fn (): ClienteFacturacion => $this->proveedorDeFacturacion());
         // Cancelar un CFDI (ADR 0180): el mismo proveedor.
         $this->app->bind(CancelacionCfdi::class, fn (): CancelacionCfdi => $this->proveedorDeFacturacion());
+        $this->app->bind(OrganizacionesCfdi::class, fn (): OrganizacionesCfdi => $this->proveedorDeFacturacion());
     }
 
     /**
@@ -210,6 +213,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(EventoDeDominioTenant::class, DevolverPagoDeCitaConAnticipo::class);
         // La factura automática de una cita al pagarse, si su cliente la pidió.
         Event::listen(EventoDeDominioTenant::class, FacturarCitaAlPagarse::class);
+        Event::listen(EventoDeDominioTenant::class, EnviarFacturaAlTimbrarse::class);
         // GA4 y Meta del negocio (ADR 0143): anota sus conversiones; se mandan aparte.
         Event::listen(EventoDeDominioTenant::class, RegistrarConversionesMedicion::class);
         // Wellhub y TotalPass ven al momento los lugares de sus clases (ADR 0202).
@@ -270,10 +274,10 @@ class AppServiceProvider extends ServiceProvider
      * plataforma; si no, el falso en desarrollo y pruebas, y en producción uno que no
      * timbra (nunca un CFDI simulado a un cliente real).
      */
-    private function proveedorDeFacturacion(): CancelacionCfdi&ClienteFacturacion
+    private function proveedorDeFacturacion(): CancelacionCfdi&ClienteFacturacion&OrganizacionesCfdi
     {
         // La llave maestra la resuelve la plataforma (config en BD, con respaldo a env).
-        if (ConfiguracionPlataforma::llaveFacturapi() !== null) {
+        if (ConfiguracionPlataforma::llaveFacturapi() !== null || ConfiguracionPlataforma::llaveUsuarioFacturapi() !== null) {
             return new FacturApiHttp((string) config('agendauno.facturapi.base_url'));
         }
 

@@ -44,7 +44,7 @@ class FacturaRentaController
             ->where('ulid', (string) $request->route('cargo'))
             ->firstOrFail();
         // Sin proveedor real en producción no se factura (ni se simula).
-        if (! ConfiguracionPlataforma::facturacionDisponible()) {
+        if (! ConfiguracionPlataforma::facturacionRentaDisponible()) {
             throw ValidationException::withMessages(['facturacion' => [FacturacionNoConfigurada::MOTIVO]]);
         }
 

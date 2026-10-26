@@ -23,10 +23,10 @@ const CONTENIDO: Record<
       "Tu equipo de instructores",
       "Tus clases y los horarios que se repiten",
       "Los planes y créditos vigentes de cada alumno, a la fecha de corte que elijas (sin registrarlos como ventas)",
+      "Las reservas que ya tenían en tus próximas clases, con o sin avisarles",
     ],
     noSeTraslada: [
       "El historial de pagos y asistencias anteriores: queda en tu sistema anterior",
-      "Las reservas futuras: tus alumnos apartan de nuevo su lugar",
     ],
     configuras: [
       "Tu sucursal y su horario",

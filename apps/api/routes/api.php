@@ -95,6 +95,7 @@ use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisComprasMostradorTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
+use App\Modules\Tenancy\Http\Controllers\MisFacturasTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisParticipantesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MovimientosPagoTenantController;
@@ -583,6 +584,9 @@ Route::prefix('v1')->group(function (): void {
             // Mis documentos: los que pide el negocio, subir el propio y descargarlo.
             Route::get('/mi/documentos', [MisDocumentosTenantController::class, 'index'])->name('mi.documentos.index');
             // Mis datos para facturar (y la factura automática de mis citas).
+            // Mis facturas (ADR 0212): las que le timbró el negocio, con su PDF y su XML.
+            Route::get('/mi/facturas', [MisFacturasTenantController::class, 'index'])->name('mi.facturas.index');
+            Route::get('/mi/facturas/{factura}/{formato}', [MisFacturasTenantController::class, 'descargar'])->where('formato', 'pdf|xml')->name('mi.facturas.descargar');
             Route::get('/mi/datos-fiscales', [DatosFiscalesClienteController::class, 'mios'])->name('mi.datos-fiscales.show');
             Route::put('/mi/datos-fiscales', [DatosFiscalesClienteController::class, 'guardarMios'])->middleware('throttle:10,1,datos-fiscales')->name('mi.datos-fiscales.update');
             Route::delete('/mi/datos-fiscales', [DatosFiscalesClienteController::class, 'borrarMios'])->name('mi.datos-fiscales.destroy');
@@ -1225,6 +1229,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/datos-fiscales', [DatosFiscalesTenantController::class, 'show'])->middleware('puede:estudio.gestionar')->name('datos-fiscales.show');
             Route::put('/datos-fiscales', [DatosFiscalesTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('datos-fiscales.guardar');
             Route::post('/datos-fiscales/sello', [DatosFiscalesTenantController::class, 'subirSello'])->middleware('puede:estudio.gestionar')->name('datos-fiscales.sello');
+            Route::post('/datos-fiscales/revisar', [DatosFiscalesTenantController::class, 'revisar'])->middleware(['puede:estudio.gestionar', 'throttle:10,1,datos-fiscales-revisar'])->name('datos-fiscales.revisar');
 
             // Facturas (CFDI): emitir/timbrar vía FacturAPI, listar y consultar.
             Route::get('/facturas', [FacturasTenantController::class, 'index'])->middleware('puede:ordenes.ver')->name('facturas.index');
@@ -1232,6 +1237,9 @@ Route::prefix('v1')->group(function (): void {
             // Lo que se factura de una venta (ADR 0179): conceptos, a quién y forma de pago.
             Route::get('/facturas/borrador', [FacturasTenantController::class, 'borrador'])->middleware(['puede:ordenes.gestionar', 'plan:facturacion'])->name('facturas.borrador');
             Route::get('/facturas/{factura}', [FacturasTenantController::class, 'show'])->middleware('puede:ordenes.ver')->name('facturas.show');
+            // El PDF o el XML del CFDI y reenviarlo por correo (ADR 0212).
+            Route::get('/facturas/{factura}/{formato}', [FacturasTenantController::class, 'descargar'])->where('formato', 'pdf|xml')->middleware('puede:ordenes.ver')->name('facturas.descargar');
+            Route::post('/facturas/{factura}/enviar', [FacturasTenantController::class, 'enviar'])->middleware(['puede:ordenes.ver', 'throttle:10,1,factura-enviar'])->name('facturas.enviar');
             // Cancelar el CFDI y notas de crédito (ADR 0180): como anular o devolver un cobro.
             Route::post('/facturas/{factura}/cancelar', [FacturasTenantController::class, 'cancelar'])->middleware(['puede:pagos.reembolsar', 'plan:facturacion'])->name('facturas.cancelar');
             Route::post('/facturas/{factura}/notas-credito', [FacturasTenantController::class, 'notaDeCredito'])->middleware(['puede:pagos.reembolsar', 'plan:facturacion'])->name('facturas.notas-credito');

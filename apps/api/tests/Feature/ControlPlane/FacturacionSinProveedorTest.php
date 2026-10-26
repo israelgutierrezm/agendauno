@@ -48,8 +48,13 @@ it('en producción sin llave de FacturAPI no factura ni lo ofrece; fuera de prod
         fn () => expect(FacturaTenant::query()->count())->toBe(0),
     );
 
-    // Con la llave, se vuelve a facturar con el proveedor real.
+    // Con la llave de usuario (la que da de alta a los negocios, ADR 0212), se vuelve
+    // a facturar con el proveedor real; la de la plataforma sola es para la renta.
     config(['agendauno.facturapi.llave' => 'sk_test_llave']);
+    test()->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.estudio.facturacion_disponible', false);
+    config(['agendauno.facturapi.llave_usuario' => 'sk_user_llave']);
     test()->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.estudio.facturacion_disponible', true);
@@ -59,7 +64,8 @@ it('la verificación de producción avisa que sin llave de FacturAPI no hay fact
     config(['agendauno.facturapi.llave' => null]);
 
     $this->artisan('agendauno:verificar-produccion')
-        ->expectsOutputToContain('AVISO Llave de FacturAPI (CFDI)');
+        ->expectsOutputToContain('AVISO Llave de usuario de FacturAPI (alta de negocios)')
+        ->expectsOutputToContain('AVISO Llave de FacturAPI de la plataforma (renta)');
 });
 
 it('en producción sin llave de FacturAPI no se venden timbres', function (): void {

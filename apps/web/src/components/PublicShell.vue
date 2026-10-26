@@ -107,6 +107,8 @@ defineEmits<{ alternarTema: [] }>();
       'tu-public-shell--access': esAcceso,
     }"
   >
+    <!-- Con el teclado, lo primero es saltar el menú (se ve al recibir el foco). -->
+    <a href="#contenido" class="tu-saltar-contenido">Saltar al contenido</a>
     <header v-if="esAcceso || !esRutaPublicaDeNegocio" class="tu-public-nav">
       <div
         class="tu-public-container min-h-18 py-2 flex items-center justify-between gap-4"
@@ -231,7 +233,7 @@ defineEmits<{ alternarTema: [] }>();
       }}</RouterLink>
     </nav>
 
-    <main class="flex-1">
+    <main id="contenido" class="flex-1" tabindex="-1">
       <slot />
     </main>
 
@@ -394,6 +396,25 @@ defineEmits<{ alternarTema: [] }>();
 </template>
 
 <style>
+.tu-saltar-contenido {
+  position: absolute;
+  left: 0.75rem;
+  top: -4rem;
+  z-index: 100;
+  padding: 0.6rem 1rem;
+  border-radius: 0.6rem;
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 18%);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.tu-saltar-contenido:focus {
+  top: 0.75rem;
+}
+#contenido:focus {
+  outline: none;
+}
 /* Acceso ocupa el alto disponible sin sumar otra ventana completa al encabezado
    y al pie. Si el formulario crece (zoom, avisos o resultados), la página fluye. */
 .tu-public-shell--access {

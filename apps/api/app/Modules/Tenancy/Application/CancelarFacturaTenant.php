@@ -161,11 +161,11 @@ class CancelarFacturaTenant
             ->first();
     }
 
-    /** La llave de FacturAPI del negocio (la de la plataforma, si no tiene propia). */
+    /** La llave de FacturAPI del negocio, la de su organización (ADR 0212). */
     private function llave(): string
     {
         $datos = DatosFiscalesTenant::query()->first();
 
-        return (string) ($datos->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
+        return $datos instanceof DatosFiscalesTenant ? EmitirFacturaTenant::llaveDe($datos) : '';
     }
 }

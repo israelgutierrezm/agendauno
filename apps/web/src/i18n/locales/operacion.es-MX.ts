@@ -1076,7 +1076,7 @@ export default {
       mercadopago: "Tarjeta, OXXO y más, en la página de pago de Mercado Pago.",
       openpay: "Tarjeta y pago en tienda con referencia.",
       ventanilla:
-        "Depósito o transferencia: el alumno sube su comprobante y tú lo validas.",
+        "Depósito o transferencia a tu cuenta: lo registras en Cobros o en la caja cuando lo recibes.",
     },
     estado: {
       cobrando: "Cobrando",

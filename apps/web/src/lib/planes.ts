@@ -17,6 +17,9 @@ export type TipoVigencia = "dias" | "meses" | "fin_de_mes";
 export interface Plan {
   id: string;
   nombre: string;
+  // Cómo se factura (ADR 0212).
+  iva?: string;
+  clave_sat?: string | null;
   tipo: TipoPlan;
   precio_minor: number;
   moneda: string;

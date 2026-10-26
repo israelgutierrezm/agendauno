@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Http\ImpuestoDeVenta;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\CategoriaArticuloTenant;
@@ -354,7 +355,8 @@ class InventarioTenantController
      */
     private function validarTodo(Request $request): array
     {
-        $reglas = $this->reglas();
+        // Cómo se factura (ADR 0212).
+        $reglas = [...$this->reglas(), ...ImpuestoDeVenta::reglas()];
         if ($request->has('extras')) {
             $reglas += [
                 'extras' => ['present', 'array', 'max:30'],
@@ -367,7 +369,7 @@ class InventarioTenantController
         /** @var list<array{id?: string|null, nombre: string, precio_minor: int}>|null $extras */
         $extras = $request->has('extras') ? array_values($validado['extras']) : null;
 
-        return [$this->datos($request, $validado), $extras];
+        return [[...$this->datos($request, $validado), ...ImpuestoDeVenta::cambios($request, $validado)], $extras];
     }
 
     /**
@@ -495,6 +497,7 @@ class InventarioTenantController
             ] : null,
             'foto_url' => $articulo->fotoUrl(),
             'ofrecer_al_reservar' => $articulo->ofrecer_al_reservar,
+            ...ImpuestoDeVenta::presentar($articulo->iva, $articulo->clave_sat),
             // Lo que se le puede agregar (ADR 0139).
             'extras' => ($articulo->relationLoaded('extras') ? $articulo->extras : $articulo->extras()->where('activo', true)->get())->map(static fn (ExtraArticuloTenant $e): array => [
                 'id' => $e->ulid, 'nombre' => $e->nombre, 'precio_minor' => $e->precio_minor,

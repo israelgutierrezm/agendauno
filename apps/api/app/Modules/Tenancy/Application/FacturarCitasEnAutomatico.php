@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\TratamientoIva;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesPersonaTenant;
@@ -70,12 +71,17 @@ class FacturarCitasEnAutomatico
         $emisor = DatosFiscalesTenant::query()->firstOrFail();
         $borrador = $this->ventas->borradorDeOrden($orden);
         $receptor = $fiscales->receptor();
+        // El IVA y la clave del SAT del servicio de la cita (ADR 0212).
+        $servicio = $reserva->sesion?->oferta;
+        $iva = TratamientoIva::de($servicio?->iva);
+        $clave = (string) ($servicio->clave_sat ?? '');
+        $clave = $clave !== '' ? $clave : '86121600';
 
         // El anticipo de una cita con anticipo: su CFDI de anticipo.
         if ((int) $reserva->orden_id === (int) $orden->getKey() && $reserva->saldo_orden_id !== null) {
             return $this->emisor->emitir(
                 $emisor, $receptor,
-                [['descripcion' => 'Anticipo', 'cantidad' => 1, 'precio_unitario_minor' => $this->sinIva($borrador['total_minor']), 'clave_prod_serv' => '84111506', 'clave_unidad' => 'ACT']],
+                [['descripcion' => 'Anticipo', 'cantidad' => 1, 'precio_unitario_minor' => $this->sinIva($borrador['total_minor'], $iva), 'clave_prod_serv' => '84111506', 'clave_unidad' => 'ACT', 'iva' => $iva->value]],
                 $fiscales->uso_cfdi, $borrador['forma_pago'], $borrador['moneda'],
                 anticipo: true, ordenId: (int) $orden->getKey(),
             );
@@ -88,7 +94,7 @@ class FacturarCitasEnAutomatico
             $total = (int) $anticipo->total_minor + (int) $borrador['total_minor'];
             $operacion = $this->emisor->emitir(
                 $emisor, $receptor,
-                [['descripcion' => (string) $descripcion, 'cantidad' => 1, 'precio_unitario_minor' => $this->sinIva($total), 'clave_prod_serv' => '86121600', 'clave_unidad' => 'E48']],
+                [['descripcion' => (string) $descripcion, 'cantidad' => 1, 'precio_unitario_minor' => $this->sinIva($total, $iva), 'clave_prod_serv' => $clave, 'clave_unidad' => 'E48', 'iva' => $iva->value]],
                 $fiscales->uso_cfdi, $borrador['forma_pago'], $borrador['moneda'],
                 anticipos: [(string) $anticipo->ulid], ordenId: (int) $orden->getKey(), conEgreso: true,
             );
@@ -168,9 +174,9 @@ class FacturarCitasEnAutomatico
     }
 
     /** El importe sin IVA de un precio con IVA (el CFDI se lo suma). */
-    private function sinIva(int $conIva): int
+    private function sinIva(int $conIva, TratamientoIva $tratamiento): int
     {
-        $iva = $this->parametros->entero('facturacion.iva_porcentaje');
+        $iva = intdiv($tratamiento->bps($this->parametros->entero('facturacion.iva_porcentaje') * 100), 100);
 
         return max(1, (int) round($conIva * 100 / (100 + $iva)));
     }

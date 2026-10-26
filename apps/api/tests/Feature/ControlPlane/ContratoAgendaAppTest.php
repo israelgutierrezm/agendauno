@@ -128,7 +128,7 @@ it('una clase de un negocio de clases trae su cupo y la ocupación que se muestr
         ->and($creada['cita'])->toBeNull()
         ->and($creada['clase'])->toBe([
             'capacidad' => 4, 'ocupados' => 0, 'libres' => 4, 'en_espera' => 0,
-            'lugares' => 0, 'de_pago' => false, 'precio_minor' => null,
+            'lugares' => 0, 'de_pago' => false, 'precio_minor' => null, 'en_linea' => false,
         ])
         ->and($creada['ocupacion'])->toBe(['ocupados' => 0, 'capacidad' => 4, 'porcentaje' => 0]);
 

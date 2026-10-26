@@ -2749,12 +2749,12 @@ export default {
     codigoDesarrollo: "Solo en desarrollo, el código es {codigo}.",
     operador: "Operador: {nombre}",
     facturapi: {
-      titulo: "Cuenta FacturAPI",
+      titulo: "FacturAPI: factura de la renta",
       subtitulo:
-        "La llave que la plataforma usa para timbrar por todos los negocios.",
+        "La llave en vivo de la organización de la plataforma (sk_live_…): con ella se factura la renta de cada negocio.",
       configurada: "Configurada",
       noConfigurada: "Sin configurar",
-      llave: "Llave secreta de FacturAPI",
+      llave: "Llave en vivo de la plataforma",
       guardar: "Guardar llave",
       guardando: "Guardando…",
       guardado: "Configuración guardada.",
@@ -2762,7 +2762,7 @@ export default {
       // Quitarla detiene la facturación de todos: se confirma (ADR 0132).
       quitar: "Quitar llave",
       confirmarQuitar:
-        "¿Quitar la llave de FacturAPI? Ningún negocio podrá facturar hasta que pongas otra.",
+        "¿Quitar la llave de la plataforma? La factura de la renta deja de emitirse hasta que pongas otra.",
       quitada: "Llave de FacturAPI quitada.",
     },
     legales: {

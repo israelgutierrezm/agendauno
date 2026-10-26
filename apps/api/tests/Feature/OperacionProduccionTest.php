@@ -230,16 +230,19 @@ it('exige tipo de cambio para la renta en pesos, el secreto whsec_ del webhook, 
         ->expectsOutputToContain('FALTA Tipo de cambio para cobrar en pesos — No hay ninguno capturado.')
         ->expectsOutputToContain('FALTA Secreto del webhook de Stripe — No empieza con whsec_')
         ->expectsOutputToContain('FALTA Servidor SMTP configurado — Ahora: 127.0.0.1.')
-        ->expectsOutputToContain('AVISO Llave de FacturAPI (CFDI)')
+        ->expectsOutputToContain('AVISO Llave de usuario de FacturAPI (alta de negocios)')
+        ->expectsOutputToContain('AVISO Llave de FacturAPI de la plataforma (renta)')
         ->assertFailed();
     $this->artisan('agendauno:verificar-produccion --apertura')
-        ->expectsOutputToContain('FALTA Llave de FacturAPI (CFDI)')
+        ->expectsOutputToContain('FALTA Llave de usuario de FacturAPI (alta de negocios)')
+        ->expectsOutputToContain('FALTA Llave de FacturAPI de la plataforma (renta)')
         ->assertFailed();
 
     config([
         'agendauno.banxico.token' => 'token-banxico',
         'mail.mailers.smtp.host' => 'smtp.proveedor.mx',
         'agendauno.facturapi.llave' => 'sk_live_facturapi',
+        'agendauno.facturapi.llave_usuario' => 'sk_user_facturapi',
     ]);
     ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->firstOrFail()
         ->update(['credenciales' => ['secret_key' => 'sk_test_x', 'webhook_secret' => 'whsec_x']]);
@@ -247,7 +250,8 @@ it('exige tipo de cambio para la renta en pesos, el secreto whsec_ del webhook, 
         ->expectsOutputToContain('OK    Tipo de cambio para cobrar en pesos')
         ->expectsOutputToContain('OK    Secreto del webhook de Stripe')
         ->expectsOutputToContain('OK    Servidor SMTP configurado')
-        ->expectsOutputToContain('OK    Llave de FacturAPI (CFDI)');
+        ->expectsOutputToContain('OK    Llave de usuario de FacturAPI (alta de negocios)')
+        ->expectsOutputToContain('OK    Llave de FacturAPI de la plataforma (renta)');
 });
 
 it('los respaldos, el simulacro, la agenda y la mora corren de madrugada en la Ciudad de México', function (): void {

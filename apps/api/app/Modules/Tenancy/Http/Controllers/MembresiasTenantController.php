@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Http\ImpuestoDeVenta;
 use App\Modules\Tenancy\Membresias\BajaAnticipada;
 use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
@@ -105,6 +106,8 @@ class MembresiasTenantController
             'cobra_anualidad' => ['sometimes', 'boolean'],
             ...self::reglasPermanencia(),
             ...self::reglasSocio(),
+            // Cómo se factura (ADR 0212).
+            ...ImpuestoDeVenta::reglas(),
         ]);
         // Un negocio de citas vende bonos de sesiones, no membresías (ADR 0130).
         $this->modalidades->exigirAtributos($validado);
@@ -137,6 +140,7 @@ class MembresiasTenantController
             'cobra_anualidad' => (bool) ($validado['cobra_anualidad'] ?? false),
             ...self::permanencia($validado),
             ...array_map(static fn (mixed $v): ?int => $v === null ? null : (int) $v, array_intersect_key($validado, array_flip(self::REGLAS_SOCIO))),
+            ...ImpuestoDeVenta::cambios($request, $validado),
         ]);
 
         // Avisos de coherencia del catálogo (no bloquean).
@@ -180,6 +184,8 @@ class MembresiasTenantController
             'cobra_anualidad' => ['sometimes', 'boolean'],
             ...self::reglasPermanencia(),
             ...self::reglasSocio(),
+            // Cómo se factura (ADR 0212).
+            ...ImpuestoDeVenta::reglas(),
         ]);
 
         self::exigirCuotasConMonto($validado);
@@ -200,6 +206,7 @@ class MembresiasTenantController
         if ($request->has('descripcion')) {
             $atributos['descripcion'] = self::texto($validado['descripcion'] ?? null);
         }
+        $atributos = [...$atributos, ...ImpuestoDeVenta::cambios($request, $validado)];
         if ($request->has('permanencia_meses')) {
             $atributos = [...$atributos, ...self::permanencia($validado)];
         }
@@ -408,6 +415,7 @@ class MembresiasTenantController
             'id' => $producto->ulid,
             'nombre' => $producto->nombre,
             'tipo' => $producto->tipo->value,
+            ...ImpuestoDeVenta::presentar($producto->iva, $producto->clave_sat),
             'precio_minor' => $producto->precio_minor,
             'moneda' => $producto->moneda,
             'ilimitado' => $producto->ilimitado,

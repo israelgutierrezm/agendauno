@@ -56,11 +56,35 @@ const charset = /<meta charset="[^"]*"\s*\/?>/i;
 if (!charset.test(sinIconos)) {
   throw new Error("index.html sin <meta charset>: ¿dónde van los íconos?");
 }
+// La vista previa al compartir (descripción, Open Graph y Twitter) también con la
+// marca de TurnoUno y su imagen (la de su portada: aún no tiene imagen de marca).
+const dominioTurnoUno = (
+  process.env.VITE_DOMINIO_TURNOUNO ?? "turnouno.mx"
+).toLowerCase();
 const turnouno = sinIconos
   .replace(charset, (meta) => `${meta}\n    ${ICONOS_TURNOUNO.join("\n    ")}`)
+  .replace(
+    /(<!-- marketing:head -->)([\s\S]*?)(<!-- \/marketing:head -->)/,
+    (_, abre, cabeza, cierra) =>
+      abre +
+      cabeza
+        .replace(
+          /https:\/\/[^/"]+\/assets\/brand\/agendauno\/final-v2\/open-graph\.png/g,
+          `https://${dominioTurnoUno}/assets/landing/disciplinas/barberia-v1.jpg`,
+        )
+        .replace(
+          /Logotipo de AgendaUno/g,
+          "Barbero atendiendo a un cliente en una barbería moderna",
+        )
+        .replace(/AgendaUno/g, "TurnoUno") +
+      cierra,
+  )
   .replace("<title>AgendaUno</title>", "<title>TurnoUno</title>");
 if (!turnouno.includes("<title>TurnoUno</title>")) {
   throw new Error("index.html no trae <title>AgendaUno</title> que cambiar.");
+}
+if (/og:(?:site_name|title)" content="AgendaUno"/.test(turnouno)) {
+  throw new Error("app-turnouno.html quedó con la vista previa de AgendaUno.");
 }
 await writeFile(resolve(root, "dist/app/app-turnouno.html"), turnouno);
 // El de la vista previa local. En producción, el subdominio de cada negocio tiene el

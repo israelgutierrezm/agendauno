@@ -14,10 +14,15 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\CatalogosSat;
+use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
+use App\Modules\Tenancy\Facturacion\EnviarFacturaPorCorreo;
 use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
 use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
+use App\Modules\Tenancy\Facturacion\TimbradoFallido;
+use App\Modules\Tenancy\Facturacion\TratamientoIva;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -25,6 +30,7 @@ use App\Modules\Tenancy\Models\VentaPosTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -216,6 +222,8 @@ class FacturasTenantController
             'items.*.precio_unitario_minor' => ['required', 'integer', 'min:1'],
             'items.*.clave_prod_serv' => ['required', 'string', 'max:8'],
             'items.*.clave_unidad' => ['required', 'string', 'max:3'],
+            // El IVA del concepto (ADR 0212): el general del negocio, exento o tasa cero.
+            'items.*.iva' => ['nullable', Rule::in(array_map(static fn (TratamientoIva $t): string => $t->value, TratamientoIva::cases()))],
             // Factura de un anticipo (ADR 0163): un solo concepto, su importe; la clave,
             // la unidad y la descripción las fija el SAT.
             'anticipo' => ['boolean'],
@@ -251,7 +259,7 @@ class FacturasTenantController
 
         $datos = $this->datosFiscales();
 
-        /** @var list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string}> $items */
+        /** @var list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string, iva?: string|null}> $items */
         $items = $validado['items'];
 
         $factura = $this->emisor->emitir(
@@ -293,7 +301,7 @@ class FacturasTenantController
         return [
             'id' => $factura->ulid,
             'estado' => $factura->estado->value,
-            'receptor' => ['nombre' => $factura->receptor_nombre, 'rfc' => $factura->receptor_rfc],
+            'receptor' => ['nombre' => $factura->receptor_nombre, 'rfc' => $factura->receptor_rfc, 'email' => $factura->receptor_email],
             'uso_cfdi' => $factura->uso_cfdi,
             'moneda' => $factura->moneda,
             'subtotal_minor' => $factura->subtotal_minor,
@@ -336,6 +344,52 @@ class FacturasTenantController
     }
 
     /** La factura, si quien la pide alcanza su venta (R19); sin venta, es del negocio. */
+    /**
+     * El PDF o el XML de un CFDI timbrado (ADR 0212), con la llave del negocio: FacturAPI
+     * no los entrega sin ella.
+     */
+    public function descargar(Request $request, ClienteFacturacion $cliente): Response
+    {
+        $factura = $this->facturaDeMiSede($request, (string) $request->route('factura'));
+
+        return self::archivo($factura, (string) $request->route('formato'), $this->datosFiscales(), $cliente);
+    }
+
+    /** Vuelve a mandar el CFDI por correo (al del receptor o a otro). */
+    public function enviar(Request $request): JsonResponse
+    {
+        $factura = $this->facturaDeMiSede($request, (string) $request->route('factura'));
+        $validado = $request->validate(['email' => ['nullable', 'email', 'max:255']]);
+        $correo = ($validado['email'] ?? '') !== '' ? (string) $validado['email'] : $factura->receptor_email;
+        if ($factura->estado !== EstadoFactura::Timbrada || $correo === null || $correo === '') {
+            throw ValidationException::withMessages(['email' => ['Escribe a qué correo mandarla (la factura debe estar timbrada).']]);
+        }
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        EnviarFacturaPorCorreo::dispatch((int) $estudio->getKey(), (string) $factura->ulid, $correo);
+
+        return response()->json(['data' => ['enviada_a' => $correo]], 202);
+    }
+
+    /**
+     * El archivo de un CFDI timbrado, para descargar.
+     */
+    public static function archivo(FacturaTenant $factura, string $formato, DatosFiscalesTenant $emisor, ClienteFacturacion $cliente): Response
+    {
+        abort_unless(in_array($formato, ['pdf', 'xml'], true), 404);
+        abort_unless($factura->estado === EstadoFactura::Timbrada && $factura->facturapi_id !== null, 409, 'La factura no está timbrada.');
+        try {
+            $contenido = $cliente->descargar(EmitirFacturaTenant::llaveDe($emisor), (string) $factura->facturapi_id, $formato);
+        } catch (TimbradoFallido $e) {
+            throw ValidationException::withMessages(['factura' => [$e->getMessage()]]);
+        }
+
+        return response($contenido, 200, [
+            'Content-Type' => $formato === 'pdf' ? 'application/pdf' : 'application/xml',
+            'Content-Disposition' => 'attachment; filename="factura-'.$factura->uuid.'.'.$formato.'"',
+        ]);
+    }
+
     private function facturaDeMiSede(Request $request, string $ulid): FacturaTenant
     {
         $factura = FacturaTenant::query()->where('ulid', $ulid)->with(['orden', 'venta', 'relacionada'])->firstOrFail();
