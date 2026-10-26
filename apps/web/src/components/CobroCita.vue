@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import CampoCupon from "@/components/CampoCupon.vue";
 import FormasDePago from "@/components/FormasDePago.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { puedeEntrar } from "@/lib/acceso";
@@ -67,6 +68,21 @@ const servicio = computed(() =>
     : 0,
 );
 const conMostrador = computed(() => puedeEntrar("pos", tenant));
+// Un cupón (ADR 0220): descuenta del servicio; el servidor lo vuelve a validar.
+const cupon = ref("");
+const descuentoCupon = ref(0);
+const servicioNeto = computed(() =>
+  Math.max(0, servicio.value - (cupon.value !== "" ? descuentoCupon.value : 0)),
+);
+async function revisarCupon(
+  codigo: string,
+): Promise<{ descuento_minor: number }> {
+  const { data } = await api.post<{ data: { descuento_minor: number } }>(
+    `${props.base}/promociones/validar`,
+    { codigo, subtotal_minor: servicio.value },
+  );
+  return data.data;
+}
 
 const articulos = ref<Articulo[]>([]);
 const cargandoArticulos = ref(false);
@@ -87,6 +103,7 @@ const valor = () => ({
   propinaPct: propinaPct.value,
   propinaOtra: propinaOtra.value,
   recibido: recibido.value,
+  cupon: cupon.value,
 });
 const abiertoEditor = computed(() => props.abierto && resultado.value === null);
 const editor = useEditorFormulario({
@@ -111,10 +128,12 @@ const propina = computed(() => {
     return aMinor(propinaOtra.value, tenant.pais) ?? 0;
   }
   return Math.round(
-    ((servicio.value + productos.value) * propinaPct.value) / 100,
+    ((servicioNeto.value + productos.value) * propinaPct.value) / 100,
   );
 });
-const total = computed(() => servicio.value + productos.value + propina.value);
+const total = computed(
+  () => servicioNeto.value + productos.value + propina.value,
+);
 // Con varias formas de pago (ADR 0177): cuánto con cada una; suman todo.
 const dividido = ref(false);
 const partes = ref<ParteCobro[] | null>(null);
@@ -210,6 +229,8 @@ watch(
     propinaPct.value = 0;
     propinaOtra.value = "";
     recibido.value = "";
+    cupon.value = "";
+    descuentoCupon.value = 0;
     enviarTicket.value = false;
     resultado.value = null;
     clave = `cita-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -245,6 +266,7 @@ async function cobrar(): Promise<void> {
       })),
       propina_minor: propina.value,
       recibido_minor: enEfectivo.value > 0 ? recibidoMinor.value : null,
+      ...(cupon.value !== "" ? { cupon: cupon.value } : {}),
       enviar_ticket: enviarTicket.value,
       clave_intento: clave,
     }),
@@ -438,6 +460,14 @@ async function cerrar(): Promise<void> {
       <p v-if="editor.errores.value.items" class="tu-error-campo" role="alert">
         {{ editor.errores.value.items }}
       </p>
+      <CampoCupon
+        v-if="servicio > 0"
+        v-model="cupon"
+        :revisar="revisarCupon"
+        :dinero="dinero"
+        :deshabilitado="editor.guardando.value"
+        @aplicado="(d: number) => (descuentoCupon = d)"
+      />
 
       <!-- Productos que se lleva (si hay mostrador) -->
       <div v-if="conMostrador">

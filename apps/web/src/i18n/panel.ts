@@ -141,6 +141,7 @@ import bajaNegocio from "./locales/bajaNegocio.es-MX";
 import datosNegocio from "./locales/datosNegocio.es-MX";
 import legalesNuevos from "./locales/legalesNuevos.es-MX";
 import misComisiones from "./locales/misComisiones.es-MX";
+import cupon from "./locales/cupon.es-MX";
 
 export const mensajesPanel = {
   adminUsabilidad,
@@ -271,4 +272,5 @@ export const mensajesPanel = {
   datosNegocio,
   legalesNuevos,
   misComisiones,
+  cupon,
 };

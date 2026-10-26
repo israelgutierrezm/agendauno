@@ -133,6 +133,44 @@ describe("cobro al terminar la cita", () => {
     expect(w.text()).toContain("AB12CD34");
   });
 
+  it("un cupón descuenta del servicio y se manda al cobrar (ADR 0220)", async () => {
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/promociones/validar")
+            ? { descuento_minor: 5000 }
+            : {
+                servicio_minor: 20000,
+                productos_minor: 0,
+                propina_minor: 0,
+                total_minor: 20000,
+                ticket: { folio: "CU20" },
+              },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-prueba="abrir-cupon"]').trigger("click");
+    await w.get("#cc-codigo").setValue("corte20");
+    await w.get('[data-prueba="aplicar-cupon"]').trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/promociones/validar",
+      { codigo: "corte20", subtotal_minor: 25000 },
+    );
+    expect(w.get('[data-prueba="cupon-aplicado"]').text()).toContain("CORTE20");
+    expect(w.get('[data-prueba="total-cita"]').text()).toContain("200.00");
+
+    await w.get("#form-cobro-cita").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/reservas/r1/cobro",
+      expect.objectContaining({ cupon: "corte20" }),
+    );
+  });
+
   it("con anticipo pagado solo cobra lo que falta (ADR 0161)", async () => {
     const w = montar({
       ...sesion,

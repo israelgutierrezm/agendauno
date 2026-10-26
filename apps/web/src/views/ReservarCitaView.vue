@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CampoCupon from "@/components/CampoCupon.vue";
 import {
   computed,
   nextTick,
@@ -866,6 +867,21 @@ watch(paso, (p) => {
 // Una cita por intento: reintentar lo mismo no agenda otra (ADR 0201).
 const intento = intentoUnico();
 
+// Un cupón del negocio (ADR 0220): se revisa antes y se aplica al agendar.
+const cupon = ref("");
+async function revisarCupon(
+  codigo: string,
+): Promise<{ descuento_minor: number }> {
+  const { data } = await api.get<{ data: { descuento_minor: number } }>(
+    `/api/v1/app/${slug.value}/citas/cupon`,
+    { params: { codigo, oferta_id: servicioId.value } },
+  );
+  return data.data;
+}
+watch(servicioId, () => {
+  cupon.value = "";
+});
+
 async function agendar(): Promise<void> {
   if (!listoParaAgendar.value) {
     error.value = null;
@@ -882,6 +898,7 @@ async function agendar(): Promise<void> {
     inicia_en_local: relojLocal(slotSel.value),
     duracion_minutos: duracion.value,
     ...(nota.value.trim() !== "" ? { nota: nota.value.trim() } : {}),
+    ...(cupon.value !== "" ? { cupon: cupon.value } : {}),
     ...(paraOtra.value && asiste.value.trim() !== ""
       ? { asiste: asiste.value.trim() }
       : {}),
@@ -2166,6 +2183,20 @@ onMounted(cargar);
                   <span>{{ $t("perfilPublico.agendar.precioServicio") }}</span>
                   <strong>{{ precioDe(servicioSel) }}</strong>
                 </div>
+                <!-- Cupón (ADR 0220): solo en lo que se paga. -->
+                <CampoCupon
+                  v-if="
+                    !servicioSel?.con_plan &&
+                    (servicioSel?.precio_minor ?? 0) > 0
+                  "
+                  v-model="cupon"
+                  class="mt-2"
+                  :revisar="revisarCupon"
+                  :dinero="
+                    (m: number) => dinero(m, servicioSel?.moneda ?? null)
+                  "
+                  :deshabilitado="agendando"
+                />
                 <fieldset
                   v-if="anticipoSel !== null"
                   class="rc-anticipo"

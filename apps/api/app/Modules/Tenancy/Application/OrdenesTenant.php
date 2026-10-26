@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Ordenes\Exceptions\PrimeraVezNoDisponible;
 use App\Modules\Tenancy\Ordenes\Exceptions\ProductoArchivado;
+use App\Modules\Tenancy\Ordenes\Exceptions\PromocionInvalida;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Support\Facades\DB;
@@ -215,6 +216,33 @@ class OrdenesTenant
      * producto. Al pagarla, el fulfillment CONFIRMA la reserva ligada (no concede un
      * derecho). La reserva se crea aparte (ver {@see ReservasTenant::reservarConPago()}).
      */
+    /**
+     * Aplica un cupón a una orden que falta pagar (ADR 0220): al agendar una cita o al
+     * cobrarla. Descuenta de su total (nunca más que el total) y guarda cuál fue; su
+     * uso se cuenta al pagarse. Una orden pagada, cancelada o que ya tiene cupón, no.
+     */
+    public function aplicarCupon(OrdenTenant $orden, string $codigo): OrdenTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($orden, $codigo): OrdenTenant {
+            $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueada->estado !== EstadoOrden::Pendiente) {
+                throw new PromocionInvalida('El cupón solo se aplica a lo que falta por pagar.');
+            }
+            if ($bloqueada->promocion_id !== null) {
+                throw new PromocionInvalida('Ya se aplicó un cupón a este cobro.');
+            }
+            ['promocion' => $promocion, 'descuento' => $descuento] = $this->promociones->aplicarEnOrden($codigo, (int) $bloqueada->total_minor);
+            $descuento = min($descuento, (int) $bloqueada->total_minor);
+            $bloqueada->update([
+                'total_minor' => (int) $bloqueada->total_minor - $descuento,
+                'descuento_minor' => (int) $bloqueada->descuento_minor + $descuento,
+                'promocion_id' => $promocion->getKey(),
+            ]);
+
+            return $bloqueada;
+        });
+    }
+
     public function crearPorSesion(PersonaTenant $comprador, SesionTenant $sesion, int $montoMinor, string $moneda, ?int $sucursalId = null): OrdenTenant
     {
         return OrdenTenant::query()->create([

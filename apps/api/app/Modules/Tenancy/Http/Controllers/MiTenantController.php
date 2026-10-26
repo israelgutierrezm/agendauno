@@ -655,6 +655,8 @@ class MiTenantController
             'acepta_whatsapp' => ['boolean'],
             // Si el servicio pide anticipo (ADR 0161): pagar solo el anticipo o todo.
             'pagar' => ['nullable', Rule::in(['anticipo', 'todo'])],
+            // Un cupón del negocio (ADR 0220): a lo que falta pagar de la cita.
+            'cupon' => ['nullable', 'string', 'max:64'],
             // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
             'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
@@ -671,8 +673,8 @@ class MiTenantController
         $pagarTodo = ($validado['pagar'] ?? null) === 'todo';
         $clave = $validado['idempotency_key'] ?? null;
         $reserva = $instructor instanceof Usuario
-            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave)
-            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave);
+            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave, cupon: $validado['cupon'] ?? null)
+            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave, $validado['cupon'] ?? null);
         $nueva = $reserva->wasRecentlyCreated;
         $cambios = array_filter([
             'nota_cliente' => trim((string) ($validado['nota'] ?? '')),

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CampoCupon from "@/components/CampoCupon.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 
@@ -236,6 +237,21 @@ watch([servicioId, profesionalId, sucursalId, fecha], buscarHorarios);
 
 const intento = intentoUnico();
 
+// Un cupón del negocio (ADR 0220): se revisa antes y se aplica al agendar.
+const cupon = ref("");
+async function revisarCupon(
+  codigo: string,
+): Promise<{ descuento_minor: number }> {
+  const { data } = await api.get<{ data: { descuento_minor: number } }>(
+    `${base.value}/citas/cupon`,
+    { params: { codigo, oferta_id: servicioId.value } },
+  );
+  return data.data;
+}
+watch(servicioId, () => {
+  cupon.value = "";
+});
+
 async function agendar(): Promise<void> {
   if (servicio.value === null || slotSel.value === "") {
     return;
@@ -256,6 +272,7 @@ async function agendar(): Promise<void> {
     ...(anticipo.value !== null
       ? { pagar: pagarTodo.value ? "todo" : "anticipo" }
       : {}),
+    ...(cupon.value !== "" ? { cupon: cupon.value } : {}),
   };
   try {
     const { data } = await api.post<{
@@ -600,6 +617,19 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Cupón (ADR 0220): solo en lo que se paga. -->
+      <CampoCupon
+        v-if="
+          servicio &&
+          !servicio.con_plan &&
+          (servicio.prepagados ?? 0) === 0 &&
+          (servicio.precio_minor ?? 0) > 0
+        "
+        v-model="cupon"
+        :revisar="revisarCupon"
+        :dinero="(m: number) => dinero(m, servicio?.moneda ?? 'MXN')"
+        :deshabilitado="agendando"
+      />
       <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
       </AvisoTono>

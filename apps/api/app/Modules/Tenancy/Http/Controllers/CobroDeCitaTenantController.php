@@ -51,6 +51,8 @@ class CobroDeCitaTenantController
             'recibido_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'enviar_ticket' => ['nullable', 'boolean'],
             'clave_intento' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
+            // Un cupón (ADR 0220): al servicio, antes de cobrarlo.
+            'cupon' => ['nullable', 'string', 'max:64'],
             // Con varias formas de pago (ADR 0177): cuánto con cada una; suman todo.
             ...PartesCobro::reglas(),
         ]);
@@ -91,6 +93,7 @@ class CobroDeCitaTenantController
             $clave,
             $actor,
             partes: $partes,
+            cupon: $validado['cupon'] ?? null,
         );
         try {
             $resumen = $cobrar();

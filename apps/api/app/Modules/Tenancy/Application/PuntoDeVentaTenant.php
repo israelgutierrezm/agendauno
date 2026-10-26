@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\ExtraArticuloTenant;
 use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\PromocionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
@@ -32,6 +33,7 @@ class PuntoDeVentaTenant
         private readonly InventarioTenant $inventario,
         private readonly RegionNegocioTenant $region,
         private readonly CajasTenant $cajas,
+        private readonly GestionarPromocionesTenant $promociones,
     ) {}
 
     /**
@@ -84,13 +86,13 @@ class PuntoDeVentaTenant
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras?: list<ExtraArticuloTenant>, precio_minor?: int|null}>  $items
      * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
      */
-    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0, ?int $reservaId = null, ?string $huella = null, ?array $partes = null, ?int $efectivoMinor = null): VentaPosTenant
+    public function vender(SucursalTenant $sucursal, array $items, string $metodo, ?Usuario $actor = null, int $propinaMinor = 0, ?PersonaTenant $comprador = null, ?int $recibidoMinor = null, ?string $claveIntento = null, ?OrdenTenant $orden = null, int $servicioMinor = 0, ?int $reservaId = null, ?string $huella = null, ?array $partes = null, ?int $efectivoMinor = null, ?string $cupon = null): VentaPosTenant
     {
         if ($partes !== null) {
             $metodo = PartesCobro::MIXTO;
         }
 
-        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor, $reservaId, $huella, $partes, $efectivoMinor): VentaPosTenant {
+        return DB::connection('tenant')->transaction(function () use ($sucursal, $items, $metodo, $actor, $propinaMinor, $comprador, $recibidoMinor, $claveIntento, $orden, $servicioMinor, $reservaId, $huella, $partes, $efectivoMinor, $cupon): VentaPosTenant {
             // La caja de la sede (ADR 0175), bloqueada antes que los artículos.
             $turno = $this->cajas->turnoParaMovimiento((int) $sucursal->getKey());
             $moneda = $items !== [] ? $items[0]['articulo']->moneda : ($orden->moneda ?? $this->region->moneda());
@@ -122,6 +124,7 @@ class PuntoDeVentaTenant
                 ->keyBy('id');
 
             $total = 0;
+            $lineas = [];
             foreach ($items as $n => $item) {
                 $articulo = $bloqueados->get((int) $item['articulo']->getKey());
                 if (! $articulo instanceof ArticuloTenant) {
@@ -151,7 +154,7 @@ class PuntoDeVentaTenant
                 $subtotal = ($articulo->precio_minor + $extrasMinor) * $cantidad;
                 $total += $subtotal;
 
-                $venta->lineas()->create([
+                $lineas[] = $venta->lineas()->create([
                     'articulo_id' => $articulo->getKey(),
                     'cantidad' => $cantidad,
                     'precio_unitario_minor' => $articulo->precio_minor,
@@ -169,6 +172,23 @@ class PuntoDeVentaTenant
                     $actor,
                     $venta->getKey(),
                 );
+            }
+
+            // Un cupón (ADR 0220): se reparte en las líneas (una devolución regresa lo que
+            // de verdad se pagó) y se cuenta su uso: la venta se paga en el acto.
+            if ($cupon !== null && $cupon !== '' && $total > 0) {
+                ['promocion' => $promocion, 'descuento' => $descuento] = $this->promociones->aplicarEnOrden($cupon, $total);
+                $descuento = min($descuento, $total);
+                $restante = $descuento;
+                foreach ($lineas as $i => $linea) {
+                    $parte = $i === count($lineas) - 1 ? $restante : intdiv((int) $linea->subtotal_minor * $descuento, $total);
+                    $parte = min($parte, (int) $linea->subtotal_minor);
+                    $linea->update(['subtotal_minor' => (int) $linea->subtotal_minor - $parte]);
+                    $restante -= $parte;
+                }
+                $total -= $descuento - $restante;
+                $venta->update(['descuento_minor' => $descuento - $restante, 'promocion_id' => $promocion->getKey()]);
+                PromocionTenant::query()->whereKey($promocion->getKey())->increment('usos');
             }
 
             // Con varias formas, suman lo vendido y la propina (ADR 0177). «Mixto» sin

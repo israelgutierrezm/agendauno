@@ -399,6 +399,38 @@ describe("ventas recientes del mostrador", () => {
     });
   });
 
+  it("un cupón se revisa contra el carrito, baja el total y se manda al vender (ADR 0220)", async () => {
+    mocks.post.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/pos/cupon")
+          ? { data: { descuento_minor: 5600 } }
+          : {},
+      }),
+    );
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await w.get('[data-prueba="abrir-cupon"]').trigger("click");
+    await w.get("#cc-codigo").setValue("CORTE20");
+    await w.get('[data-prueba="aplicar-cupon"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/pos/cupon", {
+      codigo: "CORTE20",
+      subtotal_minor: 28000,
+    });
+    expect(w.get('[data-prueba="descuento-cupon"]').text()).toContain("56.00");
+    expect(w.get('[data-prueba="total-cobrar"]').text()).toContain("224.00");
+
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/pos/ventas",
+      expect.objectContaining({ cupon: "CORTE20" }),
+    );
+  });
+
   it("el total y la confirmación van en la moneda del negocio, no en pesos", async () => {
     sesion.moneda = "EUR";
     sesion.pais = "ES";

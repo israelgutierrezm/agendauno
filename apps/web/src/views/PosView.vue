@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import CampoCupon from "@/components/CampoCupon.vue";
 import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
@@ -205,6 +206,31 @@ const precioLinea = (l: Linea) =>
 const totalCarrito = computed(() =>
   carrito.value.reduce((s, l) => s + precioLinea(l) * l.cantidad, 0),
 );
+// Un cupón (ADR 0220): se reparte en lo vendido; el servidor lo vuelve a validar.
+const cupon = ref("");
+const descuentoCupon = ref(0);
+const descuentoMinor = computed(() =>
+  cupon.value !== "" ? Math.min(descuentoCupon.value, totalCarrito.value) : 0,
+);
+const netoCarrito = computed(() => totalCarrito.value - descuentoMinor.value);
+async function revisarCupon(
+  codigo: string,
+): Promise<{ descuento_minor: number }> {
+  const { data } = await api.post<{ data: { descuento_minor: number } }>(
+    `${base.value}/pos/cupon`,
+    { codigo, subtotal_minor: totalCarrito.value },
+  );
+  return data.data;
+}
+watch(
+  () => carrito.value.length === 0,
+  (vacio) => {
+    if (vacio) {
+      cupon.value = "";
+      descuentoCupon.value = 0;
+    }
+  },
+);
 const piezas = computed(() =>
   carrito.value.reduce((s, l) => s + l.cantidad, 0),
 );
@@ -320,9 +346,9 @@ const propinaMinor = computed(() => {
   if (propinaModo.value === "otra") {
     return Math.max(0, Math.round(Number(propinaOtra.value || 0) * 100));
   }
-  return Math.round((totalCarrito.value * propinaModo.value) / 100);
+  return Math.round((netoCarrito.value * propinaModo.value) / 100);
 });
-const totalCobrar = computed(() => totalCarrito.value + propinaMinor.value);
+const totalCobrar = computed(() => netoCarrito.value + propinaMinor.value);
 // Con varias formas de pago (ADR 0177): cuánto con cada una; suman el total.
 const dividido = ref(false);
 const partes = ref<ParteCobro[] | null>(null);
@@ -352,6 +378,8 @@ function reiniciarCobro(): void {
   recibido.value = "";
   comprador.value = "";
   dividido.value = false;
+  cupon.value = "";
+  descuentoCupon.value = 0;
 }
 // Cómo se cobra, en palabras (para confirmar): la forma o cada parte con su monto.
 const formaEnPalabras = computed(() =>
@@ -526,6 +554,7 @@ async function cobrar(): Promise<void> {
       })),
       propina_minor: propinaMinor.value,
       recibido_minor: recibidoMinor.value,
+      ...(cupon.value !== "" ? { cupon: cupon.value } : {}),
       comprador_id: comprador.value !== "" ? comprador.value : null,
       enviar_ticket: comprador.value !== "" && enviarTicket.value,
       ...(apartadosACobrar.value.length > 0
@@ -1008,6 +1037,16 @@ onMounted(async () => {
                 :pais="sesion.pais"
               />
             </div>
+            <CampoCupon
+              v-if="carrito.length > 0"
+              v-model="cupon"
+              class="mt-4"
+              :revisar="revisarCupon"
+              :dinero="(m: number) => dinero(m)"
+              :base="totalCarrito"
+              :deshabilitado="cobrando"
+              @aplicado="(d: number) => (descuentoCupon = d)"
+            />
             <div v-if="carrito.length > 0" class="mt-4" data-prueba="propina">
               <p class="tu-label">{{ $t("mostradorVisual.propina.titulo") }}</p>
               <div class="tu-segmentado w-full" role="group">
@@ -1052,7 +1091,7 @@ onMounted(async () => {
               />
             </div>
             <dl
-              v-if="propinaMinor > 0"
+              v-if="propinaMinor > 0 || descuentoMinor > 0"
               class="mt-3 grid gap-1 text-sm"
               :style="{ color: 'var(--texto-suave)' }"
             >
@@ -1060,14 +1099,20 @@ onMounted(async () => {
                 <dt>{{ $t("mostradorVisual.subtotal") }}</dt>
                 <dd class="tabular-nums">{{ dinero(totalCarrito) }}</dd>
               </div>
-              <div class="flex justify-between">
+              <div v-if="descuentoMinor > 0" class="flex justify-between">
+                <dt>{{ $t("cupon.descuento") }}</dt>
+                <dd class="tabular-nums" data-prueba="descuento-cupon">
+                  −{{ dinero(descuentoMinor) }}
+                </dd>
+              </div>
+              <div v-if="propinaMinor > 0" class="flex justify-between">
                 <dt>{{ $t("mostradorVisual.propina.titulo") }}</dt>
                 <dd class="tabular-nums">{{ dinero(propinaMinor) }}</dd>
               </div>
             </dl>
             <div class="mo-total">
               <span>{{
-                propinaMinor > 0
+                propinaMinor > 0 || descuentoMinor > 0
                   ? $t("mostradorVisual.totalCobrar")
                   : $t("pos.total")
               }}</span>

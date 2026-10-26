@@ -482,6 +482,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.disponibilidad');
         Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.dias');
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.agendar');
+        // Cuánto descuenta un cupón antes de agendar (ADR 0220).
+        Route::get('/citas/cupon', [PublicoCitasController::class, 'cupon'])->middleware(['throttle:20,1,cupon-citas', 'modalidad:citas'])->name('citas.cupon');
         // Pagar y ver la orden de una sesión por el enlace del correo: también la clase
         // de pago suelto (ADR 0065), así que son del núcleo, sin modalidad.
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
@@ -1190,6 +1192,8 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/categorias-articulo/{categoria}', [CategoriasArticuloTenantController::class, 'destroy'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('categorias-articulo.destroy');
             Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('pos.ventas.index');
             Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.store');
+            // Cuánto descuenta un cupón en el carrito, con el permiso de vender (ADR 0220).
+            Route::post('/pos/cupon', [PromocionesTenantController::class, 'validar'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.cupon');
             // A quién se le vende: una persona del negocio o público en general (ADR 0145).
             Route::get('/pos/compradores', [PuntoDeVentaTenantController::class, 'compradores'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.compradores');
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).

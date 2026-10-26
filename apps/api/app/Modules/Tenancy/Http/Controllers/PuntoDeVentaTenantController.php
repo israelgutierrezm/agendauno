@@ -177,12 +177,15 @@ class PuntoDeVentaTenantController
             // Lo que el comprador apartó al reservar y se cobra ahora (ADR 0194).
             'apartados' => ['nullable', 'array', 'max:30'],
             'apartados.*' => ['string', 'max:40'],
+            // Un cupón del negocio (ADR 0220): a lo vendido (no a la propina).
+            'cupon' => ['nullable', 'string', 'max:64'],
         ]);
         $partes = PartesCobro::desde($validado['partes'] ?? null);
 
         // Ya se registró con esta clave (la respuesta se perdió): la misma venta, si es la
         // misma operación; con otra (u otra cita), conflicto (R05).
         $clave = $validado['clave_intento'] ?? null;
+        $cupon = trim((string) ($validado['cupon'] ?? ''));
         $huella = PuntoDeVentaTenant::huella('mostrador', [
             'sucursal' => $validado['sucursal_id'],
             'items' => array_map(static fn (array $i): array => [
@@ -193,6 +196,8 @@ class PuntoDeVentaTenantController
             'propina' => (int) ($validado['propina_minor'] ?? 0),
             'recibido' => $validado['recibido_minor'] ?? null,
             'comprador' => $validado['comprador_id'] ?? null,
+            // Con cupón, también (sin él, la de siempre).
+            ...($cupon !== '' ? ['cupon' => mb_strtoupper($cupon)] : []),
         ]);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
@@ -227,7 +232,7 @@ class PuntoDeVentaTenantController
 
         try {
             // La venta y lo apartado que se entrega con ella, juntos (ADR 0194).
-            $venta = DB::connection('tenant')->transaction(function () use ($sucursal, $items, $validado, $actor, $comprador, $clave, $huella, $partes): VentaPosTenant {
+            $venta = DB::connection('tenant')->transaction(function () use ($sucursal, $items, $validado, $actor, $comprador, $clave, $huella, $partes, $cupon): VentaPosTenant {
                 $venta = $this->pos->vender(
                     $sucursal, $items, $validado['metodo_pago'] ?? 'efectivo', $actor,
                     (int) ($validado['propina_minor'] ?? 0), $comprador,
@@ -235,6 +240,7 @@ class PuntoDeVentaTenantController
                     $clave,
                     huella: $huella,
                     partes: $partes,
+                    cupon: $cupon !== '' ? $cupon : null,
                 );
                 app(ApartadosArticuloTenant::class)->entregar(array_values(array_map('strval', (array) ($validado['apartados'] ?? []))), $venta);
 
@@ -389,6 +395,8 @@ class PuntoDeVentaTenantController
             // Cómo va el envío del ticket, aparte de la venta (R06).
             'ticket_envio' => $venta->estadoTicket(),
             'total_minor' => $venta->total_minor,
+            // Lo que descontó un cupón (ADR 0220), ya restado del total.
+            'descuento_minor' => (int) ($venta->descuento_minor ?? 0),
             // Aparte de lo vendido (ADR 0139): la propina, lo cobrado y el cambio.
             'propina_minor' => $venta->propina_minor,
             'cobrado_minor' => $venta->cobradoMinor(),

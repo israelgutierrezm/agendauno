@@ -66,6 +66,7 @@ class AgendarCitaTenant
         private readonly VerificarAgendaTenant $agenda,
         private readonly ReservasTenant $reservas,
         private readonly ServiciosPrepagadosTenant $prepagados,
+        private readonly OrdenesTenant $ordenes,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
         private readonly ElegirRecursoTenant $recursos,
         private readonly ParametrosTenant $parametros,
@@ -83,6 +84,7 @@ class AgendarCitaTenant
         bool $porNegocio = false,
         bool $pagarTodo = false,
         ?string $clave = null,
+        ?string $cupon = null,
     ): ReservaTenant {
         $this->exigirNegocioDeCitas();
         $previa = $this->yaAgendada($clave, $persona, $oferta, $sucursal, $inicia, $instructorId);
@@ -114,7 +116,7 @@ class AgendarCitaTenant
         }
 
         try {
-            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave);
+            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave, $cupon);
         } catch (SesionNoReservable|QueryException $e) {
             // Otro intento con la misma clave llegó antes: tomó el horario (o la clave
             // única) y su cita es la respuesta.
@@ -146,6 +148,7 @@ class AgendarCitaTenant
         int $duracionMin,
         bool $pagarTodo = false,
         ?string $clave = null,
+        ?string $cupon = null,
     ): ReservaTenant {
         $this->exigirNegocioDeCitas();
         // Antes de buscar a otro profesional: el reintento ya tiene a quien le tocó.
@@ -178,7 +181,7 @@ class AgendarCitaTenant
         $ultimo = null;
         foreach ($candidatos->sortBy(static fn (Usuario $u): int => (int) ($carga[$u->getKey()] ?? 0)) as $profesional) {
             try {
-                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin, pagarTodo: $pagarTodo, clave: $clave);
+                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin, pagarTodo: $pagarTodo, clave: $clave, cupon: $cupon);
             } catch (SesionNoReservable $e) {
                 $ultimo = $e;
             }
@@ -263,9 +266,18 @@ class AgendarCitaTenant
         bool $porNegocio,
         bool $pagarTodo,
         ?string $clave,
+        ?string $cupon = null,
     ): ReservaTenant {
-        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave, $cupon): ReservaTenant {
             $reserva = $this->crearCita($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo);
+            // Con cupón (ADR 0220): a lo que falta pagar (el resto, si hay anticipo). Si el
+            // cupón no sirve, no se agenda: quien lo escribió lo corrige.
+            if ($cupon !== null && $cupon !== '') {
+                $orden = $reserva->saldo_orden_id !== null ? $reserva->saldoOrden : $reserva->orden;
+                if ($orden !== null) {
+                    $this->ordenes->aplicarCupon($orden, $cupon);
+                }
+            }
             // En la misma transacción: si otro intento ya guardó esta clave, el índice
             // único deshace esta cita completa (sesión, orden y retención).
             if ($clave !== null && $clave !== '') {

@@ -49,6 +49,8 @@ class VentaPosTenant extends Model
         'propina_minor', 'recibido_minor', 'persona_id', 'ticket_enviado_en', 'clave_intento',
         'orden_id', 'servicio_minor', 'reserva_id', 'huella_intento', 'ticket_envio_fallido_en',
         'ticket_solicitado_en',
+        // Un cupón (ADR 0220): cuánto descontó y cuál fue.
+        'descuento_minor', 'promocion_id',
     ];
 
     /**

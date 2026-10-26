@@ -467,6 +467,21 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
 - `POST /pagos/{pago}/reembolsos` de un pago mixto pide `metodo` (la forma por la que
   sale), sin pasar de lo que entró por ella.
 
+## Cupones en citas y en el mostrador (ADR 0220)
+
+- `cupon` (opcional, hasta 64 caracteres) en `POST /citas`, `POST /mi/citas`,
+  `POST /agenda/citas`, `POST /reservas/{reserva}/cobro` y `POST /pos/ventas`. Un cupón
+  que no sirve responde 422 con su `message` y no agenda, cobra ni vende nada.
+  - Al agendar, descuenta la orden de la cita (la del saldo, si hay anticipo); no con
+    bono ni en un servicio pagado por adelantado.
+  - Al cobrar la cita, descuenta el servicio pendiente.
+  - En el mostrador se reparte en las líneas; la venta trae `descuento_minor`.
+- Revisar antes, sin usarlo: `GET /citas/cupon?codigo=&oferta_id=` (público, 20 por
+  minuto), `POST /promociones/validar` (`ordenes.gestionar`) y `POST /pos/cupon`
+  (`pos.vender`) con `{codigo, subtotal_minor}`. Responden `codigo`, `descuento_minor`
+  y `total_minor`.
+- El uso del cupón se cuenta al pagarse.
+
 ## Devolución parcial en el mostrador (ADR 0178)
 
 - `POST /pos/ventas/{venta}/devoluciones` (`pagos.reembolsar`): `lineas` (lista de

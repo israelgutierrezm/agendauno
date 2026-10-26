@@ -49,9 +49,9 @@ class CobroDeCitaTenant
      * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
      * @return Resumen
      */
-    public function cobrar(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?string $clave, ?Usuario $actor, ?string $huella = null, ?array $partes = null): array
+    public function cobrar(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?string $clave, ?Usuario $actor, ?string $huella = null, ?array $partes = null, ?string $cupon = null): array
     {
-        $huella ??= self::huella($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $partes);
+        $huella ??= self::huella($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $partes, $cupon);
         if ($clave !== null) {
             $previa = VentaPosTenant::query()->where('clave_intento', $clave)->first();
             if ($previa instanceof VentaPosTenant) {
@@ -61,7 +61,7 @@ class CobroDeCitaTenant
             }
         }
 
-        $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella, $partes): array {
+        $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella, $partes, $cupon): array {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
             // Ya con la cita bajo candado: si el mismo intento llegó dos veces a la vez
             // (doble clic, reintento de red), el segundo encuentra aquí el cobro del
@@ -90,6 +90,15 @@ class CobroDeCitaTenant
             $aCobrar = collect([$principal, $resto])
                 ->filter(static fn (?OrdenTenant $o): bool => $o?->estado === EstadoOrden::Pendiente)
                 ->values();
+            // Un cupón (ADR 0220): a lo último que falta (el resto, si hay anticipo).
+            if ($cupon !== null && $cupon !== '') {
+                $ultima = $aCobrar->last();
+                if (! $ultima instanceof OrdenTenant) {
+                    throw ValidationException::withMessages(['cupon' => ['Esta cita ya está cobrada: el cupón no se aplica.']]);
+                }
+                $conCupon = $this->ordenes->aplicarCupon($ultima, $cupon);
+                $aCobrar = $aCobrar->map(static fn (OrdenTenant $o): OrdenTenant => $o->is($conCupon) ? $conCupon : $o);
+            }
             $orden = $aCobrar->first() ?? $resto ?? $principal;
             $servicio = (int) $aCobrar->sum('total_minor');
             if ($servicio === 0 && $items === [] && $propinaMinor <= 0) {
@@ -162,7 +171,7 @@ class CobroDeCitaTenant
      * @param  list<array{articulo: ArticuloTenant, cantidad: int, extras: list<ExtraArticuloTenant>, precio_minor: int|null}>  $items
      * @param  list<array{metodo: string, monto_minor: int}>|null  $partes
      */
-    public static function huella(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?array $partes = null): string
+    public static function huella(ReservaTenant $reserva, string $metodo, array $items, int $propinaMinor, ?int $recibidoMinor, ?string $referencia, ?array $partes = null, ?string $cupon = null): string
     {
         $pedido = [
             'reserva' => (string) $reserva->ulid,
@@ -179,6 +188,10 @@ class CobroDeCitaTenant
         // Sin partes, la huella de siempre (los cobros ya hechos se siguen reconociendo).
         if ($partes !== null) {
             $pedido['partes'] = $partes;
+        }
+        // Con cupón, también (sin él, la de siempre).
+        if ($cupon !== null && $cupon !== '') {
+            $pedido['cupon'] = mb_strtoupper(trim($cupon));
         }
 
         return PuntoDeVentaTenant::huella('cita', $pedido);

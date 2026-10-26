@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\AtribucionTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
+use App\Modules\Tenancy\Application\GestionarPromocionesTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PuestaEnMarchaTenant;
@@ -161,6 +162,28 @@ class PublicoCitasController
         )]);
     }
 
+    /**
+     * Cuánto descuenta un cupón en un servicio (ADR 0220), para mostrarlo antes de
+     * agendar. No lo usa: se aplica al agendar.
+     */
+    public function cupon(Request $request, GestionarPromocionesTenant $promociones): JsonResponse
+    {
+        $this->paginaDeCitas($request);
+        $validado = $request->validate([
+            'codigo' => ['required', 'string', 'max:64'],
+            'oferta_id' => ['required', 'string'],
+        ]);
+        $oferta = OfertaTenant::paraAgendar($validado['oferta_id']);
+        $precio = (int) ($oferta->precio_clase_minor ?? 0);
+        $resultado = $promociones->previsualizar($validado['codigo'], $precio);
+
+        return response()->json(['data' => [
+            'codigo' => $resultado['promocion']->codigo,
+            'descuento_minor' => min($resultado['descuento'], $precio),
+            'total_minor' => max(0, $precio - $resultado['descuento']),
+        ]]);
+    }
+
     public function agendar(Request $request, AtribucionTenant $atribucion): JsonResponse
     {
         $this->paginaDeCitas($request);
@@ -193,6 +216,8 @@ class PublicoCitasController
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
             // Si el servicio pide anticipo (ADR 0161): pagar solo el anticipo o todo.
             'pagar' => ['nullable', Rule::in(['anticipo', 'todo'])],
+            // Un cupón del negocio (ADR 0220): a lo que falta pagar de la cita.
+            'cupon' => ['nullable', 'string', 'max:64'],
             // De dónde llegó (ADR 0142): se guarda con su cita y su orden.
             ...Atribucion::reglas(),
             ...IdentificadoresNavegador::reglas(),
@@ -227,8 +252,8 @@ class PublicoCitasController
         $clave = $validado['idempotency_key'] ?? null;
         try {
             $reserva = $instructor instanceof Usuario
-                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave)
-                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave);
+                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave, cupon: $validado['cupon'] ?? null)
+                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave, $validado['cupon'] ?? null);
         } catch (LimiteCitasPorPagar) {
             // Sin decir a un anónimo si ese correo es de un cliente ni cuánto debe.
             throw new LimiteCitasPorPagar('No se puede agendar con estos datos desde aquí. Entra a tu cuenta o comunícate con el negocio.');
