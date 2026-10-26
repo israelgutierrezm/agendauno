@@ -138,6 +138,7 @@ import eliminarCuenta from "./locales/eliminarCuenta.es-MX";
 import cfdi from "./locales/cfdi.es-MX";
 import bajaNegocio from "./locales/bajaNegocio.es-MX";
 import datosNegocio from "./locales/datosNegocio.es-MX";
+import legalesNuevos from "./locales/legalesNuevos.es-MX";
 
 export const mensajesPanel = {
   adminUsabilidad,
@@ -265,4 +266,5 @@ export const mensajesPanel = {
   cfdi,
   bajaNegocio,
   datosNegocio,
+  legalesNuevos,
 };

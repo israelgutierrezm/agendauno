@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Acceso\AdministradorPlataforma;
 use App\Modules\Platform\Operacion\AlertaPlataforma;
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Platform\Operacion\RespaldosPlataforma;
 use App\Modules\Platform\Operacion\VerificacionProduccion;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Throwable;
 
 /**
@@ -76,11 +79,16 @@ class PlataformaOperacionController
                     'primera_en' => $a->primera_en->toIso8601String(),
                     'ultima_en' => $a->ultima_en->toIso8601String(),
                     'avisada' => ! $a->pendiente,
+                    // Atendida: cuándo y quién (ADR 0216); las que piden algo, si falta.
+                    'atendida_en' => $a->atendida_en?->toIso8601String(),
+                    'atendida_por' => $a->atendida_por,
+                    'pide_atencion' => in_array($a->tipo, AlertasPlataforma::PIDEN_ATENCION, true),
                 ])->all(),
             // La lista llega recortada a las más recientes; estos son los conteos de
             // todo el historial (30 días; lo que falta avisar se queda hasta avisarse).
             'alertas_total' => AlertaPlataforma::query()->count(),
             'alertas_por_avisar' => AlertaPlataforma::query()->where('pendiente', true)->count(),
+            'alertas_sin_atender' => AlertaPlataforma::query()->whereIn('tipo', AlertasPlataforma::PIDEN_ATENCION)->whereNull('atendida_en')->count(),
             'revisado_en' => CarbonImmutable::now()->toIso8601String(),
         ]]);
     }
@@ -96,5 +104,23 @@ class PlataformaOperacionController
         $estados = array_column(array_filter($puntos, fn (array $p): bool => $p['seccion'] === $seccion), 'estado');
 
         return in_array('falta', $estados, true) ? 'falta' : (in_array('aviso', $estados, true) ? 'aviso' : 'ok');
+    }
+
+    /** Marca una alerta atendida (ADR 0216), con quién la atendió. */
+    public function atender(Request $request): JsonResponse
+    {
+        $validado = $request->validate([
+            'tipo' => ['required', 'string', 'max:60'],
+            'clave' => ['required', 'string', 'max:191'],
+        ]);
+        $alerta = AlertaPlataforma::query()->where('tipo', $validado['tipo'])->where('clave', $validado['clave'])->firstOrFail();
+        $operador = $request->attributes->get('administrador_plataforma');
+        $alerta->update([
+            'atendida_en' => CarbonImmutable::now(),
+            'atendida_por' => $operador instanceof AdministradorPlataforma ? $operador->nombre : 'Plataforma',
+            'pendiente' => false,
+        ]);
+
+        return response()->json(['data' => ['atendida_en' => $alerta->atendida_en?->toIso8601String(), 'atendida_por' => $alerta->atendida_por]]);
     }
 }

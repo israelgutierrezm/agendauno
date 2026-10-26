@@ -186,6 +186,40 @@ class DocumentosLegales
     }
 
     /**
+     * Los documentos (aviso de privacidad y términos) con una versión vigente que el
+     * negocio aún no acepta (ADR 0216): se publicó una nueva desde que lo hizo. Un
+     * negocio de demostración no los acepta.
+     *
+     * @return list<array{tipo: string, version: int, vigente_desde: string}>
+     */
+    public function pendientes(Estudio $estudio): array
+    {
+        if ($estudio->es_demo) {
+            return [];
+        }
+        $pendientes = [];
+        try {
+            foreach ([DocumentoLegal::AVISO, DocumentoLegal::TERMINOS] as $tipo) {
+                $vigente = $this->vigente($tipo);
+                if ($vigente === null) {
+                    continue;
+                }
+                $aceptada = (int) DB::table('aceptaciones_legales')
+                    ->where('estudio_id', $estudio->getKey())
+                    ->where('tipo', $tipo)
+                    ->max('version');
+                if ($aceptada < $vigente->version) {
+                    $pendientes[] = ['tipo' => $tipo, 'version' => (int) $vigente->version, 'vigente_desde' => $vigente->vigente_desde->toIso8601String()];
+                }
+            }
+        } catch (Throwable) {
+            return [];
+        }
+
+        return $pendientes;
+    }
+
+    /**
      * Deja constancia de que el negocio aceptó las versiones vigentes.
      */
     public function registrarAceptacion(Estudio $estudio, string $email, ?string $ip, ?string $navegador): void

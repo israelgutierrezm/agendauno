@@ -39,6 +39,8 @@ class EnviarAlertas extends Command
         AlertaPlataforma::query()
             ->where('pendiente', false)
             ->where('ultima_en', '<', CarbonImmutable::now()->subDays(self::DIAS_HISTORIAL))
+            // Lo que pide algo a alguien se queda hasta que alguien lo atiende (ADR 0216).
+            ->where(static fn ($q) => $q->whereNotNull('atendida_en')->orWhereNotIn('tipo', AlertasPlataforma::PIDEN_ATENCION))
             ->delete();
 
         if ($pendientes->isEmpty()) {

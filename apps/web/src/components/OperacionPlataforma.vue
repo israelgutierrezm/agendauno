@@ -8,6 +8,7 @@ import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
 import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Operación de la plataforma, para el superadmin: lo mismo que dicen la consola
@@ -46,6 +47,10 @@ interface Alerta {
   primera_en: string;
   ultima_en: string;
   avisada: boolean;
+  // Atendida y si pide algo a alguien (ADR 0216).
+  atendida_en?: string | null;
+  atendida_por?: string | null;
+  pide_atencion?: boolean;
 }
 interface Operacion {
   version: string;
@@ -71,6 +76,7 @@ interface Operacion {
   alertas: Alerta[];
   alertas_total: number;
   alertas_por_avisar: number;
+  alertas_sin_atender?: number;
   revisado_en: string;
 }
 
@@ -80,6 +86,7 @@ const cliente = crearClientePlataforma({
   headers: { Accept: "application/json" },
 });
 
+const toast = useToastStore();
 const datos = ref<Operacion | null>(null);
 const cargando = ref(false);
 const error = ref<string | null>(null);
@@ -97,6 +104,32 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+}
+
+// Marcar atendida una alerta que pide algo (ADR 0216).
+const atendiendo = ref<string | null>(null);
+async function atender(a: Alerta): Promise<void> {
+  atendiendo.value = `${a.tipo}-${a.clave}`;
+  try {
+    const { data } = await cliente.post<{
+      data: { atendida_en: string; atendida_por: string };
+    }>(
+      "/api/v1/plataforma/alertas/atender",
+      { tipo: a.tipo, clave: a.clave },
+      { headers: { Authorization: `Bearer ${props.token}` } },
+    );
+    a.atendida_en = data.data.atendida_en;
+    a.atendida_por = data.data.atendida_por;
+    if (datos.value && (datos.value.alertas_sin_atender ?? 0) > 0) {
+      datos.value.alertas_sin_atender =
+        (datos.value.alertas_sin_atender ?? 1) - 1;
+    }
+    toast.exito(t("plataformaAdmin.operacion.atendidaOk"));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    atendiendo.value = null;
   }
 }
 
@@ -679,6 +712,27 @@ onMounted(cargar);
                     <span v-else :style="{ color: 'var(--texto-suave)' }">
                       {{ $t("plataformaAdmin.operacion.avisada") }}
                     </span>
+                    <span
+                      v-if="a.atendida_en"
+                      class="tu-sub block"
+                      data-prueba="alerta-atendida"
+                    >
+                      {{
+                        $t("plataformaAdmin.operacion.atendida", {
+                          quien: a.atendida_por ?? "—",
+                        })
+                      }}
+                    </span>
+                    <button
+                      v-else-if="a.pide_atencion"
+                      type="button"
+                      class="tu-btn tu-btn-secundario tu-btn-chico mt-1"
+                      :disabled="atendiendo !== null"
+                      data-prueba="atender-alerta"
+                      @click="atender(a)"
+                    >
+                      {{ $t("plataformaAdmin.operacion.atender") }}
+                    </button>
                   </td>
                 </tr>
               </tbody>

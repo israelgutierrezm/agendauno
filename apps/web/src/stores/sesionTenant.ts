@@ -109,6 +109,12 @@ export interface EstudioSesion {
     puede_revertir: boolean;
   } | null;
   publicado?: boolean;
+  /** Versiones nuevas del aviso o de los términos que su dueño aún no acepta (ADR 0216). */
+  legales_pendientes?: {
+    tipo: "aviso_privacidad" | "terminos";
+    version: number;
+    vigente_desde: string;
+  }[];
   en_directorio?: boolean;
   perfil?: string;
   perfil_config?: PerfilConfig;
@@ -463,6 +469,19 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     await cargarYo();
   }
 
+  /** El dueño acepta las versiones nuevas del aviso y de los términos (ADR 0216). */
+  async function aceptarLegales(): Promise<void> {
+    const { data } = await api.post<{
+      data: { legales_pendientes: EstudioSesion["legales_pendientes"] };
+    }>(`/api/v1/app/${slug.value}/legales/aceptar`, {});
+    if (estudio.value) {
+      estudio.value = {
+        ...estudio.value,
+        legales_pendientes: data.data.legales_pendientes ?? [],
+      };
+    }
+  }
+
   /** Revierte la baja que pidió el dueño mientras sus datos sigan ahí. */
   async function revertirBajaNegocio(): Promise<void> {
     await api.post(`/api/v1/app/${slug.value}/negocio/revertir-baja`, {});
@@ -678,6 +697,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     dadoDeBaja,
     darDeBajaNegocio,
     revertirBajaNegocio,
+    aceptarLegales,
     tieneVariosRoles,
     destinoAlEntrar,
     requiereElegirRol,

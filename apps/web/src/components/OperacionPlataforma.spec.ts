@@ -9,6 +9,9 @@ import OperacionPlataforma from "./OperacionPlataforma.vue";
 const get = vi.hoisted(() => vi.fn());
 vi.mock("axios", () => ({ default: { create: () => ({ get }) } }));
 vi.mock("@/lib/api", () => ({ mensajeDeError: (e: unknown) => String(e) }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 
 const operacion = {
   version: "abc1234",

@@ -14,6 +14,7 @@ import NavLateral from "@/components/NavLateral.vue";
 import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import AvisoMedicion from "@/components/AvisoMedicion.vue";
+import AceptarLegalesNuevos from "@/components/AceptarLegalesNuevos.vue";
 import AvisoRenta from "@/components/AvisoRenta.vue";
 import AvisoSinSucursal from "@/components/AvisoSinSucursal.vue";
 import BarraParticipante from "@/components/BarraParticipante.vue";
@@ -471,6 +472,8 @@ onMounted(() => {
           <AvisoSinSucursal v-if="sesion.usuario?.sin_sucursal" />
           <!-- El pago de la suscripción por atender (ADR 0152), a quien la paga. -->
           <AvisoRenta class="tu-sin-imprimir" />
+          <!-- Versión nueva de los legales: su dueño la acepta al entrar (ADR 0216). -->
+          <AceptarLegalesNuevos />
           <!-- Clientes con personas a su cargo: de quién es la cuenta (ADR 0123). -->
           <BarraParticipante
             v-if="

@@ -135,6 +135,8 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     whatsapp: string | null;
     // Confirmó su número con un código al registrarse (ADR 0070).
     whatsapp_verificado?: boolean;
+    // ¿Ya activó su cuenta? (ADR 0216)
+    cuenta_activa?: boolean | null;
   };
   onboarding_completo: boolean;
   // Quién lo suspendió por última vez, cuándo y por qué (ADR 0132).
@@ -655,6 +657,25 @@ function reactivar(): void {
         encabezados(),
       ),
     t("plataformaAdmin.ficha.reactivado"),
+  );
+}
+
+// Reenviar al dueño su activación (ADR 0216).
+function reenviarActivacion(): void {
+  const f = ficha.value;
+  if (f === null) {
+    return;
+  }
+  void accion(
+    () =>
+      cliente.post(
+        `/api/v1/plataforma/estudios/${f.slug}/reenviar-activacion`,
+        {},
+        encabezados(),
+      ),
+    t("plataformaAdmin.ficha.activacionReenviada", {
+      correo: f.contacto.email ?? "",
+    }),
   );
 }
 
@@ -2793,6 +2814,26 @@ function borrar(): void {
               >
                 {{ $t("plataformaAdmin.ficha.whatsappVerificado") }}
               </span>
+              <!-- Aún no activa su cuenta: se le reenvía (ADR 0216). -->
+              <div
+                v-if="ficha.contacto.cuenta_activa === false"
+                class="mt-2 flex flex-wrap items-center gap-2"
+                data-prueba="cuenta-sin-activar"
+              >
+                <span
+                  class="tu-estado text-xs"
+                  :style="{ '--tono': 'var(--aviso)' }"
+                  >{{ $t("plataformaAdmin.ficha.cuentaSinActivar") }}</span
+                >
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
+                  :disabled="accionando"
+                  @click="reenviarActivacion"
+                >
+                  {{ $t("plataformaAdmin.ficha.reenviarActivacion") }}
+                </button>
+              </div>
             </div>
           </section>
 

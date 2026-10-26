@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Legales\AvisarLegalesNuevos;
 use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
@@ -481,6 +482,10 @@ class PlataformaController
     public function publicarLegal(Request $request, DocumentosLegales $legales): JsonResponse
     {
         $documento = $legales->publicar((string) $request->route('tipo'));
+        // Los dueños se enteran y la aceptan al entrar (ADR 0216); las cookies, no.
+        if ($documento->tipo !== DocumentoLegal::COOKIES) {
+            AvisarLegalesNuevos::dispatch($documento->tipo, (int) $documento->version);
+        }
 
         return response()->json(['data' => [
             'tipo' => $documento->tipo,

@@ -25,7 +25,7 @@ class AlertaPlataforma extends Model
 {
     protected $table = 'alertas_plataforma';
 
-    protected $fillable = ['tipo', 'clave', 'estudio', 'mensaje', 'veces', 'primera_en', 'ultima_en', 'pendiente', 'notificada_en'];
+    protected $fillable = ['tipo', 'clave', 'estudio', 'mensaje', 'veces', 'primera_en', 'ultima_en', 'pendiente', 'notificada_en', 'atendida_en', 'atendida_por'];
 
     /**
      * @var array<string, string>
@@ -36,5 +36,6 @@ class AlertaPlataforma extends Model
         'ultima_en' => 'datetime',
         'pendiente' => 'boolean',
         'notificada_en' => 'datetime',
+        'atendida_en' => 'datetime',
     ];
 }

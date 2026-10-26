@@ -829,6 +829,11 @@ export const plataformaAdmin = {
     colAviso: "Correo",
     avisada: "Enviado",
     porAvisar: "Por enviar",
+    // Atendidas (ADR 0216).
+    atender: "Marcar atendida",
+    atendida: "Atendida por {quien}",
+    atendidaOk: "Alerta atendida.",
+    sinAtender: "{n} por atender",
     // Un tipo de alerta sin nombre aún (su mensaje la describe).
     tipoOtro: "Otra alerta",
     tipos: {
@@ -930,6 +935,10 @@ export const plataformaAdmin = {
     suspendido: "Negocio suspendido.",
     reactivar: "Reactivar negocio",
     reactivado: "Negocio reactivado.",
+    // La activación del dueño (ADR 0216).
+    cuentaSinActivar: "Aún no activa su cuenta",
+    reenviarActivacion: "Reenviar activación",
+    activacionReenviada: "Activación reenviada a {correo}.",
     // Baja del negocio (ADR 0213).
     darDeBaja: "Dar de baja",
     motivoBaja: "Motivo de la baja",

@@ -27,6 +27,15 @@ class AlertasPlataforma
     public const HORAS_ESPERA = 6;
 
     /**
+     * Las que piden algo a alguien (ADR 0216): no se borran del historial hasta que
+     * alguien las marca atendidas.
+     */
+    public const PIDEN_ATENCION = [
+        'modulo_solicitado', 'wellhub_solicitud', 'renta_cobrada_dos_veces', 'renta_devuelta', 'renta_en_disputa',
+        'evento_outbox_aparcado',
+    ];
+
+    /**
      * Excepciones ya registradas con su tipo (para no duplicarlas como "error").
      *
      * @var SplObjectStorage<Throwable, null>
@@ -70,6 +79,9 @@ class AlertasPlataforma
                 'veces' => $alerta->veces + 1,
                 'ultima_en' => $ahora,
                 'pendiente' => $alerta->pendiente || $reavisar,
+                // Volvió a pasar: ya no está atendida.
+                'atendida_en' => null,
+                'atendida_por' => null,
             ])->save();
 
             return true;

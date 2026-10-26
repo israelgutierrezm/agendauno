@@ -43,6 +43,7 @@ class ResolverEstudio
         'renta', 'renta.quien-cuenta', 'renta.pagar', 'renta.factura', 'renta.factura.descargar', 'renta.recibo',
         'avisos-plataforma', 'avisos-plataforma.guardar', 'avisos-plataforma.codigo', 'avisos-plataforma.verificar',
         'avisos-plataforma.cambio.codigo', 'avisos-plataforma.cambio',
+        'legales.aceptar',
     ];
 
     /**

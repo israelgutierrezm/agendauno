@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
+use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
@@ -25,6 +26,7 @@ use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\Models\MedicionUso;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\ModuloNegocio;
 use App\Modules\Tenancy\PerfilNegocio;
 use Carbon\CarbonImmutable;
@@ -106,6 +108,8 @@ class PlataformaEstudiosController
                 'whatsapp' => $modelo->whatsappCompleto(),
                 // Confirmó su número con un código y aceptó avisos (ADR 0070).
                 'whatsapp_verificado' => $modelo->contacto_whatsapp_verificado_en !== null,
+                // ¿Ya activó su cuenta? Si no, se le reenvía la activación (ADR 0216).
+                'cuenta_activa' => self::cuentaDelDuenoActiva($modelo),
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
             // La última vez que la plataforma lo suspendió: quién, cuándo y por qué (ADR 0132).
@@ -246,6 +250,42 @@ class PlataformaEstudiosController
         Log::info('plataforma.estudio.reactivado', ['estudio' => $modelo->slug]);
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);
+    }
+
+    /** ¿El dueño ya activó su cuenta? Null si su base no está. */
+    private static function cuentaDelDuenoActiva(Estudio $estudio): ?bool
+    {
+        $gestor = app(GestorDeConexionTenant::class);
+        if (! $gestor->baseDeDatosExiste($estudio)) {
+            return null;
+        }
+        $correo = (string) $estudio->contacto_email;
+        $activo = $gestor->ejecutarEn($estudio, static fn (): mixed => Usuario::query()->where('email', $correo)->value('activo'));
+
+        return $activo === null ? null : (bool) $activo;
+    }
+
+    /**
+     * Reenvía al dueño el correo para activar su cuenta, con un enlace nuevo (ADR 0216):
+     * para quien no lo encontró o se le venció. Uno que ya la activó entra con su
+     * contraseña (o la recupera).
+     */
+    public function reenviarActivacion(string $estudio, GestorDeConexionTenant $gestor, EnviarActivacionTenant $activacion): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $correo = (string) $modelo->contacto_email;
+        $activo = $gestor->baseDeDatosExiste($modelo)
+            ? $gestor->ejecutarEn($modelo, static fn (): ?bool => Usuario::query()->where('email', $correo)->value('activo'))
+            : null;
+        if ($activo === null) {
+            throw ValidationException::withMessages(['estudio' => ['No se encontró la cuenta del dueño de este negocio.']]);
+        }
+        if ((bool) $activo) {
+            throw ValidationException::withMessages(['estudio' => ['El dueño ya activó su cuenta: si no recuerda su contraseña, que la recupere desde Entrar.']]);
+        }
+        $activacion->enviar($modelo, $correo);
+
+        return response()->json(['data' => ['enviado_a' => $correo]]);
     }
 
     /**

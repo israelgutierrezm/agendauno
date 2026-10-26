@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\ActivacionPropietario;
 use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
@@ -239,6 +240,21 @@ class AuthTenantController
      * Apple y Google para cualquier rol. Quien entra solo con Google crea antes una
      * contraseña con «¿Olvidaste tu contraseña?».
      */
+    /**
+     * El dueño acepta las versiones vigentes del aviso de privacidad y de los términos
+     * (ADR 0216): queda constancia con su correo, la fecha, su IP y su navegador.
+     */
+    public function aceptarLegales(Request $request, DocumentosLegales $legales): JsonResponse
+    {
+        $usuario = $this->usuarioTenant($request);
+        abort_unless($usuario instanceof Usuario, 401);
+        abort_unless($usuario->tieneRol('propietario'), 403, 'Solo el dueño del negocio acepta los términos de la plataforma.');
+        $estudio = $this->estudioDe($request);
+        $legales->registrarAceptacion($estudio, (string) $usuario->email, $request->ip(), $request->userAgent());
+
+        return response()->json(['data' => ['legales_pendientes' => $legales->pendientes($estudio)]]);
+    }
+
     public function eliminarCuenta(Request $request, EliminarCuentaPropiaTenant $eliminar): JsonResponse
     {
         $usuario = $this->usuarioTenant($request);
@@ -397,6 +413,8 @@ class AuthTenantController
                 'puede_revertir' => $estudio->baja_por === BajaDeNegocio::POR_DUENO,
             ] : null,
             'publicado' => $estudio->publicado,
+            // Versiones nuevas del aviso o de los términos que su dueño aún no acepta (ADR 0216).
+            'legales_pendientes' => app(DocumentosLegales::class)->pendientes($estudio),
             'en_directorio' => $estudio->enDirectorio(),
             // Perfil de negocio (R35): el frontend adapta terminologia/flags sin forks.
             'perfil' => $estudio->perfil_negocio->value,

@@ -377,6 +377,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/facturas/{factura}/cancelacion', [PlataformaRentaController::class, 'consultarCancelacion'])->name('facturas.cancelacion');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.
         Route::get('/operacion', PlataformaOperacionController::class)->name('operacion');
+        // Marcar atendida una alerta (ADR 0216).
+        Route::post('/alertas/atender', [PlataformaOperacionController::class, 'atender'])->name('alertas.atender');
+        // Reenviar al dueño el correo para activar su cuenta (ADR 0216).
+        Route::post('/estudios/{estudio}/reenviar-activacion', [PlataformaEstudiosController::class, 'reenviarActivacion'])->middleware('throttle:10,60,reenviar-activacion-plataforma')->name('estudios.reenviar-activacion');
         // Monitoreo de errores de la API, la web y la app (ADR 0080).
         Route::get('/errores', [PlataformaErroresController::class, 'index'])->name('errores');
         Route::get('/errores/{error}', [PlataformaErroresController::class, 'show'])->name('errores.show');
@@ -496,6 +500,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
             Route::put('/yo/rol-activo', [AuthTenantController::class, 'rolActivo'])->name('yo.rol-activo');
             // Eliminar la cuenta propia (ADR 0211) y abrir la web desde la app.
+            // Aceptar las versiones nuevas del aviso y de los términos (ADR 0216): el dueño.
+            Route::post('/legales/aceptar', [AuthTenantController::class, 'aceptarLegales'])->name('legales.aceptar');
             Route::post('/yo/eliminar-cuenta', [AuthTenantController::class, 'eliminarCuenta'])->middleware('throttle:confirmar-contrasena')->name('yo.eliminar-cuenta');
             Route::post('/yo/enlace-web', [AuthTenantController::class, 'enlaceWeb'])->middleware('throttle:10,1,enlace-web')->name('yo.enlace-web');
             // Conectar o quitar Google para entrar con él (ADR 0093: Google no registra).
