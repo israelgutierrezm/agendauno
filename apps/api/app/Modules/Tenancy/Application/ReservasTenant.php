@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -122,12 +123,22 @@ class ReservasTenant
     }
 
     /**
-     * Reserva ligada a una orden por la sesión: `PendientePago` (retiene el cupo hasta
-     * pagar en línea o expirar) o `Confirmada` (el negocio cobra en caja).
+     * La cita de un servicio que ya pagó por adelantado (ADR 0218): confirmada, sin
+     * orden nueva, con el concepto pagado que usa.
      */
-    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado, ?int $anticipoMinor = null, bool $completo = false, ?string $clave = null): ReservaTenant
+    public function reservarPrepagada(SesionTenant $sesion, PersonaTenant $persona, LineaOrdenTenant $prepago): ReservaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado, $anticipoMinor, $completo, $clave): ReservaTenant {
+        return $this->reservarConOrden($sesion, $persona, 0, '', null, 'directo', EstadoReserva::Confirmada, prepago: $prepago);
+    }
+
+    /**
+     * Reserva ligada a una orden por la sesión: `PendientePago` (retiene el cupo hasta
+     * pagar en línea o expirar) o `Confirmada` (el negocio cobra en caja). Con un
+     * prepago, sin orden: la paga ese concepto.
+     */
+    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado, ?int $anticipoMinor = null, bool $completo = false, ?string $clave = null, ?LineaOrdenTenant $prepago = null): ReservaTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado, $anticipoMinor, $completo, $clave, $prepago): ReservaTenant {
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
@@ -156,8 +167,8 @@ class ReservasTenant
 
             // Orden por la sesión (pendiente de cobro) + la reserva que retiene el cupo. Con
             // anticipo, la orden es la del anticipo y el resto va en la del saldo.
-            $conSaldo = $anticipoMinor !== null && ! $completo && $anticipoMinor < $montoMinor;
-            $orden = $this->ordenes->crearPorSesion($persona, $bloqueada, $conSaldo ? $anticipoMinor : $montoMinor, $moneda, $sucursalId);
+            $conSaldo = $prepago === null && $anticipoMinor !== null && ! $completo && $anticipoMinor < $montoMinor;
+            $orden = $prepago === null ? $this->ordenes->crearPorSesion($persona, $bloqueada, $conSaldo ? $anticipoMinor : $montoMinor, $moneda, $sucursalId) : null;
             $saldo = $conSaldo ? $this->ordenes->crearPorSesion($persona, $bloqueada, $montoMinor - $anticipoMinor, $moneda, $sucursalId) : null;
 
             $politica = $this->politicas->paraSesion($bloqueada);
@@ -165,8 +176,9 @@ class ReservasTenant
             $reserva = ReservaTenant::query()->create([
                 'sesion_id' => $bloqueada->getKey(),
                 'persona_id' => $persona->getKey(),
-                'orden_id' => $orden->getKey(),
+                'orden_id' => $orden?->getKey(),
                 'saldo_orden_id' => $saldo?->getKey(),
+                'linea_orden_id' => $prepago?->getKey(),
                 'anticipo_minor' => $anticipoMinor,
                 'estado' => $estado->value,
                 'canal' => $canal,
@@ -179,7 +191,7 @@ class ReservasTenant
             ]);
 
             $this->emitirCreada($reserva, $bloqueada, $persona);
-            if ($estado === EstadoReserva::PendientePago) {
+            if ($estado === EstadoReserva::PendientePago && $orden !== null) {
                 $this->emitirApartada($reserva, $bloqueada, $persona, $orden, $moneda);
             }
 

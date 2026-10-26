@@ -153,6 +153,9 @@ class OpcionesCitaTenant
                 'incluye' => $o->incluidas->pluck('nombre')->values()->all(),
                 'precio_por_separado_minor' => $o->precioPorSeparadoMinor(),
                 'foto_url' => $o->fotoUrl(),
+                // Cuántas veces ya lo pagó por adelantado (un presupuesto, ADR 0218): se
+                // agenda sin pagar de nuevo.
+                'prepagados' => $persona instanceof PersonaTenant ? app(ServiciosPrepagadosTenant::class)->restantes($persona, $o) : 0,
                 // Quiénes lo dan (ULID); null = cualquier profesional (ADR 0217).
                 'profesionales' => $o->profesionales->isEmpty() ? null : $o->profesionales->pluck('ulid')->values()->all(),
                 'precio_minor' => $o->precio_clase_minor,

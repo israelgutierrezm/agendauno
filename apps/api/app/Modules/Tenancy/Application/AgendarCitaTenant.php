@@ -65,6 +65,7 @@ class AgendarCitaTenant
     public function __construct(
         private readonly VerificarAgendaTenant $agenda,
         private readonly ReservasTenant $reservas,
+        private readonly ServiciosPrepagadosTenant $prepagados,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
         private readonly ElegirRecursoTenant $recursos,
         private readonly ParametrosTenant $parametros,
@@ -299,8 +300,10 @@ class AgendarCitaTenant
             throw new SesionNoReservable('Esa persona no atiende citas.');
         }
 
-        // El cliente no aparta sin fin citas que no paga (ADR 0065).
-        if (! $porNegocio && $oferta->politica_reserva === PoliticaReservaTenant::Pago) {
+        // El cliente no aparta sin fin citas que no paga (ADR 0065); una ya pagada por
+        // adelantado no cuenta.
+        if (! $porNegocio && $oferta->politica_reserva === PoliticaReservaTenant::Pago
+            && $this->prepagados->disponible($persona, $oferta) === null) {
             $this->verificarCitasPorPagar($persona);
         }
 
@@ -334,6 +337,11 @@ class AgendarCitaTenant
         ]);
 
         if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {
+            // Ya lo pagó por adelantado (un presupuesto, ADR 0218): no se cobra otra vez.
+            $prepago = $this->prepagados->disponible($persona, $oferta, bloquear: true);
+            if ($prepago !== null) {
+                return $this->reservas->reservarPrepagada($sesion, $persona, $prepago);
+            }
             $precio = (int) ($oferta->precio_clase_minor ?? 0);
             $moneda = app(ParametrosTenant::class)->monedaDe($sucursal);
             // Con anticipo, quien agenda por su cuenta lo paga en línea para confirmar

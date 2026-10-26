@@ -31,6 +31,8 @@ class ReservaTenant extends Model
         'sin_avisos', 'referencia_externa',
         'nota_cliente', 'asiste',
         'anticipo_minor', 'saldo_orden_id',
+        // La cita se agendó con un servicio pagado por adelantado (ADR 0218).
+        'linea_orden_id',
     ];
 
     /**
@@ -103,6 +105,16 @@ class ReservaTenant extends Model
     public function saldoOrden(): BelongsTo
     {
         return $this->belongsTo(OrdenTenant::class, 'saldo_orden_id');
+    }
+
+    /**
+     * El servicio pagado por adelantado con que se agendó (ADR 0218), si así fue.
+     *
+     * @return BelongsTo<LineaOrdenTenant, $this>
+     */
+    public function lineaOrden(): BelongsTo
+    {
+        return $this->belongsTo(LineaOrdenTenant::class, 'linea_orden_id');
     }
 
     /**

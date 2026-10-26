@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * penalización por baja) y, si se generó sola, una `referencia` única. No da clases.
  *
  * @property ConceptoCuota|null $concepto
+ * @property int|null $oferta_id el servicio que se pagó por adelantado (ADR 0218)
  * @property string|null $referencia
  * @property array<string, mixed>|null $condiciones las que aceptó el cliente (plan con permanencia; B04)
  * @property array{atributos?: array<string, mixed>, ofertas?: list<int>}|null $plan el plan como se vendió (ADR 0166)
@@ -37,6 +38,8 @@ class LineaOrdenTenant extends Model
         'plan',
         // De un presupuesto (ADR 0127): un concepto escrito y, si es un artículo, cuál.
         'descripcion', 'articulo_id',
+        // Y si es un servicio, cuál: la cita que se agende lo usa (ADR 0218).
+        'oferta_id',
     ];
 
     /**

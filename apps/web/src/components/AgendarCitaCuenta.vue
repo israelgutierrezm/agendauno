@@ -42,6 +42,8 @@ interface Servicio {
   duracion_minutos: number | null;
   // Quiénes lo dan (ADR 0217); null = cualquier profesional.
   profesionales?: string[] | null;
+  // Cuántas veces ya lo pagó por adelantado (ADR 0218).
+  prepagados?: number;
   // Se descuenta de su bono (ADR 0091).
   con_plan?: boolean;
   // Lo que se paga para apartar; el resto, en el negocio (ADR 0161). Null = completo.
@@ -105,7 +107,7 @@ const servicio = computed(
   () => servicios.value.find((s) => s.id === servicioId.value) ?? null,
 );
 const anticipo = computed(() =>
-  servicio.value?.con_plan === true
+  servicio.value?.con_plan === true || (servicio.value?.prepagados ?? 0) > 0
     ? null
     : (servicio.value?.anticipo_minor ?? null),
 );
@@ -505,6 +507,20 @@ onMounted(async () => {
             data-prueba="con-bono"
           >
             {{ $t("citaCuenta.conTuBonoAyuda") }}
+          </p>
+          <p
+            v-else-if="(servicio?.prepagados ?? 0) > 0"
+            class="mt-1 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="prepagado"
+          >
+            {{
+              $t(
+                "citaCuenta.prepagado",
+                { n: servicio?.prepagados ?? 0 },
+                servicio?.prepagados ?? 0,
+              )
+            }}
           </p>
           <ServicioIncluye
             v-else-if="servicio"

@@ -219,6 +219,8 @@ class PresupuestosTenant
                 $orden->lineas()->create([
                     'producto_comercial_id' => $linea->tipo === TipoLineaPresupuesto::Producto ? $linea->referencia_id : null,
                     'articulo_id' => $linea->tipo === TipoLineaPresupuesto::Articulo ? $linea->referencia_id : null,
+                    // Un servicio queda pagado por adelantado: su cita no se cobra otra vez (ADR 0218).
+                    'oferta_id' => $linea->tipo === TipoLineaPresupuesto::Servicio ? $linea->referencia_id : null,
                     'descripcion' => $linea->tipo === TipoLineaPresupuesto::Producto ? null : $linea->descripcion,
                     'cantidad' => $linea->cantidad,
                     'precio_unitario_minor' => $linea->precio_unitario_minor,
