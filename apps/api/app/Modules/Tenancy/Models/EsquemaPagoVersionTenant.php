@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $usuario_id
  * @property TipoPago $tipo
  * @property int $monto_minor
+ * @property int|null $porcentaje_bp la comisión en puntos base (1000 = 10 %; ADR 0219)
  * @property string $moneda
  * @property CarbonInterface|null $vigente_desde
  */
@@ -24,12 +25,13 @@ class EsquemaPagoVersionTenant extends Model
 
     protected $table = 'esquemas_pago_versiones';
 
-    protected $fillable = ['usuario_id', 'tipo', 'monto_minor', 'moneda', 'vigente_desde'];
+    protected $fillable = ['usuario_id', 'tipo', 'monto_minor', 'porcentaje_bp', 'moneda', 'vigente_desde'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
+        'porcentaje_bp' => 'integer',
         'tipo' => TipoPago::class,
         'monto_minor' => 'integer',
         'vigente_desde' => 'date',

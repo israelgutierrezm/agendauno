@@ -10,8 +10,12 @@ use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\AsistenciaTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
+use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Nomina\TipoPago;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -33,6 +37,13 @@ use Illuminate\Support\Facades\DB;
  * - Cada sesión se paga con la tarifa vigente el día en que fue
  *   ({@see TarifasDePagoTenant}): si la tarifa cambió dentro del periodo, la persona
  *   sale en una fila por tarifa.
+ *
+ * En un negocio de citas (ADR 0219):
+ * - Por porcentaje, se gana el porcentaje de lo cobrado por cada cita: sus órdenes
+ *   pagadas, el precio del servicio pagado por adelantado o, con bono, el precio del
+ *   servicio. La proyección, con el precio del servicio.
+ * - Las propinas cobradas con sus citas van en su propia fila (`tipo` = `propinas`),
+ *   tenga o no esquema de pago.
  */
 class CalcularNominaTenant
 {
@@ -42,7 +53,7 @@ class CalcularNominaTenant
     ) {}
 
     /**
-     * @return list<array{usuario_id: string|null, usuario: string|null, tipo: string, monto_minor: int, moneda: string, vigente_desde: string|null, unidades: float, monto_total_minor: int, unidades_por_venir: float, por_venir_minor: int, al_cierre_minor: int}>
+     * @return list<array{usuario_id: string|null, usuario: string|null, tipo: string, monto_minor: int, porcentaje_bp: int|null, moneda: string, vigente_desde: string|null, unidades: float, monto_total_minor: int, unidades_por_venir: float, por_venir_minor: int, al_cierre_minor: int}>
      */
     public function calcular(string $desde, string $hasta): array
     {
@@ -70,7 +81,7 @@ class CalcularNominaTenant
             if ($grupos === []) {
                 $version = $this->tarifas->para($usuarioId, $fin) ?? new EsquemaPagoVersionTenant([
                     'usuario_id' => $usuarioId, 'tipo' => $esquema->tipo, 'monto_minor' => $esquema->monto_minor,
-                    'moneda' => $esquema->moneda, 'vigente_desde' => null,
+                    'porcentaje_bp' => $esquema->porcentaje_bp, 'moneda' => $esquema->moneda, 'vigente_desde' => null,
                 ]);
                 $grupos[] = ['version' => $version, 'hechas' => collect(), 'por_venir' => collect()];
             }
@@ -84,6 +95,7 @@ class CalcularNominaTenant
                     'usuario' => $esquema->usuario?->name,
                     'tipo' => $version->tipo->value,
                     'monto_minor' => $version->monto_minor,
+                    'porcentaje_bp' => $version->porcentaje_bp,
                     'moneda' => $version->moneda,
                     'vigente_desde' => $version->vigente_desde?->toDateString(),
                     'unidades' => $unidades,
@@ -95,7 +107,43 @@ class CalcularNominaTenant
             }
         }
 
-        return $filas;
+        return [...$filas, ...$this->propinas($inicio, $fin)];
+    }
+
+    /**
+     * Las propinas cobradas con las citas del periodo, por profesional (ADR 0219): de
+     * las ventas que no se anularon.
+     *
+     * @return list<array{usuario_id: string|null, usuario: string|null, tipo: string, monto_minor: int, porcentaje_bp: int|null, moneda: string, vigente_desde: string|null, unidades: float, monto_total_minor: int, unidades_por_venir: float, por_venir_minor: int, al_cierre_minor: int}>
+     */
+    private function propinas(CarbonImmutable $inicio, CarbonImmutable $fin): array
+    {
+        $filas = DB::connection('tenant')->table('ventas_pos')
+            ->join('reservas', 'ventas_pos.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'reservas.sesion_id', '=', 'sesiones.id')
+            ->join('users', 'sesiones.instructor_id', '=', 'users.id')
+            ->whereNull('ventas_pos.anulada_en')
+            ->where('ventas_pos.propina_minor', '>', 0)
+            ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
+            ->groupBy('users.id', 'users.ulid', 'users.name', 'ventas_pos.moneda')
+            ->orderBy('users.name')
+            ->selectRaw('users.ulid as ulid, users.name as nombre, ventas_pos.moneda as moneda, count(*) as veces, sum(ventas_pos.propina_minor) as total')
+            ->get();
+
+        return $filas->map(static fn (object $f): array => [
+            'usuario_id' => (string) $f->ulid,
+            'usuario' => (string) $f->nombre,
+            'tipo' => 'propinas',
+            'monto_minor' => 0,
+            'porcentaje_bp' => null,
+            'moneda' => (string) $f->moneda,
+            'vigente_desde' => null,
+            'unidades' => (float) $f->veces,
+            'monto_total_minor' => (int) $f->total,
+            'unidades_por_venir' => 0.0,
+            'por_venir_minor' => 0,
+            'al_cierre_minor' => (int) $f->total,
+        ])->values()->all();
     }
 
     /**
@@ -145,7 +193,52 @@ class CalcularNominaTenant
 
                 return [round($minutos / 60, 2), intdiv($monto * $minutos, 60)];
             })(),
+            TipoPago::PorcentajeVenta => [
+                (float) $sesiones->count(),
+                intdiv($this->cobradoDeCitas($sesiones->pluck('id')->all(), $proyectar) * (int) ($tarifa->porcentaje_bp ?? 0), 10000),
+            ],
         };
+    }
+
+    /**
+     * Lo cobrado por esas citas (ADR 0219), sobre lo que se calcula la comisión: sus
+     * órdenes pagadas (la del servicio y la del saldo de un anticipo), el precio del
+     * servicio pagado por adelantado o, si se tomó con su bono, el precio del servicio.
+     * Con `$proyectar`, el precio del servicio de las reservas confirmadas.
+     *
+     * @param  list<int>  $sesionIds
+     */
+    private function cobradoDeCitas(array $sesionIds, bool $proyectar): int
+    {
+        if ($sesionIds === []) {
+            return 0;
+        }
+        $reservas = ReservaTenant::query()
+            ->whereIn('sesion_id', $sesionIds)
+            ->where('estado', EstadoReserva::Confirmada->value)
+            ->with(['sesion.oferta', 'orden', 'saldoOrden', 'lineaOrden'])
+            ->get();
+
+        return (int) $reservas->sum(static function (ReservaTenant $r) use ($proyectar): int {
+            $precio = (int) ($r->sesion?->oferta->precio_clase_minor ?? 0);
+            if ($proyectar) {
+                return $precio;
+            }
+            $pagado = 0;
+            foreach ([$r->orden, $r->saldoOrden] as $orden) {
+                if ($orden instanceof OrdenTenant && $orden->estado === EstadoOrden::Pagada) {
+                    $pagado += (int) $orden->total_minor;
+                }
+            }
+            if ($pagado > 0) {
+                return $pagado;
+            }
+            if ($r->lineaOrden instanceof LineaOrdenTenant) {
+                return (int) $r->lineaOrden->precio_unitario_minor;
+            }
+
+            return $r->derecho_id !== null ? $precio : 0;
+        });
     }
 
     /**

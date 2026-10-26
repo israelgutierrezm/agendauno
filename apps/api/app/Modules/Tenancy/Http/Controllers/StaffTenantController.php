@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
+use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
@@ -96,7 +97,9 @@ class StaffTenantController
         $usuario = Usuario::query()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
         $validado = $request->validate([
             'tipo' => ['required', Rule::enum(TipoPago::class)],
-            'monto_minor' => ['required', 'integer', 'min:0'],
+            // Por porcentaje (citas, ADR 0219): el porcentaje, con hasta dos decimales.
+            'monto_minor' => ['required_unless:tipo,'.TipoPago::PorcentajeVenta->value, 'nullable', 'integer', 'min:0'],
+            'porcentaje' => ['required_if:tipo,'.TipoPago::PorcentajeVenta->value, 'nullable', 'numeric', 'min:0.01', 'max:100', 'decimal:0,2'],
             'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'vigente_desde' => ['nullable', 'date_format:Y-m-d'],
         ]);
@@ -115,9 +118,14 @@ class StaffTenantController
                 .': la tarifa nueva puede valer desde el '.$siguiente->format('d/m/Y').'.',
             ]]);
         }
+        $porcentaje = $validado['tipo'] === TipoPago::PorcentajeVenta->value;
+        if ($porcentaje && ! app(ModalidadNegocioTenant::class)->esCitas()) {
+            throw ValidationException::withMessages(['tipo' => ['La comisión en porcentaje es de los negocios de citas: lo que se cobra por cada cita.']]);
+        }
         $datos = [
             'tipo' => $validado['tipo'],
-            'monto_minor' => (int) $validado['monto_minor'],
+            'monto_minor' => $porcentaje ? 0 : (int) $validado['monto_minor'],
+            'porcentaje_bp' => $porcentaje ? (int) round(((float) $validado['porcentaje']) * 100) : null,
             'moneda' => mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())),
         ];
 
@@ -136,9 +144,31 @@ class StaffTenantController
             'usuario' => $usuario->ulid,
             'tipo' => $esquema->tipo->value,
             'monto_minor' => $esquema->monto_minor,
+            'porcentaje_bp' => $esquema->porcentaje_bp,
             'moneda' => $esquema->moneda,
             'vigente_desde' => $version->vigente_desde?->toDateString(),
         ]], 201);
+    }
+
+    /**
+     * Mis comisiones (ADR 0219): lo que el profesional lleva ganado en el periodo con
+     * su esquema (devengado y por venir) y sus propinas. Solo lo suyo.
+     */
+    public function misComisiones(Request $request): JsonResponse
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 401);
+        abort_unless($usuario->esProfesional(), 403, 'Solo quien atiende tiene comisiones.');
+        $validado = $request->validate([
+            'desde' => ['required', 'date'],
+            'hasta' => ['required', 'date', 'after_or_equal:desde'],
+        ]);
+        $mias = array_values(array_filter(
+            $this->nomina->calcular($validado['desde'], $validado['hasta']),
+            static fn (array $fila): bool => $fila['usuario_id'] === $usuario->ulid,
+        ));
+
+        return response()->json(['data' => $mias]);
     }
 
     public function nomina(Request $request): JsonResponse

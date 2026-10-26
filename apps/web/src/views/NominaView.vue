@@ -37,13 +37,16 @@ interface Persona {
   rol: string;
   foto_url?: string | null;
 }
-type TipoPago = "por_clase" | "por_asistente" | "por_hora";
+type TipoPago = "por_clase" | "por_asistente" | "por_hora" | "porcentaje_venta";
 interface FilaNomina {
   usuario_id?: string | null;
   usuario: string | null;
-  tipo: TipoPago;
+  // Las propinas de sus citas van en su propia fila (ADR 0219).
+  tipo: TipoPago | "propinas";
   unidades: number;
   monto_minor?: number;
+  // Por porcentaje: en puntos base (1000 = 10 %).
+  porcentaje_bp?: number | null;
   // Lo ya impartido (devengado).
   monto_total_minor: number;
   // Lo que falta del periodo (proyección).
@@ -63,21 +66,29 @@ interface FilaVista {
   filas: FilaNomina[];
   devengado: number;
   porVenir: number;
+  // Sus propinas del periodo (ya van en lo devengado).
+  propinas: number;
 }
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
-const TIPOS: { valor: TipoPago; icono: string }[] = [
+// El porcentaje de lo cobrado, solo en un negocio de citas (ADR 0219).
+const TIPOS = computed<{ valor: TipoPago; icono: string }[]>(() => [
   { valor: "por_clase", icono: "agenda" },
   { valor: "por_asistente", icono: "personas" },
   { valor: "por_hora", icono: "reloj" },
-];
-const TONO_TIPO: Record<TipoPago, string> = {
+  ...(sesion.esCitas
+    ? [{ valor: "porcentaje_venta" as const, icono: "dinero" }]
+    : []),
+]);
+const TONO_TIPO: Record<TipoPago | "propinas", string> = {
   por_clase: "tu-tono-azul",
   por_asistente: "tu-tono-morado",
   por_hora: "tu-tono-naranja",
+  porcentaje_venta: "tu-tono-verde",
+  propinas: "tu-tono-verde",
 };
 
 const equipo = ref<Persona[]>([]);
@@ -85,6 +96,7 @@ const nombresRoles = ref<Record<string, string>>({});
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
+// `monto`: en pesos o, por porcentaje, el porcentaje (ADR 0219).
 const esquema = ref<{ usuarioId: string; tipo: TipoPago; monto: string }>({
   usuarioId: "",
   tipo: "por_clase",
@@ -165,9 +177,17 @@ function fechaCorta(isoFecha: string): string {
   const [a, m, d] = isoFecha.split("-");
   return `${d}/${m}/${a}`;
 }
-function etiquetaTipo(tipo: TipoPago): string {
+function etiquetaTipo(tipo: TipoPago | "propinas", fila?: FilaNomina): string {
   if (tipo === "por_clase") {
     return t("nominaVisual.porSesion", { sesion: termino.value });
+  }
+  if (tipo === "porcentaje_venta") {
+    return fila?.porcentaje_bp
+      ? t("nominaVisual.porcentajeDe", { n: fila.porcentaje_bp / 100 })
+      : t("nominaVisual.porcentajeVenta");
+  }
+  if (tipo === "propinas") {
+    return t("nominaVisual.propinas");
   }
   return tipo === "por_asistente"
     ? t("nomina.tipoPorAsistente")
@@ -177,7 +197,7 @@ function cantidad(f: FilaNomina): string {
   const n = Number.isInteger(f.unidades)
     ? f.unidades
     : Math.round(f.unidades * 10) / 10;
-  if (f.tipo === "por_clase") {
+  if (f.tipo === "por_clase" || f.tipo === "porcentaje_venta") {
     return `${n} ${n === 1 ? termino.value : plural(termino.value)}`;
   }
   return f.tipo === "por_asistente"
@@ -205,12 +225,20 @@ function sumas(suyas: FilaNomina[]): {
   filas: FilaNomina[];
   devengado: number;
   porVenir: number;
+  propinas: number;
 } {
+  // Las propinas van aparte de su esquema (ADR 0219), pero se le pagan.
+  const deEsquema = suyas.filter((f) => f.tipo !== "propinas");
+  const propinas = suyas
+    .filter((f) => f.tipo === "propinas")
+    .reduce((s, f) => s + f.monto_total_minor, 0);
   return {
-    fila: suyas.at(-1) ?? null,
-    filas: suyas,
-    devengado: suyas.reduce((s, f) => s + f.monto_total_minor, 0),
-    porVenir: suyas.reduce((s, f) => s + (f.por_venir_minor ?? 0), 0),
+    fila: deEsquema.at(-1) ?? null,
+    filas: deEsquema,
+    devengado:
+      deEsquema.reduce((s, f) => s + f.monto_total_minor, 0) + propinas,
+    porVenir: deEsquema.reduce((s, f) => s + (f.por_venir_minor ?? 0), 0),
+    propinas,
   };
 }
 const filasVista = computed<FilaVista[]>(() => {
@@ -373,11 +401,20 @@ async function guardarEsquema(): Promise<void> {
     return;
   const listo = await guardarConEditor(
     () =>
-      api.put(`${base.value}/staff/${esquema.value.usuarioId}/esquema-pago`, {
-        tipo: esquema.value.tipo,
-        monto_minor: Math.round(Number(esquema.value.monto) * 100),
-        moneda: sesion.moneda,
-      }),
+      api.put(
+        `${base.value}/staff/${esquema.value.usuarioId}/esquema-pago`,
+        esquema.value.tipo === "porcentaje_venta"
+          ? {
+              tipo: esquema.value.tipo,
+              porcentaje: Number(esquema.value.monto),
+              moneda: sesion.moneda,
+            }
+          : {
+              tipo: esquema.value.tipo,
+              monto_minor: Math.round(Number(esquema.value.monto) * 100),
+              moneda: sesion.moneda,
+            },
+      ),
     t("nominaVisual.esquemaGuardado", { nombre: nombreEsquema.value }),
   );
   if (listo !== undefined) {
@@ -391,11 +428,18 @@ function editar(x: FilaVista): void {
   if (x.id === null) {
     return;
   }
+  const fila = x.fila;
+  const tipo: TipoPago =
+    fila && fila.tipo !== "propinas" ? fila.tipo : "por_clase";
   esquema.value = {
     usuarioId: x.id,
-    tipo: x.fila?.tipo ?? "por_clase",
+    tipo,
     monto:
-      x.fila?.monto_minor !== undefined ? String(x.fila.monto_minor / 100) : "",
+      tipo === "porcentaje_venta"
+        ? String((fila?.porcentaje_bp ?? 0) / 100)
+        : fila?.monto_minor !== undefined
+          ? String(fila.monto_minor / 100)
+          : "",
   };
   empezar();
   editorEsquema.value = true;
@@ -413,11 +457,11 @@ function exportar(): void {
       t("nominaVisual.colPorVenir"),
     ],
     ...filasVista.value
-      .filter((x) => x.fila !== null)
+      .filter((x) => x.fila !== null || x.propinas > 0)
       .map((x) => [
         x.nombre,
-        etiquetaTipo(x.fila!.tipo),
-        cantidadDe(x),
+        x.fila ? etiquetaTipo(x.fila.tipo, x.fila) : t("nominaVisual.propinas"),
+        x.fila ? cantidadDe(x) : "",
         (x.devengado / 100).toFixed(2),
         (x.porVenir / 100).toFixed(2),
       ]),
@@ -518,11 +562,13 @@ onMounted(async () => {
               </div>
               <div>
                 <label class="tu-label" for="em">{{
-                  $t("nomina.monto")
+                  esquema.tipo === "porcentaje_venta"
+                    ? $t("nominaVisual.porcentaje")
+                    : $t("nomina.monto")
                 }}</label>
                 <div class="nm-monto">
                   <span aria-hidden="true" data-prueba="simbolo-monto">{{
-                    simbolo
+                    esquema.tipo === "porcentaje_venta" ? "%" : simbolo
                   }}</span>
                   <input
                     id="em"
@@ -739,7 +785,11 @@ onMounted(async () => {
                 class="text-right font-semibold tabular-nums"
                 :data-etiqueta="$t('nominaVisual.colTotal')"
               >
-                {{ x.fila ? dinero(x.devengado, x.fila.moneda) : "—" }}
+                {{
+                  x.fila || x.propinas > 0
+                    ? dinero(x.devengado, x.fila?.moneda ?? moneda)
+                    : "—"
+                }}
               </td>
               <td :data-etiqueta="$t('nominaVisual.colEsquema')">
                 <span>
@@ -747,7 +797,7 @@ onMounted(async () => {
                     v-if="x.fila"
                     class="nm-pastilla"
                     :class="TONO_TIPO[x.fila.tipo]"
-                    >{{ etiquetaTipo(x.fila.tipo) }}</span
+                    >{{ etiquetaTipo(x.fila.tipo, x.fila) }}</span
                   >
                   <span v-else class="nm-sub">—</span>
                   <span
@@ -763,6 +813,16 @@ onMounted(async () => {
                 :data-etiqueta="$t('nominaVisual.colCantidad')"
               >
                 {{ x.fila ? cantidadDe(x) : "—" }}
+                <span
+                  v-if="x.propinas > 0"
+                  class="block nm-sub"
+                  data-prueba="propinas"
+                  >{{
+                    $t("nominaVisual.conPropinas", {
+                      monto: dinero(x.propinas, x.fila?.moneda ?? moneda),
+                    })
+                  }}</span
+                >
               </td>
               <td
                 class="text-right tabular-nums nm-sub"

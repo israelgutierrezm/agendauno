@@ -691,6 +691,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Lo que lleva ganado quien atiende citas (ADR 0219).
+      path: "/mis-comisiones",
+      name: "mis-comisiones",
+      component: () => import("@/views/MisComisionesView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Mi perfil: foto, nombre y contraseña de quien tiene la sesión (todo rol).
       path: "/mi-perfil",
       name: "mi-perfil",

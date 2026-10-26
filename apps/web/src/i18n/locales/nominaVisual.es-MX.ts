@@ -11,7 +11,15 @@ export default {
     por_clase: "Lo que se le paga por cada {sesion} que atiende.",
     por_asistente: "Lo que se le paga por cada persona que llega.",
     por_hora: "Lo que se le paga por cada hora agendada.",
+    porcentaje_venta:
+      "El porcentaje de lo que se cobra por cada {sesion} suya (sin la propina).",
   },
+  // Comisión en porcentaje y propinas (ADR 0219).
+  porcentaje: "Porcentaje",
+  porcentajeVenta: "Porcentaje de lo cobrado",
+  porcentajeDe: "{n} % de lo cobrado",
+  propinas: "Propinas",
+  conPropinas: "+ {monto} de propinas",
   periodoAyuda: "Selecciona el rango de fechas para calcular la nómina.",
   resumen: "Resumen del periodo",
   resumenAyuda:

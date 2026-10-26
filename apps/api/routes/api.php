@@ -1025,6 +1025,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/sesiones/{sesion}/staff', [StaffTenantController::class, 'asignar'])->middleware('puede:agenda.gestionar')->name('sesiones.staff.store');
             Route::put('/staff/{usuario}/esquema-pago', [StaffTenantController::class, 'esquemaPago'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('staff.esquema-pago');
             Route::get('/nomina', [StaffTenantController::class, 'nomina'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina');
+            // Lo que lleva ganado el profesional: su comisión y sus propinas (ADR 0219).
+            Route::get('/mis-comisiones', [StaffTenantController::class, 'misComisiones'])->middleware('plan:comisiones')->name('mis-comisiones');
             // Cortes de nómina: cerrar un periodo, registrar su pago y los ajustes posteriores.
             Route::get('/nomina/cortes', [CortesNominaTenantController::class, 'index'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.index');
             Route::post('/nomina/cortes', [CortesNominaTenantController::class, 'cerrar'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina.cortes.cerrar');

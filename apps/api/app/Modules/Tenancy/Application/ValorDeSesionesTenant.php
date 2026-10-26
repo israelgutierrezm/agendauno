@@ -67,7 +67,7 @@ class ValorDeSesionesTenant
             foreach (array_keys(PersonalDeSesionTenant::participantes($sesion, $suyas)) as $usuarioId) {
                 $tarifa = $tarifas->para((int) $usuarioId, $sesion->inicia_en);
                 if ($tarifa instanceof EsquemaPagoVersionTenant) {
-                    $pagos[$usuarioId] = $this->pagoDe($tarifa, $presentes->count(), $minutos);
+                    $pagos[$usuarioId] = $this->pagoDe($tarifa, $presentes->count(), $minutos, $ingreso);
                 }
             }
 
@@ -131,7 +131,7 @@ class ValorDeSesionesTenant
         return [$ingreso, $sinCosto];
     }
 
-    private function pagoDe(EsquemaPagoVersionTenant $tarifa, int $presentes, int $minutos): int
+    private function pagoDe(EsquemaPagoVersionTenant $tarifa, int $presentes, int $minutos, int $ingreso): int
     {
         $monto = $tarifa->monto_minor;
 
@@ -139,6 +139,8 @@ class ValorDeSesionesTenant
             TipoPago::PorClase => $monto,
             TipoPago::PorAsistente => $monto * $presentes,
             TipoPago::PorHora => intdiv($monto * $minutos, 60),
+            // Su porcentaje de lo que dejó la sesión (ADR 0219).
+            TipoPago::PorcentajeVenta => intdiv($ingreso * (int) ($tarifa->porcentaje_bp ?? 0), 10000),
         };
     }
 }

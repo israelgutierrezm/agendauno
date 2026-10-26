@@ -293,6 +293,8 @@ export default {
       grupo: "Mi trabajo",
       inicio: "Inicio",
       calendario: "Mi calendario",
+      // Lo que lleva ganado (citas, ADR 0219).
+      comisiones: "Mis comisiones",
       // Lo del panel que le sirve, con el nombre de lo suyo.
       mis: "Mis {grupo}",
       resenas: "Mis reseñas",

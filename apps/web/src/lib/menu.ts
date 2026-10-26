@@ -615,6 +615,7 @@ export const MENU_PORTALES: GrupoMenu[] = [
     areas: [
       ["inicio-instructor", "portal.instructor.nav.inicio", "panel"],
       ["mis-clases", "portal.instructor.nav.calendario", "cuadricula"],
+      ["mis-comisiones", "portal.instructor.nav.comisiones", "dinero"],
     ].map(([ruta, etiqueta, icono]) => ({
       clave: ruta,
       etiqueta,

@@ -199,6 +199,12 @@ export const POLITICAS: Record<string, Politica> = {
   "mi-configuracion": { soloMiembro: true },
   "inicio-instructor": { soloInstructor: true },
   "mis-clases": { soloInstructor: true },
+  // Lo que lleva ganado quien atiende citas (ADR 0219).
+  "mis-comisiones": {
+    soloInstructor: true,
+    modalidad: "citas",
+    funcion: "comisiones",
+  },
 
   // ---- Personales ----
   "mi-perfil": { personal: true },

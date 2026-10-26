@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Esquema de pago de un miembro del staff (R17): como se le calcula la nomina
  * (por clase / por asistente / por hora) y el monto por unidad. Unico por usuario.
+ *
+ * @property int|null $porcentaje_bp la comisión en puntos base (1000 = 10 %; ADR 0219)
  */
 class EsquemaPagoTenant extends Model
 {
@@ -21,12 +23,13 @@ class EsquemaPagoTenant extends Model
 
     protected $table = 'esquemas_pago';
 
-    protected $fillable = ['usuario_id', 'tipo', 'monto_minor', 'moneda', 'activo'];
+    protected $fillable = ['usuario_id', 'tipo', 'monto_minor', 'porcentaje_bp', 'moneda', 'activo'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
+        'porcentaje_bp' => 'integer',
         'tipo' => TipoPago::class,
         'monto_minor' => 'integer',
         'activo' => 'boolean',

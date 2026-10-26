@@ -140,6 +140,7 @@ import cfdi from "./locales/cfdi.es-MX";
 import bajaNegocio from "./locales/bajaNegocio.es-MX";
 import datosNegocio from "./locales/datosNegocio.es-MX";
 import legalesNuevos from "./locales/legalesNuevos.es-MX";
+import misComisiones from "./locales/misComisiones.es-MX";
 
 export const mensajesPanel = {
   adminUsabilidad,
@@ -269,4 +270,5 @@ export const mensajesPanel = {
   bajaNegocio,
   datosNegocio,
   legalesNuevos,
+  misComisiones,
 };

@@ -325,6 +325,8 @@ describe("menú de quien imparte", () => {
     expect(grupos[0].areas.map((a) => a.clave)).toEqual([
       "inicio-instructor",
       "mis-clases",
+      // Lo que lleva ganado (ADR 0219).
+      "mis-comisiones",
       "inicio",
       "clientes",
       "marketing",
