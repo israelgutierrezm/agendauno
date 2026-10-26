@@ -63,6 +63,10 @@ final class ReciboRentaPdf
             'timbres' => "Timbres de facturación {$marca}",
             'whatsapp' => "Mensajes de WhatsApp {$marca}",
             'ajuste' => "Cambio de plan {$marca} {$cuando}",
+            // Un cargo que hizo la plataforma a mano (ADR 0214): con su descripción.
+            'manual' => is_array($cargo->desglose) && is_string($cargo->desglose['descripcion'] ?? null)
+                ? (string) $cargo->desglose['descripcion']
+                : "Servicio {$marca}",
             default => "Suscripción {$marca} {$cuando}",
         };
     }

@@ -34,6 +34,10 @@ import ModulosNegocio, {
 import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
 import SolicitudesWellhub from "@/components/SolicitudesWellhub.vue";
 import MedicionPlataforma from "@/components/MedicionPlataforma.vue";
+import AccionesCargoPlataforma, {
+  type FacturaRenta,
+} from "@/components/AccionesCargoPlataforma.vue";
+import CargoManualPlataforma from "@/components/CargoManualPlataforma.vue";
 import CondonarCargo from "@/components/CondonarCargo.vue";
 import type { PlanCitas } from "@/lib/suscripcion";
 import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
@@ -120,6 +124,9 @@ interface Cargo {
   estudio_suspendido_por?: string | null;
   // Pendiente: el superadmin lo puede condonar (queda cancelado).
   condonable?: boolean;
+  // Con qué se pagó y su factura con detalle (ADR 0214).
+  metodo_pago?: string | null;
+  factura_detalle?: FacturaRenta | null;
 }
 interface FichaApi extends Omit<Estudio, "uso"> {
   contacto: {
@@ -232,6 +239,15 @@ const desafio = ref<string | null>(null);
 const correoDestino = ref("");
 const codigoDesarrollo = ref<string | null>(null);
 const operador = ref<string | null>(null);
+// Qué puede hacer quien entró (ADR 0215): solo el perfil total ve la configuración.
+const perfilOperador = ref<string>("total");
+const SOLO_TOTAL: Pestana[] = [
+  "tarifas",
+  "parametros",
+  "configuracion",
+  "medicion",
+  "equipo",
+];
 const autenticado = ref(false);
 const cargando = ref(false);
 // Con un token guardado no se pinta la puerta mientras se comprueba (sin parpadeo).
@@ -770,6 +786,7 @@ const CONCEPTOS_COBRO = [
   "timbres",
   "whatsapp",
   "complemento",
+  "manual",
 ];
 useFiltrosEnUrl({
   buscarCobro: buscarCobros,
@@ -1272,12 +1289,18 @@ async function cargar(): Promise<void> {
   try {
     const [, yo] = await Promise.all([
       cargarEstudios(),
-      cliente.get<{ data: { administrador: { nombre: string } | null } }>(
-        "/api/v1/plataforma/yo",
-        encabezados(),
-      ),
+      cliente.get<{
+        data: { administrador: { nombre: string; perfil?: string } | null };
+      }>("/api/v1/plataforma/yo", encabezados()),
     ]);
     operador.value = yo.data.data.administrador?.nombre ?? null;
+    perfilOperador.value = yo.data.data.administrador?.perfil ?? "total";
+    if (
+      perfilOperador.value !== "total" &&
+      SOLO_TOTAL.includes(pestana.value)
+    ) {
+      pestana.value = "estudios";
+    }
     autenticado.value = true;
     void cargarDemosProximas();
     // La configuración no impide entrar: si falla, se ve en su pestaña (ADR 0132).
@@ -1362,18 +1385,23 @@ const gruposSecciones = computed<GrupoPlataforma[]>(() =>
   GRUPOS.map((g) => ({
     clave: g.clave,
     texto: t(`plataformaAdmin.grupos.${g.clave}`),
-    secciones: g.secciones.map(([clave, icono]) => ({
-      clave,
-      icono,
-      texto: textoPestana(clave),
-      cuenta:
-        clave === "estudios"
-          ? (metaEstudios.value?.total_negocios ?? estudios.value.length)
-          : clave === "demos" && (demosProximas.value ?? 0) > 0
-            ? (demosProximas.value ?? undefined)
-            : undefined,
-    })),
-  })),
+    secciones: g.secciones
+      .filter(
+        ([clave]) =>
+          perfilOperador.value === "total" || !SOLO_TOTAL.includes(clave),
+      )
+      .map(([clave, icono]) => ({
+        clave,
+        icono,
+        texto: textoPestana(clave),
+        cuenta:
+          clave === "estudios"
+            ? (metaEstudios.value?.total_negocios ?? estudios.value.length)
+            : clave === "demos" && (demosProximas.value ?? 0) > 0
+              ? (demosProximas.value ?? undefined)
+              : undefined,
+      })),
+  })).filter((g) => g.secciones.length > 0),
 );
 
 // Paso 1: correo, contraseña y token. Si coinciden, llega un código por correo.
@@ -2801,6 +2829,14 @@ function borrar(): void {
             >
               {{ $t("plataformaAdmin.ficha.cargos") }}
             </h3>
+            <CargoManualPlataforma
+              :api-url="apiUrl"
+              :token="token"
+              :slug="ficha.slug"
+              :nombre="ficha.nombre"
+              :moneda="ficha.moneda ?? 'MXN'"
+              @creado="recargarFicha"
+            />
             <p
               v-if="ficha.cargos.length === 0"
               class="mt-2"
@@ -2832,6 +2868,13 @@ function borrar(): void {
                     @condonar="(m) => condonar(c, m, recargarFicha)"
                   />
                 </div>
+                <AccionesCargoPlataforma
+                  class="pl-condonar"
+                  :api-url="apiUrl"
+                  :token="token"
+                  :cargo="c"
+                  @cambiado="recargarFicha"
+                />
               </div>
             </dl>
           </section>

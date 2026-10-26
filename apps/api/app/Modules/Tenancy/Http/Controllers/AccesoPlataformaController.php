@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Platform\Acceso\AccesoPlataforma;
 use App\Modules\Platform\Acceso\AdministradorPlataforma;
 use App\Modules\Platform\Acceso\BitacoraPlataforma;
+use App\Modules\Platform\Acceso\PerfilesPlataforma;
 use App\Modules\Tenancy\Exceptions\AccesoPlataformaInvalido;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,6 +91,11 @@ class AccesoPlataformaController
      */
     private function presentar(AdministradorPlataforma $administrador): array
     {
-        return ['nombre' => $administrador->nombre, 'email' => $administrador->email];
+        return [
+            'nombre' => $administrador->nombre,
+            'email' => $administrador->email,
+            // Qué puede hacer (ADR 0215).
+            'perfil' => $administrador->perfil ?: PerfilesPlataforma::TOTAL,
+        ];
     }
 }

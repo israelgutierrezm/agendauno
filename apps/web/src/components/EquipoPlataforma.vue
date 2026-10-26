@@ -21,6 +21,8 @@ interface Operador {
   nombre: string;
   email: string;
   activo: boolean;
+  // Qué puede hacer (ADR 0215).
+  perfil: Perfil;
   ultimo_acceso_en: string | null;
   sesiones_abiertas: number;
   soy_yo: boolean;
@@ -51,7 +53,14 @@ const sesiones = ref<Sesion[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const accionando = ref<string | null>(null);
-const nuevo = ref({ nombre: "", email: "", password: "" });
+const PERFILES = ["total", "cobranza", "soporte", "lectura"] as const;
+type Perfil = (typeof PERFILES)[number];
+const nuevo = ref<{
+  nombre: string;
+  email: string;
+  password: string;
+  perfil: Perfil;
+}>({ nombre: "", email: "", password: "", perfil: "soporte" });
 const cambiando = ref<string | null>(null);
 const nuevaContrasena = ref("");
 
@@ -88,7 +97,7 @@ async function agregar(): Promise<void> {
     toast.exito(
       t("plataformaAdmin.equipo.agregado", { nombre: nuevo.value.nombre }),
     );
-    nuevo.value = { nombre: "", email: "", password: "" };
+    nuevo.value = { nombre: "", email: "", password: "", perfil: "soporte" };
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -117,6 +126,26 @@ async function cambiarActivo(o: Operador): Promise<void> {
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
+  } finally {
+    accionando.value = null;
+  }
+}
+
+async function cambiarPerfil(o: Operador, perfil: Perfil): Promise<void> {
+  accionando.value = o.id;
+  try {
+    await cliente.put(
+      `/api/v1/plataforma/administradores/${o.id}`,
+      { perfil },
+      encabezados(),
+    );
+    toast.exito(
+      t("plataformaAdmin.equipo.perfilCambiado", { nombre: o.nombre }),
+    );
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+    await cargar();
   } finally {
     accionando.value = null;
   }
@@ -266,6 +295,23 @@ onMounted(() => void cargar());
             </form>
           </div>
           <div class="flex flex-wrap items-center gap-2">
+            <select
+              class="tu-input w-auto text-sm"
+              :value="o.perfil"
+              :disabled="accionando !== null || o.soy_yo"
+              :aria-label="t('plataformaAdmin.equipo.perfil')"
+              data-prueba="perfil-operador"
+              @change="
+                cambiarPerfil(
+                  o,
+                  ($event.target as HTMLSelectElement).value as Perfil,
+                )
+              "
+            >
+              <option v-for="p in PERFILES" :key="p" :value="p">
+                {{ t(`plataformaAdmin.equipo.perfiles.${p}`) }}
+              </option>
+            </select>
             <span
               class="tu-estado text-sm"
               :style="{
@@ -308,7 +354,7 @@ onMounted(() => void cargar());
       </ul>
 
       <form
-        class="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
+        class="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto] sm:items-end"
         data-prueba="nuevo-operador"
         @submit.prevent="agregar"
       >
@@ -350,6 +396,16 @@ onMounted(() => void cargar());
             required
           />
         </div>
+        <div>
+          <label class="tu-label" for="op-perfil">{{
+            t("plataformaAdmin.equipo.perfil")
+          }}</label>
+          <select id="op-perfil" v-model="nuevo.perfil" class="tu-input">
+            <option v-for="p in PERFILES" :key="p" :value="p">
+              {{ t(`plataformaAdmin.equipo.perfiles.${p}`) }}
+            </option>
+          </select>
+        </div>
         <button
           type="submit"
           class="tu-btn tu-btn-primario"
@@ -360,6 +416,9 @@ onMounted(() => void cargar());
       </form>
       <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ t("plataformaAdmin.equipo.contrasenaAyuda") }}
+      </p>
+      <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+        {{ t("plataformaAdmin.equipo.perfilesAyuda") }}
       </p>
     </section>
 

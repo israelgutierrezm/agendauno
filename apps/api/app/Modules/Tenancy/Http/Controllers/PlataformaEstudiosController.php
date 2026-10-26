@@ -91,6 +91,9 @@ class PlataformaEstudiosController
                 'vence_en' => $c->vence_en?->toDateString(),
                 'pagado_en' => $c->pagado_en?->toIso8601String(),
                 'factura' => $facturas->get($c->getKey())?->estado->value,
+                // Su factura con detalle (ADR 0214): error, forma de pago y cancelación.
+                'factura_detalle' => ($f = $facturas->get($c->getKey())) instanceof FacturaPlataforma ? PlataformaRentaController::factura($f) : null,
+                'metodo_pago' => $c->metodo_pago,
                 // Solo un cargo pendiente se puede condonar (`POST /plataforma/cargos/{cargo}/condonar`).
                 'condonable' => $c->estado === EstadoCargoRenta::Pendiente,
             ])->values()->all();

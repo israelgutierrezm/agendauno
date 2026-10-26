@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property string $email
  * @property string $password
  * @property bool $activo
+ * @property string $perfil qué puede hacer (ADR 0215): `total`, `cobranza`, `soporte` o `lectura`
  * @property Carbon|null $ultimo_acceso_en
  */
 class AdministradorPlataforma extends Model
@@ -24,7 +25,7 @@ class AdministradorPlataforma extends Model
 
     protected $table = 'administradores_plataforma';
 
-    protected $fillable = ['nombre', 'email', 'password', 'activo', 'ultimo_acceso_en'];
+    protected $fillable = ['nombre', 'email', 'password', 'activo', 'perfil', 'ultimo_acceso_en'];
 
     protected $hidden = ['password'];
 

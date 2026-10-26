@@ -107,6 +107,16 @@ class ConfirmarCargoRenta
             }
         }
 
+        $this->despuesDelPago($pagado);
+    }
+
+    /**
+     * Lo que sigue a un cargo pagado, venga de una pasarela o se registre a mano: se
+     * reactiva el negocio si ya no debe, se suman los timbres o mensajes comprados y el
+     * primer mes pagado de un invitado da su mes gratis (ADR 0188).
+     */
+    public function despuesDelPago(?CargoRenta $pagado): void
+    {
         $this->suspension->reactivarSiPago($pagado?->estudio);
         // Una compra de timbres o de mensajes: se suman al saldo del negocio.
         $this->timbres->aplicar($pagado);

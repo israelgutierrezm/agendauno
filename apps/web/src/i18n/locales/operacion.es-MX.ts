@@ -999,6 +999,7 @@ export default {
       timbres: "Timbres",
       whatsapp: "Mensajes de WhatsApp",
       complemento: "App con tu marca",
+      manual: "Cargo manual",
     },
   },
   // Listados por páginas con búsqueda.

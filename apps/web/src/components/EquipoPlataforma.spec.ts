@@ -114,6 +114,8 @@ describe("equipo del superadmin", () => {
     await w.get("#op-nombre").setValue("Caro");
     await w.get("#op-correo").setValue("caro@agendauno.mx");
     await w.get("#op-contrasena").setValue("contraseña-segura-1");
+    // Con su perfil (ADR 0215): por omisión, soporte.
+    await w.get("#op-perfil").setValue("cobranza");
     await w.get('[data-prueba="nuevo-operador"]').trigger("submit");
     await flushPromises();
 
@@ -123,6 +125,7 @@ describe("equipo del superadmin", () => {
         nombre: "Caro",
         email: "caro@agendauno.mx",
         password: "contraseña-segura-1",
+        perfil: "cobranza",
       },
       expect.anything(),
     );

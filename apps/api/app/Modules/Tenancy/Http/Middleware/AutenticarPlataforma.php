@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Middleware;
 
 use App\Modules\Platform\Acceso\AccesoPlataforma;
 use App\Modules\Platform\Acceso\AdministradorPlataforma;
+use App\Modules\Platform\Acceso\PerfilesPlataforma;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -38,6 +39,13 @@ class AutenticarPlataforma
             // Para marcar «esta sesión» en el equipo, y quién fue en cada línea del log.
             $request->attributes->set('sesion_plataforma_huella', hash('sha256', $enviado));
             Log::withContext(['operador' => $administrador->email]);
+            // Lo que cambia algo, según su perfil (ADR 0215).
+            $perfil = (string) ($administrador->perfil ?: PerfilesPlataforma::TOTAL);
+            abort_unless(
+                PerfilesPlataforma::permite($perfil, (string) $request->route()?->getName(), $request->method()),
+                403,
+                'Tu perfil del superadmin no permite hacer esto. Pídeselo a un operador con perfil total.',
+            );
 
             return $next($request);
         }

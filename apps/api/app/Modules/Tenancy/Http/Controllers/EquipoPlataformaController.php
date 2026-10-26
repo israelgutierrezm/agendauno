@@ -6,11 +6,13 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Acceso\AdministradorPlataforma;
 use App\Modules\Platform\Acceso\BitacoraPlataforma;
+use App\Modules\Platform\Acceso\PerfilesPlataforma;
 use App\Modules\Platform\Acceso\SesionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -38,6 +40,7 @@ class EquipoPlataformaController
                 'nombre' => $a->nombre,
                 'email' => $a->email,
                 'activo' => $a->activo,
+                'perfil' => $a->perfil ?: PerfilesPlataforma::TOTAL,
                 'ultimo_acceso_en' => $a->ultimo_acceso_en?->toIso8601String(),
                 'sesiones_abiertas' => (int) ($abiertas[$a->getKey()] ?? 0),
                 'soy_yo' => $yo !== null && $yo->is($a),
@@ -50,6 +53,7 @@ class EquipoPlataformaController
             'nombre' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'string', 'min:12', 'max:200'],
+            'perfil' => ['sometimes', Rule::in(PerfilesPlataforma::PERFILES)],
         ]);
         $email = mb_strtolower(trim($validado['email']));
         if (AdministradorPlataforma::query()->whereRaw('lower(email) = ?', [$email])->exists()) {
@@ -61,6 +65,7 @@ class EquipoPlataformaController
             'email' => $email,
             'password' => $validado['password'],
             'activo' => true,
+            'perfil' => $validado['perfil'] ?? PerfilesPlataforma::TOTAL,
         ]);
 
         return response()->json(['data' => ['id' => $administrador->ulid]], 201);
@@ -73,9 +78,20 @@ class EquipoPlataformaController
             'nombre' => ['sometimes', 'string', 'max:120'],
             'activo' => ['sometimes', 'boolean'],
             'password' => ['sometimes', 'string', 'min:12', 'max:200'],
+            'perfil' => ['sometimes', Rule::in(PerfilesPlataforma::PERFILES)],
         ]);
         $yo = $this->yo($request);
         $esYo = $yo !== null && $yo->is($modelo);
+
+        // Nadie se cambia su propio perfil, y siempre queda un operador total activo.
+        if (array_key_exists('perfil', $validado) && $validado['perfil'] !== ($modelo->perfil ?: PerfilesPlataforma::TOTAL)) {
+            if ($esYo) {
+                throw ValidationException::withMessages(['perfil' => ['No puedes cambiar tu propio perfil.']]);
+            }
+            if ($validado['perfil'] !== PerfilesPlataforma::TOTAL && ! $this->quedaOtroTotal($modelo)) {
+                throw ValidationException::withMessages(['perfil' => ['Debe quedar al menos un operador activo con perfil total.']]);
+            }
+        }
 
         if (array_key_exists('activo', $validado) && ! $validado['activo'] && $modelo->activo) {
             if ($esYo) {
@@ -83,6 +99,9 @@ class EquipoPlataformaController
             }
             if (AdministradorPlataforma::query()->where('activo', true)->whereKeyNot($modelo->getKey())->doesntExist()) {
                 throw ValidationException::withMessages(['activo' => ['Debe quedar al menos un operador activo.']]);
+            }
+            if (($modelo->perfil ?: PerfilesPlataforma::TOTAL) === PerfilesPlataforma::TOTAL && ! $this->quedaOtroTotal($modelo)) {
+                throw ValidationException::withMessages(['activo' => ['Debe quedar al menos un operador activo con perfil total.']]);
             }
         }
 
@@ -95,7 +114,17 @@ class EquipoPlataformaController
                 ->update(['cerrada_en' => now()]);
         }
 
-        return response()->json(['data' => ['id' => $modelo->ulid, 'activo' => $modelo->activo, 'nombre' => $modelo->nombre]]);
+        return response()->json(['data' => ['id' => $modelo->ulid, 'activo' => $modelo->activo, 'nombre' => $modelo->nombre, 'perfil' => $modelo->perfil]]);
+    }
+
+    /** ¿Hay otro operador activo con perfil total, además de este? */
+    private function quedaOtroTotal(AdministradorPlataforma $modelo): bool
+    {
+        return AdministradorPlataforma::query()
+            ->where('activo', true)
+            ->where('perfil', PerfilesPlataforma::TOTAL)
+            ->whereKeyNot($modelo->getKey())
+            ->exists();
     }
 
     public function sesiones(Request $request): JsonResponse

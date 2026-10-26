@@ -633,6 +633,17 @@ export const plataformaAdmin = {
     contrasena: "Contraseña",
     agregar: "Agregar operador",
     agregado: "{nombre} ya puede entrar al superadmin.",
+    // Qué puede hacer cada uno (ADR 0215).
+    perfil: "Perfil",
+    perfiles: {
+      total: "Total",
+      cobranza: "Cobranza",
+      soporte: "Soporte",
+      lectura: "Solo lectura",
+    },
+    perfilesAyuda:
+      "Total: todo. Cobranza: la renta (cobros, pagos, facturas, suspender). Soporte: ayudar a los negocios (prueba, módulos, demos, errores). Solo lectura: ver sin cambiar nada.",
+    perfilCambiado: "Perfil de {nombre} actualizado.",
     contrasenaAyuda:
       "12 caracteres o más. Compártela por un canal seguro; el código de cada entrada le llega a su correo.",
     sesionesTitulo: "Sesiones abiertas",
@@ -973,6 +984,56 @@ export const plataformaAdmin = {
   facturas: {
     timbrada: "Timbrada",
     error: "Con error",
+    cancelada: "Cancelada",
+  },
+  // La renta a mano (ADR 0214).
+  rentaManual: {
+    registrarPago: "Registrar pago",
+    metodo: "Cómo pagó",
+    metodos: {
+      transferencia: "Transferencia",
+      deposito: "Depósito",
+      efectivo: "Efectivo",
+      cheque: "Cheque",
+    },
+    referencia: "Referencia (opcional)",
+    fecha: "Fecha del pago",
+    confirmarPago:
+      "¿Registrar el pago de {monto}? El cargo queda pagado y, si el negocio estaba suspendido por renta y ya no debe, se reactiva.",
+    pagoRegistrado: "Pago registrado.",
+    pagadoCon: "Pagado con {metodo}",
+    facturar: "Facturar",
+    reintentar: "Reintentar factura",
+    facturada: "Factura timbrada.",
+    errorFactura: "No se timbró: {motivo}",
+    pdf: "PDF",
+    xml: "XML",
+    cancelarFactura: "Cancelar factura",
+    motivoCancelacion: "Motivo del SAT",
+    motivos: {
+      "02": "02 · Con errores, sin relación",
+      "03": "03 · No se llevó a cabo la operación",
+    },
+    confirmarCancelar:
+      "¿Cancelar la factura {uuid} ante el SAT? Si el negocio debe aceptarla, queda en espera.",
+    cancelacion: {
+      pendiente: "Cancelación en espera de que la acepte",
+      aceptada: "Factura cancelada",
+      rechazada: "El negocio rechazó la cancelación",
+      vencida: "La cancelación venció sin respuesta",
+    },
+    consultar: "Ver cómo va",
+    cancelacionPedida: "Cancelación pedida al SAT.",
+    cancelacionRevisada: "Cancelación revisada.",
+    nuevoCargo: "Nuevo cargo manual",
+    descripcion: "Descripción",
+    montoConIva: "Importe con IVA",
+    moneda: "Moneda",
+    vence: "Vence el",
+    crear: "Crear cargo",
+    cargoCreado: "Cargo creado: el negocio ya lo ve en su suscripción.",
+    confirmarCargo:
+      "¿Cobrarle {monto} a {estudio} por «{descripcion}»? Lo ve en su suscripción y lo paga como su renta.",
   },
   pais: {
     etiqueta: "País",

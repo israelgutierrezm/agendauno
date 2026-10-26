@@ -112,6 +112,7 @@ export default {
       timbres: "Timbres",
       whatsapp: "Mensajes de WhatsApp",
       complemento: "App con tu marca",
+      manual: "Servicio",
     },
     cubre: "Del {desde} al {hasta}",
     tipoCambio: "1 USD = {valor} MXN ({fecha})",

@@ -33,7 +33,7 @@ class PlataformaCobrosController
             'vencidos' => ['nullable', 'boolean'],
             // El negocio (nombre o slug) y qué se cobra.
             'q' => ['nullable', 'string', 'max:100'],
-            'concepto' => ['nullable', 'in:renta,plan,ajuste,timbres,whatsapp,complemento'],
+            'concepto' => ['nullable', 'in:renta,plan,ajuste,timbres,whatsapp,complemento,manual'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);

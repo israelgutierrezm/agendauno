@@ -123,6 +123,7 @@ use App\Modules\Tenancy\Http\Controllers\PlataformaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaErroresController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaEstudiosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaOperacionController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaRentaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PorCobrarTenantController;
@@ -366,6 +367,14 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/medicion/{producto}/{proveedor}/probar', [MedicionPlataformaController::class, 'probar'])->middleware('throttle:10,1,medicion-probar')->name('medicion.probar');
         // Condonar un cargo de renta pendiente (queda cancelado; reactiva si ya no debe).
         Route::post('/cargos/{cargo}/condonar', [PlataformaCobrosController::class, 'condonar'])->name('cargos.condonar');
+        // La renta a mano (ADR 0214): un pago fuera de la pasarela, un cargo manual y la
+        // factura de cada cargo (emitir o reintentar, descargar y cancelar).
+        Route::post('/cargos/{cargo}/pago', [PlataformaRentaController::class, 'registrarPago'])->name('cargos.pago');
+        Route::post('/estudios/{estudio}/cargos', [PlataformaRentaController::class, 'crearCargo'])->name('estudios.cargos.crear');
+        Route::post('/cargos/{cargo}/factura', [PlataformaRentaController::class, 'emitirFactura'])->name('cargos.factura');
+        Route::get('/facturas/{factura}/{formato}', [PlataformaRentaController::class, 'descargarFactura'])->whereIn('formato', ['pdf', 'xml'])->name('facturas.descargar');
+        Route::post('/facturas/{factura}/cancelar', [PlataformaRentaController::class, 'cancelarFactura'])->name('facturas.cancelar');
+        Route::post('/facturas/{factura}/cancelacion', [PlataformaRentaController::class, 'consultarCancelacion'])->name('facturas.cancelacion');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.
         Route::get('/operacion', PlataformaOperacionController::class)->name('operacion');
         // Monitoreo de errores de la API, la web y la app (ADR 0080).

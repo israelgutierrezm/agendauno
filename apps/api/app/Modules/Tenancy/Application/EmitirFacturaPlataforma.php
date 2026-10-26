@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 class EmitirFacturaPlataforma
 {
     /** IVA cuando el cargo no trae su tasa (cargos anteriores) o es cuota fija. */
-    private const IVA_POR_OMISION = 16;
+    public const IVA_POR_OMISION = 16;
 
     public function __construct(private readonly ClienteFacturacion $cliente) {}
 
@@ -76,6 +76,7 @@ class EmitirFacturaPlataforma
                 'receptor_regimen' => $receptor['regimen_fiscal'] ?? null,
                 'receptor_cp' => $receptor['codigo_postal'],
                 'uso_cfdi' => (string) config('agendauno.facturapi.renta.uso_cfdi'),
+                'forma_pago' => CobrosManualesRenta::formaPagoSat($cargo),
                 'moneda' => $cargo->moneda,
                 'subtotal_minor' => $subtotal,
                 'impuesto_minor' => $impuesto,
@@ -141,7 +142,8 @@ class EmitirFacturaPlataforma
                 ],
             ]],
             'use' => (string) config('agendauno.facturapi.renta.uso_cfdi'),
-            'payment_form' => (string) config('agendauno.facturapi.renta.forma_pago'),
+            // La forma de pago con que se cobró (ADR 0214): un pago a mano dice cuál.
+            'payment_form' => CobrosManualesRenta::formaPagoSat($cargo),
             'currency' => $cargo->moneda,
         ];
     }
