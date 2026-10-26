@@ -628,6 +628,7 @@ class OpcionCita {
     this.precioMinor,
     this.moneda = 'MXN',
     this.anticipoMinor,
+    this.profesionales,
   });
 
   final String id;
@@ -691,6 +692,13 @@ class OpcionCita {
       sucursalId == null ||
       sucursales!.contains(sucursalId);
 
+  /// Servicio: quiénes lo dan (ids, ADR 0217). null si lo da cualquiera.
+  final List<String>? profesionales;
+
+  /// ¿Ese profesional da este servicio?
+  bool loDa(String profesionalId) =>
+      profesionales == null || profesionales!.contains(profesionalId);
+
   factory OpcionCita.desdeJson(
     Map<String, dynamic> j, {
     String moneda = 'MXN',
@@ -711,6 +719,9 @@ class OpcionCita {
     precioMinor: (j['precio_minor'] as num?)?.toInt(),
     moneda: Formato.moneda(j['moneda'], moneda),
     anticipoMinor: (j['anticipo_minor'] as num?)?.toInt(),
+    profesionales: j['profesionales'] is List
+        ? (j['profesionales'] as List).whereType<String>().toList()
+        : null,
   );
 }
 
@@ -726,9 +737,13 @@ class OpcionesCita {
   final List<OpcionCita> profesionales;
 
   /// Solo quienes atienden en la sede elegida: con alguien de otra sede no habría
-  /// horarios (como en la web).
-  List<OpcionCita> profesionalesEn(String? sucursalId) =>
-      profesionales.where((p) => p.atiendeEn(sucursalId)).toList();
+  /// horarios (como en la web). Con un servicio, solo quienes lo dan (ADR 0217).
+  List<OpcionCita> profesionalesEn(
+    String? sucursalId, {
+    OpcionCita? servicio,
+  }) => profesionales
+      .where((p) => p.atiendeEn(sucursalId) && (servicio?.loDa(p.id) ?? true))
+      .toList();
 }
 
 /// Lo que el alumno tiene por pagar: p. ej. la renovación de su membresía, que se

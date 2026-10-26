@@ -1639,6 +1639,14 @@ export const recursosServicio = {
   resumen: "usa {lista}",
 };
 
+// Quién da cada servicio en un negocio de citas (ADR 0217).
+export const profesionalesServicio = {
+  titulo: "Quién lo da",
+  ayuda:
+    "Solo a quienes marques se les puede agendar este servicio. Sin marcar a nadie, lo da cualquiera del equipo.",
+  resumen: "lo da {lista}",
+};
+
 // "Esta y las siguientes" en una clase recurrente (fase 2, punto 2.5).
 export const cambiarSerie = {
   titulo: "Esta y las siguientes",

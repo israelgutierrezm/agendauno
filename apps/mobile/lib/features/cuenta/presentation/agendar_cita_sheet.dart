@@ -129,9 +129,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     });
   }
 
-  /// Quienes atienden en la sede elegida (sin sede, todo el equipo).
+  /// Quienes atienden en la sede elegida (sin sede, todo el equipo) y dan el
+  /// servicio elegido (ADR 0217).
   List<OpcionCita> get _profesionalesSede =>
-      _opciones?.profesionalesEn(_sede?.id) ?? const [];
+      _opciones?.profesionalesEn(_sede?.id, servicio: _servicio) ?? const [];
 
   /// Al elegir sede, si quien estaba elegido no atiende ahí, se parte de nuevo:
   /// con varios, todo el equipo de la sede; con uno, esa persona (como en la web).
@@ -389,6 +390,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       _servicio = v;
                       // Otro servicio, otro anticipo: se vuelve a lo de omisión.
                       _pagarTodo = false;
+                      // Y quizá otro equipo: solo quienes lo dan (ADR 0217).
+                      _ajustarProfesional();
                     });
                     _buscarHorarios();
                   }),

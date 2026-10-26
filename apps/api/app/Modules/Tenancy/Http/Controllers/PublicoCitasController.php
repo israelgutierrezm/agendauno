@@ -145,15 +145,19 @@ class PublicoCitasController
             'desde' => ['required', 'date_format:Y-m-d'],
             'dias' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_DIAS],
             'instructor_id' => ['nullable', 'string'],
+            // Con el servicio, solo los días de quienes lo dan (ADR 0217).
+            'oferta_id' => ['nullable', 'string'],
         ]);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = $this->profesionalElegido($validado);
+        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::paraAgendar($validado['oferta_id']) : null;
 
         return response()->json(['data' => $this->disponibilidad->paraCliente()->diasConAtencion(
             $sucursal,
             $validado['desde'],
             (int) ($validado['dias'] ?? 14),
             $instructor instanceof Usuario ? (int) $instructor->getKey() : null,
+            $oferta,
         )]);
     }
 

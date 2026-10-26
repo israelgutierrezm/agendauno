@@ -42,6 +42,8 @@ export interface OfertaCita {
   precio_clase_minor?: number | null;
   politica_reserva?: string;
   duracion_minutos?: number | null;
+  // Quiénes lo dan (ADR 0217); vacío = cualquier profesional.
+  profesionales?: string[];
 }
 
 const props = defineProps<{
@@ -171,7 +173,11 @@ const profesionalesCompatibles = computed(() =>
   props.profesionales
     .filter(
       (p) =>
-        !p.sucursales?.length || p.sucursales.includes(form.value.sucursalId),
+        (!p.sucursales?.length ||
+          p.sucursales.includes(form.value.sucursalId)) &&
+        // Y solo quienes dan el servicio elegido (ADR 0217).
+        (!(oferta.value?.profesionales ?? []).length ||
+          (oferta.value?.profesionales ?? []).includes(p.id)),
     )
     .map((p) => ({ ...p, atiende: atiendeElDia(p.id) }))
     .sort((a, b) => Number(a.atiende === false) - Number(b.atiende === false)),

@@ -124,11 +124,11 @@ class OpcionesCitaTenant
         $deCobro = OfertaTenant::query()
             ->vigentes()
             ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
-            ->with(['actividad', 'incluidas'])
+            ->with(['actividad', 'incluidas', 'profesionales'])
             ->get();
         $canjeables = collect();
         if ($persona instanceof PersonaTenant) {
-            $conPlan = $this->conPlan()->with(['actividad', 'incluidas'])->get();
+            $conPlan = $this->conPlan()->with(['actividad', 'incluidas', 'profesionales'])->get();
             $cubiertas = $this->derechos->ofertasCubiertas($persona, $conPlan, self::UNIDADES_POR_CITA);
             $canjeables = $conPlan->filter(static fn (OfertaTenant $o): bool => in_array((int) $o->getKey(), $cubiertas, true));
         }
@@ -153,6 +153,8 @@ class OpcionesCitaTenant
                 'incluye' => $o->incluidas->pluck('nombre')->values()->all(),
                 'precio_por_separado_minor' => $o->precioPorSeparadoMinor(),
                 'foto_url' => $o->fotoUrl(),
+                // Quiénes lo dan (ULID); null = cualquier profesional (ADR 0217).
+                'profesionales' => $o->profesionales->isEmpty() ? null : $o->profesionales->pluck('ulid')->values()->all(),
                 'precio_minor' => $o->precio_clase_minor,
                 'moneda' => app(ParametrosTenant::class)->moneda(),
                 'duracion_minutos' => $o->duracion_minutos !== null && $o->duracion_minutos > 0 ? (int) $o->duracion_minutos : $duracionDefecto,

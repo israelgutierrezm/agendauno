@@ -53,6 +53,8 @@ interface Oferta {
   anticipo_resultante_minor?: number | null;
   // Espacios o equipos que puede usar (2.4); vacío = no requiere.
   recursos?: string[];
+  // Quiénes lo dan (citas, ADR 0217); vacío = cualquier profesional.
+  profesionales?: string[];
   actividad: string | null;
   // Lo que ve quien la elige en línea (página pública y agendar).
   descripcion?: string | null;
@@ -161,6 +163,14 @@ watch([buscarServicio, verArchivados], () => {
   paginaServicios.value = 1;
 });
 const recursos = ref<Recurso[]>([]);
+// El equipo que atiende citas, para elegir quién da cada servicio (ADR 0217).
+const profesionales = ref<{ id: string; nombre: string }[]>([]);
+function profesionalesDe(ids: string[] | undefined): string {
+  return (ids ?? [])
+    .map((id) => profesionales.value.find((p) => p.id === id)?.nombre)
+    .filter(Boolean)
+    .join(", ");
+}
 function nombresDe(ids: string[] | undefined): string {
   return (ids ?? [])
     .map((id) => recursos.value.find((r) => r.id === id)?.nombre)
@@ -205,6 +215,7 @@ const form = ref<{
   preparacion: string;
   limpieza: string;
   recursos: string[];
+  profesionales: string[];
   incluye: string[];
   principiantes: boolean;
   requisitos: string;
@@ -228,6 +239,7 @@ const form = ref<{
   preparacion: "0",
   limpieza: "0",
   recursos: [],
+  profesionales: [],
   incluye: [],
   principiantes: false,
   requisitos: "",
@@ -378,6 +390,12 @@ async function cargar(): Promise<void> {
     // Espacios del negocio (si no hay, la sección no aparece).
     const r = await api.get<{ data: Recurso[] }>(`${base.value}/recursos`);
     recursos.value = r.data.data.filter((x) => x.activo);
+    if (esCitas.value) {
+      const p = await api.get<{ data: { id: string; nombre: string }[] }>(
+        `${base.value}/instructores`,
+      );
+      profesionales.value = p.data.data;
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -403,6 +421,7 @@ function configurar(o: Oferta): void {
     preparacion: String(o.preparacion_min ?? 0),
     limpieza: String(o.limpieza_min ?? 0),
     recursos: [...(o.recursos ?? [])],
+    profesionales: [...(o.profesionales ?? [])],
     incluye: [...(o.incluye ?? [])],
     principiantes: o.para_principiantes ?? false,
     requisitos: o.requisitos ?? "",
@@ -448,6 +467,13 @@ function extras(o: Oferta): string {
   if ((o.recursos ?? []).length > 0) {
     partes.push(
       t("recursosServicio.resumen", { lista: nombresDe(o.recursos) }),
+    );
+  }
+  if ((o.profesionales ?? []).length > 0) {
+    partes.push(
+      t("profesionalesServicio.resumen", {
+        lista: profesionalesDe(o.profesionales),
+      }),
     );
   }
   if ((o.incluye ?? []).length > 0) {
@@ -661,6 +687,9 @@ async function guardar(o: Oferta): Promise<void> {
       preparacion_min: Math.max(0, Number(form.value.preparacion) || 0),
       limpieza_min: Math.max(0, Number(form.value.limpieza) || 0),
       ...(recursos.value.length > 0 ? { recursos: form.value.recursos } : {}),
+      ...(esCitas.value && profesionales.value.length > 0
+        ? { profesionales: form.value.profesionales }
+        : {}),
       // En el orden en que se marcaron.
       incluye: form.value.incluye,
       ...(esCitas.value
@@ -1565,6 +1594,33 @@ onMounted(cargar);
                 </label>
               </div>
               <span class="tu-hint">{{ $t("recursosServicio.ayuda") }}</span>
+            </fieldset>
+            <!-- Quién lo da (ADR 0217): solo en citas y con más de un profesional. -->
+            <fieldset
+              v-if="esCitas && profesionales.length > 1"
+              class="sm:col-span-2"
+              data-prueba="profesionales-servicio"
+            >
+              <legend class="tu-label">
+                {{ $t("profesionalesServicio.titulo") }}
+              </legend>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                <label
+                  v-for="p in profesionales"
+                  :key="p.id"
+                  class="flex items-center gap-2"
+                >
+                  <input
+                    v-model="form.profesionales"
+                    type="checkbox"
+                    :value="p.id"
+                  />
+                  {{ p.nombre }}
+                </label>
+              </div>
+              <span class="tu-hint">{{
+                $t("profesionalesServicio.ayuda")
+              }}</span>
             </fieldset>
             <!-- Paquete (ADR 0063): servicios que incluye, sin anidar. Solo citas:
                  una clase no «incluye» otras clases. -->

@@ -82,6 +82,10 @@ class CalcularDisponibilidadTenant
     public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null, ?int $excluirSesionId = null): array
     {
         $margenes ??= new MargenesServicio;
+        // Quien no da ese servicio no tiene huecos para él (ADR 0217).
+        if ($servicio !== null && ! $servicio->loDa($instructorId)) {
+            return [];
+        }
         // Si el servicio requiere cabina o equipo (2.4), el hueco necesita uno libre.
         $conRecurso = $servicio !== null && $this->recursos->requiere($servicio) ? $servicio : null;
         // Día cerrado del negocio (feriado, cierre): no se ofrecen citas.
@@ -134,14 +138,16 @@ class CalcularDisponibilidadTenant
 
     /**
      * Quienes atienden en la sede el día de esa fecha (tienen ventana de atención
-     * ahí), por nombre: los candidatos de «cualquier profesional disponible».
+     * ahí), por nombre: los candidatos de «cualquier profesional disponible». Con un
+     * servicio, solo quienes lo dan (ADR 0217).
      *
      * @return Collection<int, Usuario>
      */
-    public function profesionalesDeSede(SucursalTenant $sucursal, string $fecha): Collection
+    public function profesionalesDeSede(SucursalTenant $sucursal, string $fecha, ?OfertaTenant $servicio = null): Collection
     {
         $zona = $this->zona($sucursal);
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
+        $quienes = $servicio?->idsDeProfesionales();
 
         return Usuario::query()
             ->profesionales()
@@ -149,6 +155,7 @@ class CalcularDisponibilidadTenant
                 ->where('sucursal_id', $sucursal->getKey())
                 ->where('dia_semana', $diaSemana)
                 ->select('instructor_id'))
+            ->when($quienes !== null, static fn ($q) => $q->whereIn('id', $quienes))
             ->orderBy('name')
             ->orderBy('id')
             ->get();
@@ -162,8 +169,13 @@ class CalcularDisponibilidadTenant
      *
      * @return list<array{fecha: string, abierto: bool}>
      */
-    public function diasConAtencion(SucursalTenant $sucursal, string $desde, int $dias, ?int $instructorId = null): array
+    public function diasConAtencion(SucursalTenant $sucursal, string $desde, int $dias, ?int $instructorId = null, ?OfertaTenant $servicio = null): array
     {
+        // Con un servicio, solo cuentan quienes lo dan (ADR 0217).
+        $quienes = $servicio?->idsDeProfesionales();
+        if ($instructorId !== null && $quienes !== null && ! in_array($instructorId, $quienes, true)) {
+            $quienes = [];
+        }
         $zona = $this->zona($sucursal);
         $ahora = CarbonImmutable::now($zona);
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay();
@@ -178,6 +190,7 @@ class CalcularDisponibilidadTenant
                 // Todo el equipo: quienes atienden citas (como en «cualquier profesional»).
                 fn ($q) => $q->whereIn('instructor_id', Usuario::query()->profesionales()->select('id')),
             )
+            ->when($quienes !== null, static fn ($q) => $q->whereIn('instructor_id', $quienes))
             ->get(['dia_semana', 'hora_fin'])
             ->groupBy('dia_semana')
             ->map(static fn ($ventanas): string => (string) $ventanas->map(static fn (HorarioAtencionTenant $v): string => self::hora((string) $v->hora_fin))->max());
@@ -214,7 +227,7 @@ class CalcularDisponibilidadTenant
     public function paraCualquiera(SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null): array
     {
         $porHora = [];
-        foreach ($this->profesionalesDeSede($sucursal, $fecha) as $profesional) {
+        foreach ($this->profesionalesDeSede($sucursal, $fecha, $servicio) as $profesional) {
             foreach ($this->paraFecha((int) $profesional->getKey(), $sucursal, $fecha, $duracionMin, $pasoMin, $margenes, $servicio) as $slot) {
                 $porHora[$slot['inicia']] ??= [...$slot, 'profesionales' => []];
                 $porHora[$slot['inicia']]['profesionales'][] = (string) $profesional->ulid;

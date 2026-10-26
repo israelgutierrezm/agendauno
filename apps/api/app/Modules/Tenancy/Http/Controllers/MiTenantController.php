@@ -584,15 +584,19 @@ class MiTenantController
             'desde' => ['required', 'date_format:Y-m-d'],
             'dias' => ['nullable', 'integer', 'min:1', 'max:62'],
             'instructor_id' => ['nullable', 'string'],
+            // Con el servicio, solo los días de quienes lo dan (ADR 0217).
+            'oferta_id' => ['nullable', 'string'],
         ]);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
+        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::paraAgendar($validado['oferta_id']) : null;
 
         return response()->json(['data' => $disponibilidad->paraCliente()->diasConAtencion(
             $sucursal,
             $validado['desde'],
             (int) ($validado['dias'] ?? 14),
             $instructor instanceof Usuario ? (int) $instructor->getKey() : null,
+            $oferta,
         )]);
     }
 

@@ -45,6 +45,8 @@ interface Servicio {
   precio_por_separado_minor?: number | null;
   // Su foto, si el negocio la subió.
   foto_url?: string | null;
+  // Quiénes lo dan (ADR 0217); null = cualquier profesional.
+  profesionales?: string[] | null;
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
@@ -316,9 +318,12 @@ const sedesConFoto = computed(() =>
 const profesionalesSede = computed<Persona[]>(() =>
   (opciones.value?.instructores ?? []).filter(
     (b) =>
-      b.sucursales === undefined ||
-      sucursalId.value === "" ||
-      b.sucursales.includes(sucursalId.value),
+      (b.sucursales === undefined ||
+        sucursalId.value === "" ||
+        b.sucursales.includes(sucursalId.value)) &&
+      // Y solo quienes dan el servicio elegido (ADR 0217).
+      (servicioSel.value?.profesionales == null ||
+        servicioSel.value.profesionales.includes(b.id)),
   ),
 );
 const variosProfesionales = computed(() => profesionalesSede.value.length > 1);
@@ -755,6 +760,7 @@ async function buscarSiguienteHorario(): Promise<void> {
         desde: desde.toISOString().slice(0, 10),
         dias: 14,
         ...(filtro.value ? { instructor_id: filtro.value } : {}),
+        ...(servicioId.value !== "" ? { oferta_id: servicioId.value } : {}),
       },
     });
     if (!vigente()) return;
@@ -1819,6 +1825,7 @@ onMounted(cargar);
                 :ruta="`/api/v1/app/${slug}/citas/dias`"
                 :sucursal-id="sucursalId"
                 :instructor-id="filtro || null"
+                :oferta-id="servicioId || null"
                 :zona="zona"
               />
 

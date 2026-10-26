@@ -17,6 +17,8 @@ const props = defineProps<{
   sucursalId: string;
   // Con alguien de preferencia, solo sus días.
   instructorId?: string | null;
+  // Con el servicio, solo los días de quienes lo dan (ADR 0217).
+  ofertaId?: string | null;
   zona: string;
   modelValue: string;
 }>();
@@ -94,6 +96,7 @@ async function cargar(mas = false, inicio?: string): Promise<void> {
         desde,
         dias: DIAS_POR_TANDA,
         ...(props.instructorId ? { instructor_id: props.instructorId } : {}),
+        ...(props.ofertaId ? { oferta_id: props.ofertaId } : {}),
       },
     });
     if (esta !== consulta) return;
@@ -151,7 +154,7 @@ watch(
   },
 );
 watch(
-  () => [props.sucursalId, props.instructorId ?? ""],
+  () => [props.sucursalId, props.instructorId ?? "", props.ofertaId ?? ""],
   () => {
     // Invalida también una petición pendiente si se deselecciona la sede.
     consulta++;

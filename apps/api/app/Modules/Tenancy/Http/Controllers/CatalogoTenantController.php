@@ -237,6 +237,11 @@ class CatalogoTenantController
             // Espacios o equipos que puede usar (2.4); [] = no requiere.
             'recursos' => ['sometimes', 'array'],
             'recursos.*' => ['string'],
+            // Quiénes lo dan (citas, ADR 0217); [] = cualquier profesional.
+            'profesionales' => ($request->attributes->get('estudio') instanceof Estudio && $request->attributes->get('estudio')->modalidad() === ModalidadServicio::Citas)
+                ? ['sometimes', 'array', 'max:200']
+                : ['prohibited'],
+            'profesionales.*' => ['string', 'distinct'],
             // Servicios que incluye (paquete, ADR 0063), en orden; [] = ninguno.
             'incluye' => ['sometimes', 'array', 'max:'.self::MAX_INCLUIDOS],
             'incluye.*' => ['string', 'distinct'],
@@ -303,6 +308,14 @@ class CatalogoTenantController
                 throw ValidationException::withMessages(['recursos' => ['Elige al menos un espacio activo.']]);
             }
         }
+        $profesionales = null;
+        if (array_key_exists('profesionales', $validado)) {
+            $elegidos = Usuario::query()->profesionales()->whereIn('ulid', $validado['profesionales'])->pluck('id')->all();
+            if (count($elegidos) !== count($validado['profesionales'])) {
+                throw ValidationException::withMessages(['profesionales' => ['Alguien de la lista no atiende citas en el negocio.']]);
+            }
+            $profesionales = $elegidos;
+        }
         // Los márgenes solo se tocan si vienen; aplican a lo que se agende desde ahora.
         foreach (['preparacion_min', 'limpieza_min'] as $campo) {
             if ($request->has($campo)) {
@@ -341,9 +354,12 @@ class CatalogoTenantController
 
         // Se guarda todo o no cambia nada: espacios, servicios incluidos (que validan
         // bajo candado lo que no se puede saber antes) y los datos del servicio.
-        DB::connection('tenant')->transaction(function () use ($oferta, $validado, $recursos, $cambios): void {
+        DB::connection('tenant')->transaction(function () use ($oferta, $validado, $recursos, $profesionales, $cambios): void {
             if ($recursos !== null) {
                 $oferta->recursos()->sync($recursos);
+            }
+            if ($profesionales !== null) {
+                $oferta->profesionales()->sync($profesionales);
             }
             if (array_key_exists('incluye', $validado)) {
                 $this->incluir($oferta, array_values($validado['incluye']));
@@ -441,7 +457,7 @@ class CatalogoTenantController
     public function ofertas(Request $request): JsonResponse
     {
         $ofertas = OfertaTenant::query()
-            ->with(['actividad.niveles', 'recursos', 'incluidas'])
+            ->with(['actividad.niveles', 'recursos', 'incluidas', 'profesionales'])
             ->when(! $request->boolean('archivados'), fn ($q) => $q->vigentes())
             ->orderBy('nombre')
             ->get();
@@ -529,6 +545,8 @@ class CatalogoTenantController
             'preparacion_min' => (int) $oferta->preparacion_min,
             'limpieza_min' => (int) $oferta->limpieza_min,
             'recursos' => $oferta->recursos->pluck('ulid')->values()->all(),
+            // Quiénes lo dan (ULID; ADR 0217): vacío = cualquier profesional.
+            'profesionales' => $oferta->profesionales->pluck('ulid')->values()->all(),
             // Servicios que incluye (paquete), en orden.
             'incluye' => $oferta->incluidas->pluck('ulid')->values()->all(),
             'foto_url' => $oferta->fotoUrl(),

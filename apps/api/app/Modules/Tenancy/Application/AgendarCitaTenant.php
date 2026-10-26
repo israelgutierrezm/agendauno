@@ -96,6 +96,11 @@ class AgendarCitaTenant
             : ($duracionMin > 0 ? $duracionMin : $this->parametros->entero('citas.duracion_defecto'));
         $termina = $inicia->addMinutes($duracion);
 
+        // Quién da el servicio lo decide el negocio (ADR 0217), también cuando agenda él.
+        if ($instructorId !== null && ! $oferta->loDa($instructorId)) {
+            throw new SesionNoReservable('Ese profesional no da este servicio. Elige a otro.');
+        }
+
         if (! $porNegocio) {
             if (! $inicia->isFuture()) {
                 throw new SesionNoReservable('Ese horario ya pasó.');
@@ -156,7 +161,7 @@ class AgendarCitaTenant
         $termina = $inicia->addMinutes($duracion);
         $dia = $inicia->setTimezone((string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona()));
 
-        $candidatos = $this->disponibilidad->profesionalesDeSede($sucursal, $dia->toDateString())
+        $candidatos = $this->disponibilidad->profesionalesDeSede($sucursal, $dia->toDateString(), $oferta)
             ->filter(fn (Usuario $u): bool => $this->disponibilidad->cabeEnHorario((int) $u->getKey(), $sucursal, $inicia, $termina));
 
         // Carga del día de cada candidato; el orden estable conserva el de nombre.

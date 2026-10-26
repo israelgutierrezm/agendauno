@@ -40,6 +40,8 @@ interface Servicio {
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
+  // Quiénes lo dan (ADR 0217); null = cualquier profesional.
+  profesionales?: string[] | null;
   // Se descuenta de su bono (ADR 0091).
   con_plan?: boolean;
   // Lo que se paga para apartar; el resto, en el negocio (ADR 0161). Null = completo.
@@ -115,9 +117,12 @@ watch(servicioId, () => {
 const profesionalesSede = computed(() =>
   profesionales.value.filter(
     (p) =>
-      p.sucursales === undefined ||
-      sucursalId.value === "" ||
-      p.sucursales.includes(sucursalId.value),
+      (p.sucursales === undefined ||
+        sucursalId.value === "" ||
+        p.sucursales.includes(sucursalId.value)) &&
+      // Y solo quienes dan el servicio elegido (ADR 0217).
+      (servicio.value?.profesionales == null ||
+        servicio.value.profesionales.includes(p.id)),
   ),
 );
 // Al cambiar de sede, si quien estaba elegido no atiende ahí, se parte de nuevo:
@@ -538,6 +543,7 @@ onMounted(async () => {
           v-model="fecha"
           :ruta="`${base}/mi/citas/dias`"
           :sucursal-id="sucursalId"
+          :oferta-id="servicioId || null"
           :instructor-id="
             profesionalId !== CUALQUIERA && profesionalId !== ''
               ? profesionalId

@@ -114,6 +114,40 @@ class OfertaTenant extends Model
     }
 
     /**
+     * Quiénes dan este servicio en un negocio de citas (ADR 0217). Sin ninguno, lo da
+     * cualquier profesional.
+     *
+     * @return BelongsToMany<Usuario, $this>
+     */
+    public function profesionales(): BelongsToMany
+    {
+        return $this->belongsToMany(Usuario::class, 'oferta_profesionales', 'oferta_id', 'usuario_id')->withTimestamps();
+    }
+
+    /**
+     * Los ids de quienes lo dan, o null si lo da cualquiera.
+     *
+     * @return list<int>|null
+     */
+    public function idsDeProfesionales(): ?array
+    {
+        $ids = $this->relationLoaded('profesionales')
+            ? $this->profesionales->modelKeys()
+            : $this->profesionales()->pluck('users.id')->all();
+        $ids = array_values(array_map('intval', $ids));
+
+        return $ids === [] ? null : $ids;
+    }
+
+    /** ¿Ese profesional lo da? (si nadie está elegido, cualquiera). */
+    public function loDa(int $usuarioId): bool
+    {
+        $ids = $this->idsDeProfesionales();
+
+        return $ids === null || in_array($usuarioId, $ids, true);
+    }
+
+    /**
      * Paquetes que incluyen este servicio.
      *
      * @return BelongsToMany<OfertaTenant, $this>
