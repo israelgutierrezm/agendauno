@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import { claveSegunModalidad } from "@/lib/menu";
 import {
   creditosDe,
   cuandoReserva,
@@ -26,14 +27,31 @@ const props = withDefaults(
     nuevo?: boolean;
     resumen?: ResumenTarjeta | null;
     mostrarPlan?: boolean;
+    // Negocio de citas: sus planes son bonos (ADR 0130).
+    citas?: boolean;
   }>(),
-  { mostrarPlan: true, celular: null, sede: null, resumen: null },
+  {
+    mostrarPlan: true,
+    celular: null,
+    sede: null,
+    resumen: null,
+    citas: false,
+  },
 );
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+// La variante «…Citas» del texto, si la hay.
+function tm(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, props.citas, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 
 const creditos = computed(() => creditosDe(props.resumen?.membresia, t));
-const estado = computed(() => estadoMembresia(props.resumen?.membresia, t));
+const estado = computed(() => estadoMembresia(props.resumen?.membresia, tm));
 
 function haceCuanto(iso: string): string {
   const dia = (d: Date) =>
@@ -86,7 +104,7 @@ const contacto = computed(() =>
     <template v-if="resumen">
       <div v-if="mostrarPlan" class="tm-plan">
         <p class="truncate text-sm font-medium">
-          {{ resumen.membresia.plan ?? $t("tarjetas.sinMembresia") }}
+          {{ resumen.membresia.plan ?? tm("tarjetas.sinMembresia") }}
         </p>
         <p class="mt-0.5 text-xs" :style="{ color: 'var(--texto-suave)' }">
           <span v-if="creditos">{{ creditos }}</span>

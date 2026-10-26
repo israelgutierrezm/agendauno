@@ -37,6 +37,7 @@ import {
   rutaFacturaDeVenta,
   rutaFacturarVenta,
 } from "@/lib/facturarVenta";
+import { claveSegunModalidad } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 // Lo que ya se debe (GET /cobranza/pendientes): compras sin pagar y citas o clases
@@ -147,6 +148,10 @@ interface Suscripcion {
 
 const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas lo que da una compra son sesiones de un bono (ADR 0130): su variante.
+function tm(clave: string): string {
+  return t(claveSegunModalidad(clave, sesion.esCitas, te));
+}
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeRegularizar = computed(() => sesion.puede("ordenes.gestionar"));
 const puedeReembolsar = computed(() => sesion.puede("pagos.reembolsar"));
@@ -1551,7 +1556,7 @@ watch(vista, cargar, { immediate: true });
                               <template v-if="r.revirtio_creditos">
                                 ·
                                 {{
-                                  $t("reembolsosPago.creditosRevertidos")
+                                  tm("reembolsosPago.creditosRevertidos")
                                 }}</template
                               ></span
                             >
@@ -1960,11 +1965,11 @@ watch(vista, cargar, { immediate: true });
             class="flex items-center justify-between gap-3 text-sm sm:col-span-2"
           >
             <span>
-              {{ $t("cobranza.reembolso.revertir") }}
+              {{ tm("cobranza.reembolso.revertir") }}
               <span
                 class="block text-xs"
                 :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("cobranza.reembolso.revertirAyuda") }}</span
+                >{{ tm("cobranza.reembolso.revertirAyuda") }}</span
               >
             </span>
             <input v-model="rRevertir" type="checkbox" class="h-5 w-5" />

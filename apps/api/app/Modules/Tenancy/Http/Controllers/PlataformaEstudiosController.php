@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Platform\Acceso\BitacoraPlataforma;
+use App\Modules\Tenancy\Application\AprovisionarNegocioRegistrado;
 use App\Modules\Tenancy\Application\BajaDeNegocio;
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
@@ -96,6 +98,13 @@ class PlataformaEstudiosController
                 // Su factura con detalle (ADR 0214): error, forma de pago y cancelación.
                 'factura_detalle' => ($f = $facturas->get($c->getKey())) instanceof FacturaPlataforma ? PlataformaRentaController::factura($f) : null,
                 'metodo_pago' => $c->metodo_pago,
+                // El cobro a la tarjeta domiciliada: cuántas veces se rechazó, por qué y cuándo
+                // se vuelve a intentar (null si no se intentó).
+                'cobro_automatico' => $c->intentos_automaticos > 0 ? [
+                    'intentos' => (int) $c->intentos_automaticos,
+                    'error' => $c->error_cobro,
+                    'proximo_intento_en' => $c->proximo_intento_en?->toIso8601String(),
+                ] : null,
                 // Solo un cargo pendiente se puede condonar (`POST /plataforma/cargos/{cargo}/condonar`).
                 'condonable' => $c->estado === EstadoCargoRenta::Pendiente,
             ])->values()->all();
@@ -112,6 +121,8 @@ class PlataformaEstudiosController
                 'cuenta_activa' => self::cuentaDelDuenoActiva($modelo),
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
+            // Lo más que se extiende su prueba de una vez (parámetro de la plataforma).
+            'extender_prueba_max' => self::maximoExtenderPrueba(),
             // La última vez que la plataforma lo suspendió: quién, cuándo y por qué (ADR 0132).
             'ultima_suspension' => $suspension instanceof BitacoraPlataforma ? [
                 'fecha' => $suspension->created_at->toIso8601String(),
@@ -314,10 +325,31 @@ class PlataformaEstudiosController
      * cubiertos por la prueba no generan cargo de renta; si ya había terminado, los que
      * corrieron entre su fin y hoy sí (se guarda ese hueco).
      */
+    /**
+     * Vuelve a intentar crear la base de un negocio que se quedó a medias (ADR 0222): en
+     * la cola, como en el registro; al terminar le llega su activación.
+     */
+    public function aprovisionar(string $estudio): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        if ($modelo->estado !== EstadoEstudio::Provisioning) {
+            throw ValidationException::withMessages(['estado' => ['Su base ya está creada.']]);
+        }
+        AprovisionarNegocioRegistrado::dispatch((int) $modelo->getKey());
+        Log::info('plataforma.estudio.aprovisionar', ['estudio' => $modelo->slug]);
+
+        return response()->json(['data' => self::resumen($modelo->refresh())], 202);
+    }
+
+    private static function maximoExtenderPrueba(): int
+    {
+        return app(ParametrosTenant::class)->entero('negocios.dias_max_extender_prueba');
+    }
+
     public function extenderPrueba(Request $request, string $estudio): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
-        $validado = $request->validate(['dias' => ['required', 'integer', 'min:1', 'max:90']]);
+        $validado = $request->validate(['dias' => ['required', 'integer', 'min:1', 'max:'.self::maximoExtenderPrueba()]]);
         if (! $modelo->estado->operativo()) {
             throw ValidationException::withMessages(['estado' => ['Reactiva el negocio antes de extender su prueba.']]);
         }

@@ -107,7 +107,13 @@ async function guardar(): Promise<void> {
     @submit.prevent="guardar"
   >
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("familias.config.texto") }}
+      {{
+        $t(
+          sesion.esCitas
+            ? "familias.config.textoCitas"
+            : "familias.config.texto",
+        )
+      }}
     </p>
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

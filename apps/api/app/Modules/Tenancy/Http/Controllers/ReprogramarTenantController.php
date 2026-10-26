@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
+use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -12,6 +16,8 @@ use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Reprogramar desde la agenda (fase 2, punto 2.1): una cita a otra hora (y otro
@@ -116,6 +122,67 @@ class ReprogramarTenantController
     }
 
     /** Solo sesiones de sus sedes (R19) y, si imparte, las suyas. */
+    /**
+     * El cupo y la sala de una clase ya programada (ADR 0223): `capacidad` (null = sin
+     * tope) no por debajo de los lugares ya ocupados y `recurso_id` (null = sin sala)
+     * libre a esa hora. La fecha queda como cambiada a mano: un cambio de la serie la
+     * respeta.
+     */
+    public function cupo(Request $request, CupoDeSesionTenant $cupos, RegistrarAuditoria $auditoria): JsonResponse
+    {
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $this->exigirSesion($request, $sesion);
+        $validado = $request->validate([
+            'capacidad' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:10000'],
+            'recurso_id' => ['sometimes', 'nullable', 'string'],
+        ]);
+        if (! $request->has('capacidad') && ! $request->has('recurso_id')) {
+            throw ValidationException::withMessages(['capacidad' => ['Indica el cupo o la sala.']]);
+        }
+        if ($sesion->estado !== EstadoSesionTenant::Programada || ! $sesion->termina_en->isFuture()) {
+            throw ValidationException::withMessages(['capacidad' => ['Esta fecha ya no se puede cambiar.']]);
+        }
+
+        $actualizada = DB::connection('tenant')->transaction(function () use ($request, $validado, $sesion, $cupos, $auditoria): SesionTenant {
+            $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
+            $antes = ['capacidad' => $bloqueada->capacidad, 'recurso_id' => $bloqueada->recurso_id];
+            if ($request->has('capacidad')) {
+                $capacidad = $validado['capacidad'] === null ? null : (int) $validado['capacidad'];
+                $ocupadas = $cupos->ocupadas($bloqueada);
+                if ($capacidad !== null && $capacidad < $ocupadas) {
+                    throw ValidationException::withMessages(['capacidad' => ["Ya hay {$ocupadas} lugares ocupados: el cupo no puede ser menor."]]);
+                }
+                $bloqueada->capacidad = $capacidad;
+            }
+            if ($request->has('recurso_id')) {
+                $recurso = $validado['recurso_id'] === null ? null : RecursoTenant::query()->where('ulid', (string) $validado['recurso_id'])->firstOrFail();
+                $motivo = $this->reprogramar->moverInstancia(
+                    $bloqueada,
+                    CarbonImmutable::instance($bloqueada->inicia_en),
+                    CarbonImmutable::instance($bloqueada->termina_en),
+                    $bloqueada->instructor_id !== null ? (int) $bloqueada->instructor_id : null,
+                    $recurso !== null ? (int) $recurso->getKey() : null,
+                );
+                if ($motivo !== null) {
+                    throw ValidationException::withMessages(['recurso_id' => [$motivo]]);
+                }
+            }
+            $bloqueada->editada_en = now();
+            $bloqueada->save();
+            $auditoria->registrar($this->actor($request), 'sesion.cupo_cambiado', 'sesion', (string) $bloqueada->ulid, $antes,
+                ['capacidad' => $bloqueada->capacidad, 'recurso_id' => $bloqueada->recurso_id]);
+
+            return $bloqueada;
+        });
+
+        return response()->json(['data' => [
+            'id' => $actualizada->ulid,
+            'capacidad' => $actualizada->capacidad,
+            'recurso_id' => $actualizada->recurso?->ulid,
+            'libres' => $cupos->libres($actualizada),
+        ]]);
+    }
+
     private function exigirSesion(Request $request, ?SesionTenant $sesion): void
     {
         abort_unless($sesion !== null && app(AccesoSesionTenant::class)->puedeOperar($sesion, $this->actor($request)), 403);

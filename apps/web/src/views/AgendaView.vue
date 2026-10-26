@@ -1228,8 +1228,9 @@ const accionando = ref(false);
 interface StaffSesion {
   id: string;
   usuario: string | null;
+  usuario_id?: string | null;
   rol: string;
-  sustituye_a: number | null;
+  sustituye_a: string | null;
 }
 const staffSesion = ref<StaffSesion[]>([]);
 const staffModel = ref({ usuarioId: "", rol: "instructor", sustituyeA: "" });
@@ -1436,6 +1437,63 @@ async function asignarStaff(id: string): Promise<void> {
         staffModel.value.sustituyeA !== "" ? staffModel.value.sustituyeA : null,
     });
     staffModel.value = { usuarioId: "", rol: "instructor", sustituyeA: "" };
+    await cargarStaffSesion(id);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    asignandoStaff.value = false;
+  }
+}
+// El cupo y la sala de una fecha ya programada (ADR 0223): el cupo no baja de lo
+// ocupado y la sala debe estar libre (lo valida el servidor).
+const cupoSala = ref({ capacidad: "", recursoId: "" });
+const guardandoCupo = ref(false);
+watch(detalle, (d) => {
+  cupoSala.value = {
+    capacidad: d?.capacidad != null ? String(d.capacidad) : "",
+    recursoId: d?.recurso_id ?? "",
+  };
+});
+const recursosDeLaClase = computed(() =>
+  recursos.value.filter(
+    (r) =>
+      r.activo &&
+      (r.sucursal_id === null ||
+        r.sucursal_id === (detalle.value?.sucursal_id ?? null)),
+  ),
+);
+async function guardarCupoSala(id: string): Promise<void> {
+  guardandoCupo.value = true;
+  error.value = null;
+  try {
+    const { data } = await api.put<{
+      data: { capacidad: number | null; recurso_id: string | null };
+    }>(`${base.value}/sesiones/${id}/cupo`, {
+      capacidad:
+        cupoSala.value.capacidad !== ""
+          ? Number(cupoSala.value.capacidad)
+          : null,
+      recurso_id:
+        cupoSala.value.recursoId !== "" ? cupoSala.value.recursoId : null,
+    });
+    if (detalle.value !== null) {
+      detalle.value.capacidad = data.data.capacidad;
+      detalle.value.recurso_id = data.data.recurso_id;
+    }
+    toast.exito(t("agenda.cupoSala.guardado"));
+    await cargarSesiones();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    guardandoCupo.value = false;
+  }
+}
+// Quitar a alguien del equipo de la clase (ADR 0223).
+async function quitarStaff(id: string, usuarioId: string): Promise<void> {
+  asignandoStaff.value = true;
+  error.value = null;
+  try {
+    await api.delete(`${base.value}/sesiones/${id}/staff/${usuarioId}`);
     await cargarStaffSesion(id);
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -1775,12 +1833,6 @@ const { mostrarSelect: elegirSucursal, actual: sucursalActual } =
     campo: toRef(form.value, "sucursalId"),
   });
 
-// Año de la fecha elegida: por defecto la recurrencia llega hasta el 31-dic de ese año.
-const anioRecurrente = computed(() =>
-  form.value.fecha !== ""
-    ? form.value.fecha.slice(0, 4)
-    : String(new Date().getFullYear()),
-);
 // Renglones repetidos (mismo día y hora) en "Horario por día".
 const horarioRepetido = computed(() => {
   const vistos = new Set<string>();
@@ -1993,12 +2045,9 @@ async function crearRecurrente(): Promise<void> {
       porHora.set(h.hora, [...(porHora.get(h.hora) ?? []), h.dia]);
     }
   }
-  // Por defecto (sin fecha final) se generan las clases hasta el 31-dic del año
-  // de la fecha elegida y la plantilla queda acotada ahí (no se extiende sola).
-  const hasta =
-    form.value.repetirHasta !== ""
-      ? form.value.repetirHasta
-      : `${desde.slice(0, 4)}-12-31`;
+  // Sin fecha final (ADR 0223): la serie queda sin fin y se generan las fechas hasta
+  // el horizonte del negocio; la tarea diaria las sigue extendiendo.
+  const hasta = form.value.repetirHasta !== "" ? form.value.repetirHasta : null;
 
   let creadas = 0;
   const omitidas: { fecha: string; motivo: string }[] = [];
@@ -2025,7 +2074,7 @@ async function crearRecurrente(): Promise<void> {
       data: { creadas: number; omitidas?: { fecha: string; motivo: string }[] };
     }>(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
       desde,
-      hasta,
+      ...(hasta !== null ? { hasta } : {}),
     });
     creadas += generacion.data.data.creadas;
     omitidas.push(...(generacion.data.data.omitidas ?? []));
@@ -3367,6 +3416,67 @@ onMounted(async () => {
 
           <!-- Lugares y canales -->
           <template v-else-if="pestanaClase === 'lugares'">
+            <!-- Cupo y sala de esta fecha (ADR 0223) -->
+            <section
+              v-if="puedeGestionar && detalle.estado === 'programada'"
+              class="tu-detalle-seccion"
+              data-prueba="cupo-sala"
+            >
+              <h3>{{ $t("agenda.cupoSala.titulo") }}</h3>
+              <form
+                class="mt-2 grid grid-cols-2 gap-2 items-end"
+                @submit.prevent="guardarCupoSala(detalle.id)"
+              >
+                <div>
+                  <label class="tu-label" for="cs-cupo">{{
+                    $t("agenda.cupoSala.cupo")
+                  }}</label>
+                  <input
+                    id="cs-cupo"
+                    v-model="cupoSala.capacidad"
+                    class="tu-input"
+                    type="number"
+                    min="1"
+                    inputmode="numeric"
+                    :placeholder="$t('agenda.cupoSala.sinTope')"
+                  />
+                </div>
+                <div v-if="recursosDeLaClase.length > 0">
+                  <label class="tu-label" for="cs-sala">{{
+                    $t("agenda.cupoSala.sala")
+                  }}</label>
+                  <select
+                    id="cs-sala"
+                    v-model="cupoSala.recursoId"
+                    class="tu-input"
+                  >
+                    <option value="">
+                      {{ $t("agenda.cupoSala.sinSala") }}
+                    </option>
+                    <option
+                      v-for="r in recursosDeLaClase"
+                      :key="r.id"
+                      :value="r.id"
+                    >
+                      {{ r.nombre }}
+                    </option>
+                  </select>
+                </div>
+                <div class="col-span-2">
+                  <button
+                    type="submit"
+                    class="tu-btn tu-btn-secundario tu-btn-chico"
+                    :disabled="guardandoCupo"
+                    data-prueba="guardar-cupo"
+                  >
+                    {{ $t("agenda.cupoSala.guardar") }}
+                  </button>
+                </div>
+              </form>
+              <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("agenda.cupoSala.ayuda") }}
+              </p>
+            </section>
             <!-- Cupos por canal / marketplace (R20) -->
             <section
               v-if="puedeGestionar && detalle.oferta_id"
@@ -3577,6 +3687,20 @@ onMounted(async () => {
                 <span class="tu-badge">{{
                   $t(`agenda.staff.rol.${a.rol}`)
                 }}</span>
+                <button
+                  v-if="
+                    a.usuario_id &&
+                    detalle.estado === 'programada' &&
+                    sesion.puede('agenda.gestionar')
+                  "
+                  type="button"
+                  class="tu-btn tu-btn-discreto tu-btn-chico ml-auto"
+                  :disabled="asignandoStaff"
+                  data-prueba="quitar-staff"
+                  @click="quitarStaff(detalle.id, a.usuario_id)"
+                >
+                  {{ $t("agenda.staff.quitar") }}
+                </button>
               </li>
             </ul>
             <form
@@ -3980,7 +4104,7 @@ onMounted(async () => {
             :min="form.fecha || undefined"
           />
           <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("agenda.nueva.repetirAyuda", { anio: anioRecurrente }) }}
+            {{ $t("agenda.nueva.repetirAyuda") }}
           </p>
         </div>
 

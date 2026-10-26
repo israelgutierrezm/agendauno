@@ -400,6 +400,7 @@ onBeforeUnmount(() => observador?.disconnect());
                 :terminos="terminos"
                 :varias-sedes="variasSedes"
                 :boton="t('captacion.widgets.publico.loQuiero')"
+                :citas="config?.modalidad === 'citas'"
                 @elegir="elegirPlan(p)"
               />
             </li>

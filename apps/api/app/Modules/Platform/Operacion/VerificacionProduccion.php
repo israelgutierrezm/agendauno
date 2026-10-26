@@ -278,9 +278,10 @@ class VerificacionProduccion
         try {
             $estudios = Estudio::query()
                 ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
-                ->get();
+                ->get(['id', 'slug']);
+            $ultimos = $this->respaldos->ultimosPorNegocio();
             foreach ($estudios as $estudio) {
-                $ultimo = $this->fechaDeRespaldo($this->respaldos->listar($estudio)[0] ?? null);
+                $ultimo = $this->fechaDeRespaldo($ultimos[(string) $estudio->slug] ?? null);
                 if ($ultimo === null || $ultimo->lessThan(CarbonImmutable::now()->subHours(self::HORAS_RESPALDO))) {
                     $sinRespaldo[] = $estudio->slug;
                 }
@@ -467,9 +468,9 @@ class VerificacionProduccion
             ...$puntos,
             $this->punto(
                 'Pagos',
-                'Domiciliación de la renta (Stripe)',
+                'Domiciliación de la renta, timbres y WhatsApp (Stripe)',
                 in_array('stripe', $listas, true),
-                'Sin Stripe, la renta no se cobra sola con la tarjeta guardada: cada dueño paga sus cargos en línea con la pasarela habilitada.',
+                'Sin Stripe, la renta no se cobra sola con la tarjeta guardada (cada dueño paga sus cargos en línea con la pasarela habilitada) y los dueños no pueden comprar timbres ni paquetes de WhatsApp.',
                 critico: false,
             ),
             $this->tipoDeCambio(),

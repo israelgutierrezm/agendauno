@@ -93,6 +93,13 @@ class PublicoCitasController
                 // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
                 'en_directorio' => $estudio->enDirectorio(),
             ],
+            // Hasta cuándo se cancela o se cambia (lo mismo que se aplica al hacerlo, desde
+            // la cuenta o desde el enlace del correo; ADR 0221): se muestra al agendar.
+            'politica' => [
+                'cancelar_horas' => $this->parametros->entero('cancelacion.horas_limite'),
+                'cambiar_horas' => $this->parametros->entero('reprogramar.horas_limite_cliente'),
+                'cambios' => $this->parametros->entero('reprogramar.maximo_cliente'),
+            ],
             ...$this->opciones->listar(),
         ]]);
     }

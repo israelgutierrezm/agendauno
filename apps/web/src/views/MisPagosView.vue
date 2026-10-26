@@ -15,6 +15,7 @@ import MisPresupuestos from "@/components/MisPresupuestos.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { claveSegunModalidad } from "@/lib/menu";
 import { participanteEnUso } from "@/lib/participanteEnUso";
 import { listaDeNombres, textoCobertura } from "@/lib/cobertura";
 import {
@@ -35,8 +36,12 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  *   cobros; sus bonos y comprarlos, solo si los tiene o el negocio los vende.
  * Lo que debe llega completo aparte (no de la primera página del historial).
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas lo que se compra es un bono de sesiones (ADR 0130): su variante.
+function tc(clave: string): string {
+  return claveSegunModalidad(clave, sesion.esCitas, te);
+}
 const cuenta = useMiCuenta();
 const corte = ref<InstanceType<typeof CortePlanes> | null>(null);
 const historial = ref<InstanceType<typeof HistorialCompras> | null>(null);
@@ -484,7 +489,7 @@ onMounted(() => void cuenta.asegurar());
           {{ $t("miCuenta.comprar.titulo") }}
         </h2>
         <AvisoTono v-if="mensaje === 'comprado'" tono="exito" class="mt-2">
-          {{ $t("miCuenta.comprar.creada") }}
+          {{ $t(tc("miCuenta.comprar.creada")) }}
         </AvisoTono>
         <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <li
@@ -498,7 +503,7 @@ onMounted(() => void cuenta.asegurar());
           >
             <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
               [
-                $t(`miCuenta.comprar.tipos.${p.tipo}`),
+                $t(tc(`miCuenta.comprar.tipos.${p.tipo}`)),
                 p.destacado ? $t("miCuenta.comprar.destacado") : null,
                 p.primera_vez ? $t("miCuenta.comprar.primeraVez") : null,
               ]
@@ -525,7 +530,7 @@ onMounted(() => void cuenta.asegurar());
               }}</template>
               <template v-else-if="p.creditos_incluidos">{{
                 $t(
-                  "miCuenta.comprar.creditos",
+                  tc("miCuenta.comprar.creditos"),
                   { n: p.creditos_incluidos / 1000 },
                   p.creditos_incluidos === 1000 ? 1 : 2,
                 )

@@ -7,7 +7,9 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Acceso\MetodoAcceso;
 use App\Modules\Tenancy\Acceso\ResultadoAcceso;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\PaseAccesoInvalido;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\KioscoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -90,8 +92,10 @@ class KioscosTenant
         $nombre = trim((string) $persona->nombre) ?: null;
         $acceso = $this->accesos->registrar($persona, MetodoAcceso::Qr, $kiosco->sucursal_id, Carbon::now());
         if ($acceso->resultado !== ResultadoAcceso::Permitido) {
+            $que = app(GestorDeConexionTenant::class)->actual()?->modalidad() === ModalidadServicio::Citas ? 'una cita tuya' : 'una clase tuya';
+
             return ['resultado' => 'sin_clase', 'nombre' => $nombre, 'clase' => null,
-                'mensaje' => 'No encontramos una clase tuya para esta hora. Pasa a recepción.'];
+                'mensaje' => "No encontramos {$que} para esta hora. Pasa a recepción."];
         }
         if ($acceso->sesion_id === null) {
             // Acceso abierto (gimnasio): entra sin clase.

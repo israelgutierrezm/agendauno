@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Events;
 
+use App\Modules\Tenancy\ModalidadServicio;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
@@ -56,6 +57,34 @@ class EventoDeDominioTenant
         // Alguien escribió a la bandeja (ADR 0200): una vez hasta que se lea.
         'bandeja.mensaje_recibido',
     ];
+
+    /**
+     * Los que solo pasan en un negocio de clases (ADR 0104): las membresías y su cobro
+     * automático y la lista de espera. En uno de citas no se ofrecen para avisos,
+     * webhooks ni automatizaciones.
+     */
+    public const SOLO_CLASES = [
+        'reserva.ofrecida',
+        'cobro.fallido',
+        'membresia.suspendida',
+        'membresia.regularizada',
+        'membresia.pausada',
+        'membresia.reanudada',
+        'membresia.renovacion_proxima',
+        'pago_automatico.solicitado',
+    ];
+
+    /**
+     * Los eventos que tienen sentido en un negocio de esa modalidad.
+     *
+     * @return list<string>
+     */
+    public static function tiposPara(?ModalidadServicio $modalidad): array
+    {
+        return $modalidad === ModalidadServicio::Citas
+            ? array_values(array_diff(self::TIPOS, self::SOLO_CLASES))
+            : self::TIPOS;
+    }
 
     /**
      * @param  array<string, mixed>  $payload

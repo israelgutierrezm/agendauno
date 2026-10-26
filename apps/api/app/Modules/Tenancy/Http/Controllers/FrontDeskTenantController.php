@@ -64,8 +64,8 @@ class FrontDeskTenantController
             ->where('inicia_en', '>=', $inicioDia)
             ->where('inicia_en', '<', $finDia)
             ->when($sucursal !== null, fn ($q) => $q->where('sucursal_id', $sucursal->getKey()))
-            // Un instructor solo ve sus sesiones asignadas.
-            ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $q->where('instructor_id', $usuario?->getKey()))
+            // Un instructor solo ve sus sesiones: las suyas y las que cubre.
+            ->when($usuario !== null && $this->acceso->esInstructorAcotado($usuario), fn ($q) => $this->acceso->soloLasSuyas($q, $usuario))
             ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->orderBy('inicia_en')
             ->get();

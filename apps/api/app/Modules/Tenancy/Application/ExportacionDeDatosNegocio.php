@@ -47,7 +47,7 @@ class ExportacionDeDatosNegocio
 
     public function armar(Estudio $estudio, ExportacionNegocio $exportacion): void
     {
-        $zipLocal = (string) tempnam(sys_get_temp_dir(), 'exp');
+        $zipLocal = sys_get_temp_dir().'/agendauno-exportacion-'.bin2hex(random_bytes(8)).'.zip';
         $temporales = [];
         try {
             $zip = new ZipArchive;
@@ -133,7 +133,7 @@ class ExportacionDeDatosNegocio
         if ($columnas === []) {
             return null;
         }
-        $ruta = (string) tempnam(sys_get_temp_dir(), 'csv');
+        $ruta = sys_get_temp_dir().'/agendauno-exportacion-'.bin2hex(random_bytes(8)).'.csv';
         $archivo = fopen($ruta, 'wb');
         if ($archivo === false) {
             throw new RuntimeException("No se pudo escribir la tabla {$tabla}.");

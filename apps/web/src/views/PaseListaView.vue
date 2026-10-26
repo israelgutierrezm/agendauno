@@ -91,8 +91,20 @@ const yaEmpezo = computed(
     (clase.value !== null &&
       ahora.value >= new Date(clase.value.inicia_en).getTime()),
 );
+// Los lugares que quedan según el servidor (ADR 0223).
+const libresDelServidor = ref<number | null | undefined>(undefined);
+// Quien llega tarde se agrega mientras dura la clase; ya terminada, no (ADR 0223).
+const yaTermino = computed(
+  () =>
+    clase.value !== null &&
+    ahora.value >= new Date(clase.value.termina_en).getTime(),
+);
 const resumen = computed(() =>
-  resumenLista(lista.value, clase.value?.capacidad ?? null),
+  resumenLista(
+    lista.value,
+    clase.value?.capacidad ?? null,
+    libresDelServidor.value,
+  ),
 );
 const visibles = computed(() =>
   filtrarLista(lista.value, filtro.value, busqueda.value),
@@ -421,9 +433,14 @@ async function cargar(silencioso = false): Promise<void> {
         invitados?: InvitadoLista[];
         plataforma?: LugarPlataformaLista[];
         fitpass?: boolean;
+        libres?: number | null;
       };
     }>(`${base.value}/sesiones/${props.id}/reservas`);
     lista.value = data.data;
+    libresDelServidor.value =
+      data.meta !== undefined && "libres" in data.meta
+        ? (data.meta.libres ?? null)
+        : undefined;
     invitados.value = data.meta?.invitados ?? [];
     plataforma.value = data.meta?.plataforma ?? [];
     fitpassActivo.value = data.meta?.fitpass ?? false;
@@ -723,7 +740,7 @@ watch(
           </button>
         </div>
         <button
-          v-if="puedeGestionar && !agregando"
+          v-if="puedeGestionar && !agregando && !yaTermino"
           type="button"
           class="tu-btn tu-btn-secundario pl-agregar"
           data-prueba="abrir-agregar"
@@ -735,7 +752,7 @@ watch(
         </button>
       </div>
       <AgregarAClase
-        v-if="agregando && puedeGestionar"
+        v-if="agregando && puedeGestionar && !yaTermino"
         class="mt-3"
         :base="base"
         :sesion-id="clase.id"

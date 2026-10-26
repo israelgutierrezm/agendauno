@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\HistorialCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
@@ -90,6 +91,9 @@ class ReservasTenantController
             'meta' => [
                 'asistencia_desde' => $sesion->inicia_en->copy()->subMinutes(app(ParametrosTenant::class)->entero('asistencia.minutos_antes'))->toIso8601String(),
                 'empezo' => $sesion->inicia_en->lessThanOrEqualTo(now()),
+                // Los lugares que aún se pueden reservar, con la regla del servidor:
+                // descuenta invitados, plataformas y lo apartado por canal (null = sin tope).
+                'libres' => app(CupoDeSesionTenant::class)->libres($sesion),
                 'sesion' => $this->resumenDeSesion($sesion),
                 // Los invitados de los clientes (ADR 0182): ocupan lugar, no son clientes.
                 'invitados' => InvitadosTenantController::deLaSesion($sesion),
@@ -223,6 +227,8 @@ class ReservasTenantController
             null,
             $validado['canal'] ?? CanalReserva::Directo->value,
             isset($validado['lugar']) ? (int) $validado['lugar'] : null,
+            // Lo hace el equipo: también a quien llega tarde, mientras dura la clase.
+            porElNegocio: true,
         );
 
         // Un reintento con la misma clave devuelve la reserva ya hecha (ADR 0201).
@@ -255,6 +261,7 @@ class ReservasTenantController
             (bool) ($validado['esperar'] ?? false),
             $validado['canal'] ?? CanalReserva::Directo->value,
             isset($validado['lugar']) ? (int) $validado['lugar'] : null,
+            porElNegocio: true,
         );
 
         return response()->json(['data' => $decision->aArreglo()]);

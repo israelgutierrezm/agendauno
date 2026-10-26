@@ -67,6 +67,9 @@ export default {
     titulo: "Familias",
     texto:
       "Un alumno con cuenta gestiona a personas a su cargo (sus hijos, por ejemplo): reserva, compra y ve sus documentos, con su autorización. Cada persona conserva sus propios planes y créditos.",
+    // En citas lo que se compra son bonos (ADR 0130).
+    textoCitas:
+      "Un alumno con cuenta gestiona a personas a su cargo (sus hijos, por ejemplo): agenda, compra y ve sus documentos, con su autorización. Cada persona conserva sus propios bonos.",
     activar: "Usar familias en este negocio",
     textoAutorizacion: "Texto de la autorización",
     ayudaTexto:

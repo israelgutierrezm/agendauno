@@ -189,16 +189,19 @@ export const ventasVisual = {
   tituloCitas: "Bonos",
   ventaActual: "Venta",
   eligePlan: "Elige un plan de la lista.",
+  eligePlanCitas: "Elige un bono de la lista.",
   verTodas: "Ver todas en Cobros",
   kpi: {
     ventasHoy: "Ventas de hoy",
     vendidoHoy: "Vendido hoy",
     porCobrar: "Órdenes por cobrar",
     planes: "Planes a la venta",
+    planesCitas: "Bonos a la venta",
   },
   col: {
     cuando: "Cuándo",
     plan: "Plan",
+    planCitas: "Bono",
   },
 };
 
@@ -207,6 +210,7 @@ export const planesVisual = {
   truncado:
     "Se muestran los {n} planes más recientes (primero los que están a la venta). Archiva o elimina los que ya no uses para ver el resto.",
   buscar: "Buscar plan",
+  buscarCitas: "Buscar bono",
   todos: "Todos",
   aLaVenta: "A la venta",
   mientrasPague: "Mientras se pague",
@@ -224,12 +228,15 @@ export const planesVisual = {
     permanencia: "Permanencia de 1 mes | Permanencia de {n} meses",
   },
   sinResultados: "Ningún plan coincide con la búsqueda.",
+  sinResultadosCitas: "Ningún bono coincide con la búsqueda.",
   kpi: {
     aLaVenta: "Planes a la venta",
+    aLaVentaCitas: "Bonos a la venta",
     archivados: "Archivados",
   },
   col: {
     plan: "Plan",
+    planCitas: "Bono",
     incluye: "Incluye",
     dura: "Vigencia y renovación",
     sirve: "Válido para",

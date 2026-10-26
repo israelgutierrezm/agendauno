@@ -103,7 +103,7 @@ function quitar(): void {
         }}</span>
         <button
           type="button"
-          class="tu-enlace text-sm"
+          class="tu-btn tu-btn-discreto tu-btn-chico"
           :disabled="deshabilitado"
           @click="quitar"
         >

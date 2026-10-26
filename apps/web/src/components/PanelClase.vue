@@ -79,13 +79,15 @@ const error = ref<string | null>(null);
 const errorCarga = ref<string | null>(null);
 const aviso = ref<string | null>(null);
 
+// Los lugares que quedan según el servidor (ADR 0223): cuenta invitados y plataformas.
+const libresDelServidor = ref<number | null | undefined>(undefined);
 // Confirmadas, ofrecidas y pendientes de pago (todas ocupan lugar); en espera aparte.
 const enSala = computed(() => roster.value.filter(ocupaLugar));
 const enEspera = computed(() =>
   roster.value.filter((r) => r.estado === "en_espera"),
 );
 const resumen = computed(() =>
-  resumenLista(roster.value, props.sesion.capacidad),
+  resumenLista(roster.value, props.sesion.capacidad, libresDelServidor.value),
 );
 const libres = computed(() => resumen.value.libres);
 
@@ -153,10 +155,15 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   errorCarga.value = null;
   try {
-    const { data } = await api.get<{ data: Reserva[] }>(
-      `${base.value}/sesiones/${props.sesion.id}/reservas`,
-    );
+    const { data } = await api.get<{
+      data: Reserva[];
+      meta?: { libres?: number | null };
+    }>(`${base.value}/sesiones/${props.sesion.id}/reservas`);
     roster.value = data.data;
+    libresDelServidor.value =
+      data.meta !== undefined && "libres" in data.meta
+        ? (data.meta.libres ?? null)
+        : undefined;
   } catch (e) {
     errorCarga.value = mensajeDeError(e);
   } finally {

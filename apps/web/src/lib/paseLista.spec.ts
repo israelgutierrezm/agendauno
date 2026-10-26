@@ -62,6 +62,9 @@ describe("pase de lista", () => {
     });
     expect(resumenLista(lista, null).libres).toBeNull();
     expect(resumenLista(lista, 4).libres).toBe(0);
+    // Con los del servidor (invitados y plataformas también ocupan; ADR 0223).
+    expect(resumenLista(lista, 8, 1).libres).toBe(1);
+    expect(resumenLista(lista, 8, null).libres).toBeNull();
   });
 
   it("en orden alfabético fijo, con filtro y búsqueda sin acentos", () => {

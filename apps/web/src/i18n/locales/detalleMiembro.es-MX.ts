@@ -3,6 +3,8 @@ export default {
   pestanas: {
     resumen: "Resumen",
     planes: "Planes y créditos",
+    // En citas lo que se vende son bonos (ADR 0130).
+    planesCitas: "Bonos",
     pagos: "Pagos",
     notas: "Notas",
   },
@@ -13,7 +15,9 @@ export default {
   },
   plan: {
     titulo: "Plan vigente",
+    tituloCitas: "Bono vigente",
     sinPlan: "Sin plan vigente",
+    sinPlanCitas: "Sin bono vigente",
     vence: "vence el {fecha}",
     vencio: "venció el {fecha}",
     pausa: "en pausa hasta el {fecha}",

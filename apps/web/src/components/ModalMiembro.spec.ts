@@ -361,10 +361,10 @@ describe("detalle de un cliente en un modal", () => {
         .get('[data-prueba="pestanas-miembro"]')
         .findAll("button")
         .map((b) => b.text()),
-    ).not.toContain("Planes y créditos");
+    ).not.toContain("Bonos");
   });
 
-  it("en citas, con medio crédito y sin plan, muestra el saldo exacto y la pestaña de planes", async () => {
+  it("en citas, con media sesión y sin bono, muestra el saldo exacto y la pestaña de bonos", async () => {
     permisos.esCitas = true;
     datosResumen = resumen({
       saldo_creditos: 0,
@@ -384,7 +384,7 @@ describe("detalle de un cliente en un modal", () => {
         .get('[data-prueba="pestanas-miembro"]')
         .findAll("button")
         .map((b) => b.text()),
-    ).toContain("Planes y créditos");
+    ).toContain("Bonos");
   });
 
   it("un saldo con fracción no se trunca (1.5, no 1)", async () => {

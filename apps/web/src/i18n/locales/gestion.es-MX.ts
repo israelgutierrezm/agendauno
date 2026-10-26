@@ -232,6 +232,9 @@ export const reglasAgenda = {
   cancelaciones: "Cancelaciones",
   cancelacionesAyuda:
     "Cancelar con esta antelación devuelve el crédito. Después, se cobra según lo que marques.",
+  // En citas no hay créditos: se devuelve el anticipo o la sesión del bono (ADR 0161).
+  cancelacionesAyudaCitas:
+    "Cancelar con esta antelación devuelve el anticipo o la sesión del bono. Después, se cobra según lo que marques.",
   horas: "Horas de anticipación",
   penalizaTarde: "Cobrar cancelaciones tardías",
   penalizaNoShow: "Cobrar inasistencias",
@@ -256,6 +259,13 @@ export const reglasAgenda = {
   motivo: "Motivo (opcional)",
   motivoPh: "Día festivo",
   agregarDia: "Agregar día",
+  // Lo ya programado el día que se cierra (ADR 0223).
+  afectadasDia:
+    "Ese día ya hay 1 clase programada ({reservas} personas con lugar o en espera). | Ese día ya hay {n} clases programadas ({reservas} personas con lugar o en espera).",
+  cancelarDelDia:
+    "Cancelarlas al cerrar el día (se avisa a cada persona y sus créditos vuelven)",
+  fechasDelDiaCanceladas:
+    "Día cerrado: se canceló 1 clase. | Día cerrado: se cancelaron {n} clases.",
   sinCerrados: "No hay días cerrados próximos.",
   quitar: "Quitar cierre",
   confirmarQuitarDia:
@@ -293,6 +303,20 @@ export const reglasAgenda = {
     vigencia: "Vigencia",
     cambiar:
       "Para cambiar días, hora o instructor, abre una de sus clases en la agenda y elige «Mover esta y las siguientes».",
+    // Hasta cuándo se repite y cancelar desde una fecha (ADR 0223).
+    fin: "Se repite hasta",
+    sinFin: "Sin fecha final",
+    guardarFin: "Guardar fecha final",
+    finGuardado:
+      "Listo: se repite hasta {fecha}. | Listo: se repite sin fecha final.",
+    finAyuda:
+      "Para que termine antes de sus fechas ya programadas, cancélalas desde el día en que termina.",
+    cancelarDesde: "Cancelar sus fechas desde",
+    cancelarFechas: "Cancelar las fechas desde ese día",
+    confirmarCancelarFechas:
+      "Se cancelan {sesiones} fechas desde el {fecha} y se avisa a {reservas} personas con lugar o en espera; sus créditos vuelven. La clase deja de repetirse desde ese día.",
+    sinFechasPorCancelar: "No tiene fechas programadas desde ese día.",
+    fechasCanceladas: "Se canceló 1 fecha. | Se cancelaron {n} fechas.",
   },
 };
 
@@ -305,6 +329,10 @@ export const creditosFicha = {
   motivoPh: "Cortesía por clase cancelada",
   confirmar: "Agregar",
   agregados: "Créditos agregados.",
+  // En citas el saldo es de sesiones de un bono (ADR 0130).
+  agregarCitas: "Agregar sesiones",
+  creditosCitas: "Sesiones",
+  agregadosCitas: "Sesiones agregadas.",
   sinMovimientos: "Sin movimientos.",
   verMas: "Ver más ({n})",
   saldo: "Saldo {n}",
@@ -450,6 +478,7 @@ export const reembolsosPago = {
   ocultar: "Ocultar reembolsos",
   por: "por {actor}",
   creditosRevertidos: "créditos revertidos",
+  creditosRevertidosCitas: "sesiones del bono quitadas",
   estados: {
     solicitado: "Solicitado",
     pendiente: "En proceso",
@@ -866,6 +895,7 @@ export const plataformaAdmin = {
       renta_devuelta: "Renta devuelta",
       renta_en_disputa: "Renta en disputa",
       modulo_solicitado: "Complemento solicitado",
+      aprovisionamiento_fallido: "Negocio sin base",
       wellhub_solicitud: "Solicitud de Wellhub",
       bienestar_no_verificable: "Visita de bienestar sin verificar",
       medicion_fallida: "Medición que no se envió",
@@ -923,6 +953,12 @@ export const plataformaAdmin = {
     uso: "Uso por mes",
     cargos: "Cargos de renta",
     sinCargos: "Aún no tiene cargos.",
+    // La domiciliación de la renta y los rechazos de la tarjeta.
+    conDomiciliacion: "Paga con tarjeta domiciliada.",
+    sinDomiciliacion: "Sin tarjeta domiciliada: paga cada cargo.",
+    tarjetaRechazada:
+      "La tarjeta rechazó el cobro | La tarjeta rechazó el cobro {n} veces",
+    proximoIntento: "se reintenta el {fecha}",
     vence: "vence el {fecha}",
     pagado: "pagado el {fecha}",
     factura: "Factura",
@@ -942,8 +978,13 @@ export const plataformaAdmin = {
     cuentaSinActivar: "Aún no activa su cuenta",
     reenviarActivacion: "Reenviar activación",
     activacionReenviada: "Activación reenviada a {correo}.",
+    // Su base no se terminó de crear al registrarse (ADR 0222).
+    sinBase: "Su base no se terminó de crear",
+    reintentarBase: "Reintentar crear su base",
+    aprovisionando:
+      "Se está creando su base; al terminar le llega su activación.",
     // Baja del negocio (ADR 0213).
-    darDeBaja: "Dar de baja",
+    darDeBaja: "Dar de baja el negocio",
     motivoBaja: "Motivo de la baja",
     motivoBajaRequerido: "Escribe el motivo de la baja.",
     confirmarBaja:
@@ -1221,6 +1262,12 @@ export const pausaMembresia = {
   enPausa: "En pausa hasta el {fecha}",
   pausada: "Membresía en pausa hasta el {fecha}.",
   reanudada: "Membresía reanudada.",
+  // En citas se pausa un bono: no tiene cobro recurrente (ADR 0130).
+  confirmarCitas: "Pausar bono",
+  ayudaCitas:
+    "Mientras esté en pausa no podrá usarlo. Al volver, su vencimiento se recorre los días que duró la pausa. Las citas que ya tenía se conservan.",
+  pausadaCitas: "Bono en pausa hasta el {fecha}.",
+  reanudadaCitas: "Bono reanudado.",
 };
 
 // Cobranza en un negocio de clases: lo próximo por cobrar son clases de pago apartadas,
@@ -1502,6 +1549,9 @@ export const bajas = {
   confirmar: "¿Dar de baja a {nombre}?",
   ayudaMiembro:
     "Deja de operar: se cancelan sus reservas por venir, sus membresías y sus pagos automáticos. Su historial (compras, pagos, asistencias) se conserva y se puede reactivar.",
+  // En citas no hay membresías ni pagos automáticos (ADR 0130).
+  ayudaMiembroCitas:
+    "Deja de operar: se cancelan sus citas por venir y sus bonos. Su historial (compras, pagos, visitas) se conserva y se puede reactivar.",
   ayudaUsuario:
     "Pierde el acceso y se cierran sus sesiones. Su historial se conserva; si lo vuelves a invitar con su correo, se reactiva.",
   motivo: "Motivo (opcional)",
@@ -1560,7 +1610,8 @@ export const cancelacion = {
   titulo: "Cancelar",
   porNegocio: "Cancela el negocio",
   porCliente: "Lo pidió el alumno",
-  calculando: "Revisando qué pasa con el crédito…",
+  // Vale para clases y citas: el crédito, el anticipo o el pago, según el caso.
+  calculando: "Revisando qué pasa al cancelar…",
   confirmar: "Sí, cancelar",
   volver: "Volver",
   canceladaPor: {
@@ -1755,6 +1806,8 @@ export const tarjetas = {
   vencio: "venció el {fecha}",
   enPausa: "en pausa hasta el {fecha}",
   sinMembresia: "Sin membresía",
+  // En citas lo que se vende son bonos, no membresías (ADR 0130).
+  sinMembresiaCitas: "Sin bono",
   adeudo: "Tiene un pago pendiente",
   ultimaVisita: "Última visita",
   sinVisitas: "Aún no asiste",

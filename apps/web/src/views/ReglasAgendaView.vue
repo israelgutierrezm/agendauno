@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
@@ -63,6 +63,7 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedePoliticas = computed(() => sesion.puede("estudio.gestionar"));
 // Quitar un día o dejar de repetir un horario es borrarlo (ADR 0077).
 const puedeEliminar = computed(() => sesion.puede("agenda.eliminar"));
+const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
 
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -92,6 +93,29 @@ useCambiosPendientes(
 const nuevaActividad = ref("");
 
 const nuevoDia = ref({ fecha: "", motivo: "" });
+// Lo ya programado ese día y si se cancela al cerrarlo (ADR 0223).
+const afectadas = ref<{ sesiones: number; reservas: number } | null>(null);
+const cancelarDelDia = ref(false);
+let pedidoAfectadas = 0;
+watch(
+  () => nuevoDia.value.fecha,
+  async (dia) => {
+    const mio = ++pedidoAfectadas;
+    afectadas.value = null;
+    cancelarDelDia.value = false;
+    if (dia === "" || !puedeGestionar.value) return;
+    try {
+      const { data } = await api.get<{
+        data: { sesiones: number; reservas: number };
+      }>(`${base.value}/excepciones-horario/afectadas`, {
+        params: { fecha: dia },
+      });
+      if (mio === pedidoAfectadas) afectadas.value = data.data;
+    } catch {
+      // Sin el dato se cierra igual; lo programado se conserva.
+    }
+  },
+);
 // Días de la ventana cuando la política no fija los suyos (los de la plataforma).
 const ventanaPlataforma = ref(30);
 
@@ -269,10 +293,19 @@ function nombreActividad(id: string | null): string {
 
 async function agregarDia(): Promise<void> {
   try {
-    await api.post(`${base.value}/excepciones-horario`, {
+    const { data } = await api.post<{
+      meta?: { cancelacion?: { canceladas: number } | null };
+    }>(`${base.value}/excepciones-horario`, {
       fecha: nuevoDia.value.fecha,
       motivo: nuevoDia.value.motivo || null,
+      ...(cancelarDelDia.value ? { cancelar_sesiones: true } : {}),
     });
+    const canceladas = data.meta?.cancelacion?.canceladas ?? 0;
+    if (canceladas > 0) {
+      toast.exito(
+        t("reglasAgenda.fechasDelDiaCanceladas", { n: canceladas }, canceladas),
+      );
+    }
     nuevoDia.value = { fecha: "", motivo: "" };
     await cargar();
   } catch (e) {
@@ -355,7 +388,13 @@ onMounted(cargar);
           {{ $t("reglasAgenda.cancelaciones") }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("reglasAgenda.cancelacionesAyuda") }}
+          {{
+            $t(
+              sesion.esCitas
+                ? "reglasAgenda.cancelacionesAyudaCitas"
+                : "reglasAgenda.cancelacionesAyuda",
+            )
+          }}
         </p>
         <p
           v-if="!puedePoliticas"
@@ -620,6 +659,29 @@ onMounted(cargar);
           >
             {{ $t("reglasAgenda.agregarDia") }}
           </button>
+          <div
+            v-if="afectadas && afectadas.sesiones > 0"
+            class="basis-full text-sm"
+            data-prueba="afectadas-dia"
+          >
+            <p :style="{ color: 'var(--texto-suave)' }">
+              {{
+                $t(
+                  "reglasAgenda.afectadasDia",
+                  { n: afectadas.sesiones, reservas: afectadas.reservas },
+                  afectadas.sesiones,
+                )
+              }}
+            </p>
+            <label class="mt-1 flex items-center gap-2">
+              <input
+                v-model="cancelarDelDia"
+                type="checkbox"
+                data-prueba="cancelar-del-dia"
+              />
+              {{ $t("reglasAgenda.cancelarDelDia") }}
+            </label>
+          </div>
         </form>
         <p
           v-if="cerradosProximos.length === 0"
@@ -663,6 +725,7 @@ onMounted(cargar);
         :puede-eliminar="puedeEliminar"
         :base="base"
         @dejar="dejarDeRepetir"
+        @cambiada="cargar"
       />
 
       <!-- Límites y tiempos del negocio (ADR 0042) -->

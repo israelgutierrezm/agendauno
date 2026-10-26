@@ -28,6 +28,7 @@ import { textoAlcance } from "@/lib/cobertura";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { usePestanaEnUrl } from "@/lib/filtrosEnUrl";
+import { claveSegunModalidad } from "@/lib/menu";
 import { useRegreso } from "@/lib/regreso";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -156,7 +157,7 @@ interface Ficha {
   pendientes?: Orden[] | null;
 }
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
@@ -190,11 +191,20 @@ const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
 const esCitas = computed(() => sesion.esCitas === true);
 const conPlanes = computed(() => (ficha.value?.derechos.length ?? 0) > 0);
 const mostrarPlanes = computed(() => !esCitas.value || conPlanes.value);
+// En citas sus planes son bonos (ADR 0130): la variante «…Citas» si existe.
+function tm(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, esCitas.value, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 // Las secciones de la ficha (pestañas en la dirección, como la de su detalle).
 const opcionesSeccion = computed(() => [
   { clave: "actividad" as const, texto: t("expediente.actividad") },
   ...(puedeVerDerechos.value && mostrarPlanes.value
-    ? [{ clave: "planes" as const, texto: t("planes.corte.tituloEquipo") }]
+    ? [{ clave: "planes" as const, texto: tm("planes.corte.tituloEquipo") }]
     : []),
   { clave: "expediente" as const, texto: t("expediente.titulo") },
 ]);
@@ -323,7 +333,7 @@ function abrirRecarga(d: Derecho): void {
 async function recargar(d: Derecho): Promise<void> {
   if (
     !(await confirmar(
-      t("confirmaciones.recargar", { n: recarga.value.creditos }),
+      tm("confirmaciones.recargar", { n: recarga.value.creditos }),
       { aceptar: t("confirmaciones.agregar") },
     ))
   ) {
@@ -335,7 +345,7 @@ async function recargar(d: Derecho): Promise<void> {
       unidades: Math.round(recarga.value.creditos * 1000),
       descripcion: recarga.value.motivo,
     });
-    toast.exito(t("creditosFicha.agregados"));
+    toast.exito(tm("creditosFicha.agregados"));
     recargando.value = null;
     movimientosDe.value = null;
     await cargar();
@@ -377,7 +387,7 @@ function abrirPausa(d: Derecho): void {
 async function pausar(d: Derecho): Promise<void> {
   if (
     !(await confirmar(
-      t("confirmaciones.pausar", { fecha: fecha(pausa.value.hasta) }),
+      tm("confirmaciones.pausar", { fecha: fecha(pausa.value.hasta) }),
       { aceptar: t("confirmaciones.pausarAceptar") },
     ))
   ) {
@@ -390,7 +400,7 @@ async function pausar(d: Derecho): Promise<void> {
       motivo: pausa.value.motivo || null,
     });
     toast.exito(
-      t("pausaMembresia.pausada", { fecha: fecha(pausa.value.hasta) }),
+      tm("pausaMembresia.pausada", { fecha: fecha(pausa.value.hasta) }),
     );
     pausando.value = null;
     await cargar();
@@ -405,7 +415,7 @@ async function reanudar(d: Derecho): Promise<void> {
   guardandoPausa.value = true;
   try {
     await api.post(`${base.value}/acuerdos/${d.acuerdo_id}/reanudar`);
-    toast.exito(t("pausaMembresia.reanudada"));
+    toast.exito(tm("pausaMembresia.reanudada"));
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -875,20 +885,20 @@ const regreso = useRegreso({
                 :style="{ borderColor: 'var(--borde)' }"
               >
                 <h2 class="text-sm font-semibold">
-                  {{ $t("ficha.derechos.titulo") }}
+                  {{ tm("ficha.derechos.titulo") }}
                 </h2>
                 <p
                   v-if="ficha.derechos.length === 0"
                   class="mt-2 text-sm"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{ $t("ficha.derechos.vacio") }}
+                  {{ tm("ficha.derechos.vacio") }}
                 </p>
                 <template v-else>
                   <p class="mt-1 text-sm" data-prueba="saldo-vigente">
                     {{
                       derechosVigentes.length === 0
-                        ? $t("ficha.derechos.sinVigente")
+                        ? tm("ficha.derechos.sinVigente")
                         : $t("ficha.derechos.saldoVigente", {
                             saldo: textoSaldoVigente,
                           })
@@ -1021,7 +1031,7 @@ const regreso = useRegreso({
                               :aria-expanded="recargando === d.id"
                               @click="abrirRecarga(d)"
                             >
-                              {{ $t("creditosFicha.agregar") }}
+                              {{ tm("creditosFicha.agregar") }}
                             </button>
                           </template>
                           <template v-if="puedeRecargar && d.acuerdo_id">
@@ -1059,7 +1069,7 @@ const regreso = useRegreso({
                             class="text-xs"
                             :style="{ color: 'var(--texto-suave)' }"
                           >
-                            {{ $t("pausaMembresia.ayuda") }}
+                            {{ tm("pausaMembresia.ayuda") }}
                           </p>
                           <div class="flex flex-wrap items-end gap-3">
                             <div>
@@ -1103,7 +1113,7 @@ const regreso = useRegreso({
                               :disabled="guardandoPausa || pausa.hasta === ''"
                               :aria-busy="guardandoPausa || undefined"
                             >
-                              {{ $t("pausaMembresia.confirmar") }}
+                              {{ tm("pausaMembresia.confirmar") }}
                             </button>
                           </div>
                         </form>
@@ -1148,7 +1158,7 @@ const regreso = useRegreso({
                         >
                           <div>
                             <label class="tu-label" :for="`rc-${d.id}`">{{
-                              $t("creditosFicha.creditos")
+                              tm("creditosFicha.creditos")
                             }}</label>
                             <input
                               :id="`rc-${d.id}`"
@@ -1517,9 +1527,9 @@ const regreso = useRegreso({
               </p>
             </template>
             <template v-else>
-              <p class="fi-etiqueta">{{ $t("ficha.membresia") }}</p>
+              <p class="fi-etiqueta">{{ tm("ficha.membresia") }}</p>
               <p class="mt-1 text-lg font-semibold tracking-tight">
-                {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
+                {{ tm(`recepcion.membresia.${resumen.membresia.estado}`) }}
               </p>
               <p
                 v-if="resumen.membresia.pausada_hasta"
@@ -1559,7 +1569,7 @@ const regreso = useRegreso({
                   class="h-1.5 w-1.5 rounded-full"
                   :style="{ background: colorAlerta(a) }"
                   aria-hidden="true"
-                />{{ $t(`recepcion.alertas.${a}`) }}</span
+                />{{ tm(`recepcion.alertas.${a}`) }}</span
               >
             </p>
 

@@ -92,6 +92,8 @@ describe("resumen adaptado a citas o clases", () => {
     const w = montar();
     await flushPromises();
     expect(w.find(".md-pastilla").exists()).toBe(true);
+    // En citas lo que tiene es un bono, no una membresía (ADR 0130).
+    expect(w.get(".md-pastilla").text()).toBe("Bono vigente");
     expect(w.get('[data-prueba="saldo-panel"]').text()).toContain("2");
   });
 

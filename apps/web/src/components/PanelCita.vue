@@ -27,6 +27,7 @@ import {
   textoInasistencia,
 } from "@/lib/confirmarAsistencia";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { claveSegunModalidad } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -58,6 +59,15 @@ const emit = defineEmits<{ cerrar: []; cambiada: [] }>();
 const { t, te } = useI18n();
 const toast = useToastStore();
 const sesionTenant = useSesionTenantStore();
+// Una cita usa una sesión de su bono, no un crédito (ADR 0130): la variante «…Citas».
+function tCitas(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, true, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 
 const accionando = ref(false);
 // Cobrar al terminar: servicio, productos y propina en un solo cobro (CobroCita).
@@ -272,7 +282,7 @@ async function marcar(asistencia: Asistencia, retardo = false): Promise<void> {
   const efecto =
     asistencia === "ausente" && !c.asistencia
       ? textoInasistencia(
-          t,
+          tCitas,
           await leerEfectoInasistencia(props.base, c.reserva_id),
         )
       : null;

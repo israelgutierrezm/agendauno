@@ -290,8 +290,8 @@ class AgendaTenantController
         // Un instructor solo ve SUS sesiones asignadas.
         $usuario = $request->attributes->get('usuario_tenant');
         $usuario = $usuario instanceof Usuario ? $usuario : null;
-        if ($this->acceso->esInstructorAcotado($usuario)) {
-            $consulta->where('instructor_id', $usuario?->getKey());
+        if ($usuario !== null && $this->acceso->esInstructorAcotado($usuario)) {
+            $this->acceso->soloLasSuyas($consulta, $usuario);
         }
         // Alcance por sucursal (R19): el staff acotado solo ve las clases de sus sedes.
         $this->scopeSucursal($consulta, $usuario);
@@ -436,8 +436,8 @@ class AgendaTenantController
 
         $usuario = $request->attributes->get('usuario_tenant');
         $usuario = $usuario instanceof Usuario ? $usuario : null;
-        if ($this->acceso->esInstructorAcotado($usuario)) {
-            $consulta->where('instructor_id', $usuario?->getKey());
+        if ($usuario !== null && $this->acceso->esInstructorAcotado($usuario)) {
+            $this->acceso->soloLasSuyas($consulta, $usuario);
         }
         // Alcance por sucursal (R19): el staff acotado solo ve oportunidades de sus sedes.
         $this->scopeSucursal($consulta, $usuario);

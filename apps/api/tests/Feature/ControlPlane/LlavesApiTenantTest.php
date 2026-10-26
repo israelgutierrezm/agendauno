@@ -88,3 +88,24 @@ it('gestionar llaves exige permiso de integraciones', function (): void {
 
     test()->getJson("/api/v1/app/{$e['slug']}/llaves-api", conBearer($coach))->assertForbidden();
 });
+
+it('cada alcance que se ofrece lee algo: reservas, planes y órdenes', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $clase = crearSesionTenant($e, $semilla, 5);
+    $vp = venderPackAMiembroTenant($e, 3000);
+    test()->postJson("/api/v1/app/{$e['slug']}/sesiones/{$clase}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
+
+    $secreto = (string) test()->postJson("/api/v1/app/{$e['slug']}/llaves-api", [
+        'nombre' => 'Integracion Y', 'scopes' => ['reservas.ver', 'derechos.ver', 'ordenes.ver'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.secreto');
+    $llave = ['X-API-Key' => $secreto];
+
+    test()->getJson("/api/v1/app/{$e['slug']}/integracion/reservas", $llave)->assertOk()
+        ->assertJsonPath('data.0.sesion_id', $clase)->assertJsonPath('data.0.persona_id', $vp['persona']);
+    test()->getJson("/api/v1/app/{$e['slug']}/integracion/derechos", $llave)->assertOk()
+        ->assertJsonPath('data.0.persona_id', $vp['persona'])->assertJsonPath('data.0.disponible', 2000);
+    test()->getJson("/api/v1/app/{$e['slug']}/integracion/ordenes", $llave)->assertOk();
+    // Sin miembros.ver no lee personas.
+    test()->getJson("/api/v1/app/{$e['slug']}/integracion/miembros", $llave)->assertForbidden();
+});

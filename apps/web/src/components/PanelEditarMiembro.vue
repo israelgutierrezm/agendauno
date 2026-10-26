@@ -264,7 +264,11 @@ async function guardar(): Promise<void> {
       >
         <p class="text-sm font-semibold">{{ $t("bajas.darDeBaja") }}</p>
         <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("bajas.ayudaMiembro") }}
+          {{
+            $t(
+              sesion.esCitas ? "bajas.ayudaMiembroCitas" : "bajas.ayudaMiembro",
+            )
+          }}
         </p>
         <input
           v-model="motivoBaja"

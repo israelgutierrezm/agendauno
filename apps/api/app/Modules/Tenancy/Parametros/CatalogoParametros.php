@@ -248,6 +248,10 @@ final class CatalogoParametros
             new DefinicionParametro(BajaDeNegocio::CLAVE_DIAS, 'Cuentas', 'Días para borrar los datos de un negocio dado de baja',
                 'Hasta entonces su dueño entra a descargar sus datos y pagar lo pendiente, y la baja se puede revertir. Ese día se borran su base, sus archivos y sus respaldos.', $e, 30, 7, 365, 'días', porNegocio: false),
 
+            // Lo más que el superadministrador extiende una prueba de una vez.
+            new DefinicionParametro('negocios.dias_max_extender_prueba', 'Cuentas', 'Días máximos para extender la prueba de un negocio',
+                'De una vez, desde la ficha del negocio en el superadministrador.', $e, 90, 7, 365, 'días', porNegocio: false),
+
             // Suspensión automática por renta vencida (ADR 0073, solo la plataforma).
             new DefinicionParametro('renta.dias_gracia_suspension', 'Renta', 'Días de gracia antes de suspender por renta vencida',
                 'Pasados estos días desde el vencimiento, el negocio se suspende solo hasta que la pague. 0 = nunca.', $e, 15, 0, 90, 'días', porNegocio: false),

@@ -1663,9 +1663,14 @@ onMounted(() => {
             :style="{ color: 'var(--texto-suave)' }"
           >
             {{
-              $t("reportes.rentabilidad.sinCosto", {
-                n: rentabilidad.totales.sin_costo_unitario,
-              })
+              $t(
+                sesion.esCitas
+                  ? "reportes.rentabilidad.sinCostoCitas"
+                  : "reportes.rentabilidad.sinCosto",
+                {
+                  n: rentabilidad.totales.sin_costo_unitario,
+                },
+              )
             }}
           </p>
         </template>

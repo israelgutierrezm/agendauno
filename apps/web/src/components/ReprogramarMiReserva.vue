@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -7,7 +7,8 @@ import { api, mensajeDeError } from "@/lib/api";
 /**
  * El cliente cambia el horario de su reserva desde su cuenta (ADR 0044): una cita a
  * otro horario libre del mismo servicio y profesional, o una clase a otra fecha de la
- * misma clase. Si el negocio no lo permite (o ya no se puede), lo dice.
+ * misma clase. Si el negocio no lo permite (o ya no se puede), lo dice. Desde el enlace
+ * de una cita sin cuenta (ADR 0221), con su `ruta` y su `firma`.
  */
 interface Opciones {
   puede: boolean;
@@ -24,7 +25,17 @@ const props = defineProps<{
   reservaId: string;
   zona: string;
   iniciaEn: string;
+  ruta?: string;
+  firma?: string;
 }>();
+
+const endpoint = computed(
+  () =>
+    props.ruta ?? `${props.base}/mi/reservas/${props.reservaId}/reprogramar`,
+);
+const conFirma = computed(() =>
+  props.firma !== undefined ? { f: props.firma } : {},
+);
 
 const emit = defineEmits<{ hecho: []; cerrar: [] }>();
 
@@ -68,10 +79,9 @@ async function cargar(): Promise<void> {
   elegido.value = "";
   cargandoHuecos.value = true;
   try {
-    const { data } = await api.get<{ data: Opciones }>(
-      `${props.base}/mi/reservas/${props.reservaId}/reprogramar`,
-      { params: { fecha: fecha.value } },
-    );
+    const { data } = await api.get<{ data: Opciones }>(endpoint.value, {
+      params: { fecha: fecha.value, ...conFirma.value },
+    });
     if (mio === pedido) {
       opciones.value = data.data;
       // Una hora tocada del día anterior mientras cargaba no se envía con el nuevo.
@@ -95,12 +105,12 @@ async function cambiar(): Promise<void> {
   guardando.value = true;
   error.value = null;
   try {
-    await api.post(
-      `${props.base}/mi/reservas/${props.reservaId}/reprogramar`,
-      opciones.value.tipo === "cita"
+    await api.post(endpoint.value, {
+      ...(opciones.value.tipo === "cita"
         ? { inicia_en_local: `${fecha.value} ${horaLocal(elegido.value)}:00` }
-        : { sesion_id: elegido.value },
-    );
+        : { sesion_id: elegido.value }),
+      ...conFirma.value,
+    });
     emit("hecho");
   } catch (e) {
     error.value = mensajeDeError(e);

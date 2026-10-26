@@ -42,7 +42,7 @@ it('los avisos por omisión de un negocio de citas hablan de su cita; los de cla
     estudioConSesion('fluo', 'f@correo.mx');
 
     expect(cuerpoPorOmisionCongruencia('barberia-a', 'reserva.confirmada'))
-        ->toContain('Tu cita está confirmada.')->toContain('liberar tu horario')
+        ->toContain('Tu cita está confirmada.')->toContain('{{enlace_cita}}')
         ->and(cuerpoPorOmisionCongruencia('fluo', 'reserva.confirmada'))
         ->toContain('Tu lugar está confirmado.')->toContain('liberar tu lugar')
         ->and(cuerpoPorOmisionCongruencia('barberia-a', 'cuenta.creada'))->toContain('ver tus bonos');

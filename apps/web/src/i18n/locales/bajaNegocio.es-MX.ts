@@ -11,7 +11,7 @@ export default {
   contrasena: "Tu contraseña",
   motivo: "¿Por qué te vas? (opcional)",
   cancelar: "Cancelar",
-  confirmar: "Dar de baja",
+  confirmar: "Dar de baja el negocio",
   // La pantalla del negocio ya dado de baja.
   estadoTitulo: "Tu negocio está dado de baja",
   estadoDesde: "Desde el {fecha}.",

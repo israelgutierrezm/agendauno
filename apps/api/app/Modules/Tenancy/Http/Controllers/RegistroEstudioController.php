@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
+use App\Modules\Tenancy\Application\AprovisionarNegocioRegistrado;
 use App\Modules\Tenancy\Application\AtribucionPlataforma;
 use App\Modules\Tenancy\Application\ConversionesPlataforma;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
@@ -124,11 +125,16 @@ class RegistroEstudioController
             ])->save();
         }
 
-        // BD del tenant creada de forma síncrona (SQLite barato). En producción con
-        // MySQL esto se despacharía a una cola; el estado permite reanudar.
-        $this->aprovisionar->ejecutar($estudio);
-        // Genera el token y ENVÍA el correo de activación (cierra el alta autónoma).
-        $token = $this->enviarActivacion->enviar($estudio, (string) $estudio->contacto_email);
+        // Su base: en producción, en la cola con reintentos, y el correo de activación sale
+        // al terminar (ADR 0222); en desarrollo y pruebas, en línea (SQLite es barato y la
+        // respuesta trae el enlace). El estado permite reanudar.
+        $token = null;
+        if ((bool) config('agendauno.plataforma.aprovisionar_en_cola')) {
+            AprovisionarNegocioRegistrado::dispatch((int) $estudio->getKey());
+        } else {
+            $this->aprovisionar->ejecutar($estudio);
+            $token = $this->enviarActivacion->enviar($estudio, (string) $estudio->contacto_email);
+        }
 
         return response()->json([
             'data' => [
@@ -145,7 +151,7 @@ class RegistroEstudioController
                 // Los identificadores con que el servidor manda estas conversiones
                 // (ADR 0143): el píxel del navegador usa los mismos y Meta deduplica.
                 'medicion' => ['eventos' => ConversionesPlataforma::idsDelRegistro($estudio)],
-                'activacion' => ! app()->environment(['local', 'testing']) ? null : [
+                'activacion' => $token === null || ! app()->environment(['local', 'testing']) ? null : [
                     'email' => $estudio->contacto_email,
                     'token' => $token,
                 ],

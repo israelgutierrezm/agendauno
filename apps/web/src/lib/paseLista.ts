@@ -95,6 +95,9 @@ export interface ResumenLista {
 export function resumenLista(
   lista: readonly ReservaLista[],
   capacidad: number | null,
+  // Los que da el servidor (ADR 0223): cuentan invitados, plataformas y lo apartado
+  // por canal. Sin el dato (versión anterior del API), se calculan con la lista.
+  libresDelServidor?: number | null,
 ): ResumenLista {
   const enSala = lista.filter(ocupaLugar);
   const cuenta = (...estados: EstadoEnLista[]): number =>
@@ -105,7 +108,14 @@ export function resumenLista(
     porMarcar: cuenta("por_marcar"),
     noVinieron: cuenta("no_vino", "no_se_presento"),
     enEspera: lista.filter((r) => r.estado === "en_espera").length,
-    libres: capacidad === null ? null : Math.max(0, capacidad - enSala.length),
+    libres:
+      libresDelServidor !== undefined
+        ? libresDelServidor === null
+          ? null
+          : Math.max(0, libresDelServidor)
+        : capacidad === null
+          ? null
+          : Math.max(0, capacidad - enSala.length),
   };
 }
 

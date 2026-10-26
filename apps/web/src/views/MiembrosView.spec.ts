@@ -337,6 +337,7 @@ describe("directorio de clientes", () => {
     expect(w.find('[data-prueba="indicador-conPlan"]').exists()).toBe(false);
     expect(w.find('[data-prueba="indicador-porVencer"]').exists()).toBe(false);
     expect(encabezados(w)).not.toContain("Plan vigente");
+    expect(encabezados(w)).not.toContain("Bono vigente");
     expect(encabezados(w)).not.toContain("Saldo");
     expect(
       w

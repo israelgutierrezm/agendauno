@@ -97,6 +97,8 @@ interface Opciones {
   cobro?: { pago_obligatorio: boolean; pago_en_linea: boolean };
   // Si el negocio manda los avisos de la cita por WhatsApp (ADR 0069).
   whatsapp?: boolean;
+  // Hasta cuándo se cancela o se cambia (ADR 0221).
+  politica?: { cancelar_horas: number; cambiar_horas: number; cambios: number };
   // Hay servicios que se toman con bono o membresía (se usan desde la cuenta).
   hay_con_plan?: boolean;
   // Lo que decide el negocio para agendar en línea (ADR 0115).
@@ -866,6 +868,30 @@ watch(paso, (p) => {
 
 // Una cita por intento: reintentar lo mismo no agenda otra (ADR 0201).
 const intento = intentoUnico();
+
+// Hasta cuándo se cancela o se cambia, antes de agendar (ADR 0221).
+const textoPolitica = computed(() => {
+  const p = opciones.value?.politica;
+  if (p === undefined) return "";
+  const partes = [
+    p.cancelar_horas > 0
+      ? t("perfilPublico.agendar.politica.cancelar", {
+          horas: p.cancelar_horas,
+        })
+      : t("perfilPublico.agendar.politica.cancelarAntes"),
+  ];
+  if (p.cambios > 0) {
+    partes.push(
+      t(
+        "perfilPublico.agendar.politica.cambiar",
+        { horas: p.cambiar_horas, n: p.cambios },
+        p.cambios,
+      ),
+    );
+  }
+  partes.push(t("perfilPublico.agendar.politica.enlace"));
+  return partes.join(" ");
+});
 
 // Un cupón del negocio (ADR 0220): se revisa antes y se aplica al agendar.
 const cupon = ref("");
@@ -2197,6 +2223,14 @@ onMounted(cargar);
                   "
                   :deshabilitado="agendando"
                 />
+                <p
+                  v-if="textoPolitica"
+                  class="mt-2 text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  data-prueba="politica-cita"
+                >
+                  {{ textoPolitica }}
+                </p>
                 <fieldset
                   v-if="anticipoSel !== null"
                   class="rc-anticipo"

@@ -178,6 +178,13 @@ const router = createRouter({
       component: () => import("@/views/ReservarCitaView.vue"),
     },
     {
+      // La cita desde el enlace firmado de sus avisos, sin cuenta (ADR 0221): verla,
+      // cambiarla de horario o cancelarla.
+      path: "/cita/:slug/:reserva",
+      name: "cita-sin-cuenta",
+      component: () => import("@/views/CitaSinCuentaView.vue"),
+    },
+    {
       // Página de enlaces del negocio (la de la bio de Instagram):
       // agendauno.mx/{slug}/enlaces o {slug}.agendauno.mx/enlaces.
       path: "/:slug/enlaces",
@@ -678,14 +685,17 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      // Portal de quien imparte: Inicio con accesos y su calendario.
+      // Portal de quien imparte: Inicio con accesos y su calendario. En un negocio de
+      // citas la dirección es /mis-citas (la guardia de abajo la cambia).
       path: "/mis-clases",
+      alias: "/mis-citas",
       name: "inicio-instructor",
       component: () => import("@/views/InicioInstructorView.vue"),
       meta: { requiereSesion: true },
     },
     {
       path: "/mis-clases/calendario",
+      alias: "/mis-citas/calendario",
       name: "mis-clases",
       component: () => import("@/views/MisClasesView.vue"),
       meta: { requiereSesion: true },
@@ -795,6 +805,20 @@ router.beforeEach(async (to) => {
     if (to.name !== "mi-perfil") {
       return { name: "mi-perfil" };
     }
+  }
+
+  // El portal de quien atiende tiene dos direcciones: /mis-citas en un negocio de
+  // citas y /mis-clases en uno de clases. Los enlaces por nombre llevan a la de
+  // clases; aquí se pasa a la de su negocio sin dejar una entrada de más.
+  const portal = /^\/mis-(clases|citas)(?=\/|$)/.exec(to.path);
+  const portalPropio = sesion.esCitas ? "citas" : "clases";
+  if (portal !== null && sesion.autenticado && portal[1] !== portalPropio) {
+    return {
+      path: to.path.replace(portal[0], `/mis-${portalPropio}`),
+      query: to.query,
+      hash: to.hash,
+      replace: true,
+    };
   }
 
   // Un usuario autenticado no debe quedarse en las páginas públicas de acceso

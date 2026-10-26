@@ -3,7 +3,8 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
-import { api } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import {
   filtrarSeries,
@@ -15,6 +16,7 @@ import {
   sigueVigente,
 } from "@/lib/programacion";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Las clases que se repiten, como una semana de lunes a domingo filtrable por
@@ -29,7 +31,11 @@ const props = defineProps<{
   puedeEliminar: boolean;
   base: string;
 }>();
-const emit = defineEmits<{ dejar: [serie: SerieProgramada] }>();
+const emit = defineEmits<{
+  dejar: [serie: SerieProgramada];
+  // Cambió su fin o se cancelaron fechas: se vuelve a cargar.
+  cambiada: [];
+}>();
 const { t } = useI18n();
 
 // «Hoy» del negocio (su zona horaria), no del navegador de quien mira.
@@ -37,6 +43,90 @@ const sesion = useSesionTenantStore();
 const hoy = hoyEnNegocio(sesion.zonaHoraria);
 const filtro = ref({ actividad: "", instructor: "", sucursal: "" });
 const detalle = ref<SerieProgramada | null>(null);
+const toast = useToastStore();
+const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
+
+// Hasta cuándo se repite y cancelar desde una fecha (ADR 0223).
+const fin = ref("");
+const sinFin = ref(true);
+const cancelarDesde = ref(hoy);
+const guardandoSerie = ref(false);
+watch(detalle, (s) => {
+  fin.value = s?.vigente_hasta ?? "";
+  sinFin.value = s?.vigente_hasta === null;
+  cancelarDesde.value = hoy;
+});
+
+async function guardarFin(): Promise<void> {
+  const s = detalle.value;
+  if (s === null || guardandoSerie.value || (!sinFin.value && fin.value === ""))
+    return;
+  guardandoSerie.value = true;
+  try {
+    const { data } = await api.put<{ data: { vigente_hasta: string | null } }>(
+      `${props.base}/plantillas-horario/${s.id}/fin`,
+      { vigente_hasta: sinFin.value ? null : fin.value },
+    );
+    const hasta = data.data.vigente_hasta;
+    toast.exito(
+      t(
+        "reglasAgenda.detalle.finGuardado",
+        { fecha: hasta !== null ? fecha(hasta) : "" },
+        hasta !== null ? 1 : 2,
+      ),
+    );
+    detalle.value = null;
+    emit("cambiada");
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    guardandoSerie.value = false;
+  }
+}
+
+async function cancelarFechas(): Promise<void> {
+  const s = detalle.value;
+  if (s === null || guardandoSerie.value || cancelarDesde.value === "") return;
+  guardandoSerie.value = true;
+  try {
+    const url = `${props.base}/plantillas-horario/${s.id}/terminar`;
+    const { data: previa } = await api.post<{
+      data: { sesiones: number; reservas: number };
+    }>(url, { desde: cancelarDesde.value, previsualizar: true });
+    if (previa.data.sesiones === 0) {
+      toast.info(t("reglasAgenda.detalle.sinFechasPorCancelar"));
+      return;
+    }
+    if (
+      !(await confirmar(
+        t("reglasAgenda.detalle.confirmarCancelarFechas", {
+          sesiones: previa.data.sesiones,
+          reservas: previa.data.reservas,
+          fecha: fecha(cancelarDesde.value),
+        }),
+        { peligro: true, aceptar: t("reglasAgenda.detalle.cancelarFechas") },
+      ))
+    ) {
+      return;
+    }
+    const { data } = await api.post<{ data: { canceladas: number } }>(url, {
+      desde: cancelarDesde.value,
+    });
+    toast.exito(
+      t(
+        "reglasAgenda.detalle.fechasCanceladas",
+        { n: data.data.canceladas },
+        data.data.canceladas,
+      ),
+    );
+    detalle.value = null;
+    emit("cambiada");
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    guardandoSerie.value = false;
+  }
+}
 
 function unicos(pares: [string | null, string | null][]): {
   id: string;
@@ -346,6 +436,60 @@ function dejar(s: SerieProgramada): void {
         <dt>{{ $t("reglasAgenda.detalle.vigencia") }}</dt>
         <dd class="first-letter:uppercase">{{ vigencia(detalle) }}</dd>
       </dl>
+      <template v-if="detalle && puedeGestionar">
+        <!-- Hasta cuándo se repite: solo se alarga (ADR 0223). -->
+        <fieldset class="mt-5 grid gap-2" data-prueba="fin-serie">
+          <legend class="tu-label">{{ $t("reglasAgenda.detalle.fin") }}</legend>
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="sinFin" type="checkbox" />
+            {{ $t("reglasAgenda.detalle.sinFin") }}
+          </label>
+          <input
+            v-if="!sinFin"
+            v-model="fin"
+            type="date"
+            class="tu-input w-auto"
+            :min="hoy"
+            :aria-label="$t('reglasAgenda.detalle.fin')"
+          />
+          <span class="tu-hint">{{ $t("reglasAgenda.detalle.finAyuda") }}</span>
+          <div>
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
+              :disabled="guardandoSerie || (!sinFin && fin === '')"
+              data-prueba="guardar-fin"
+              @click="guardarFin"
+            >
+              {{ $t("reglasAgenda.detalle.guardarFin") }}
+            </button>
+          </div>
+        </fieldset>
+        <!-- Cancelar esta y las siguientes, con cuántas personas afecta. -->
+        <div class="mt-5 grid gap-2" data-prueba="cancelar-desde">
+          <label class="tu-label" for="ps-cancelar-desde">{{
+            $t("reglasAgenda.detalle.cancelarDesde")
+          }}</label>
+          <input
+            id="ps-cancelar-desde"
+            v-model="cancelarDesde"
+            type="date"
+            class="tu-input w-auto"
+            :min="hoy"
+          />
+          <div>
+            <button
+              type="button"
+              class="tu-btn tu-btn-peligro tu-btn-chico"
+              :disabled="guardandoSerie || cancelarDesde === ''"
+              data-prueba="cancelar-fechas"
+              @click="cancelarFechas"
+            >
+              {{ $t("reglasAgenda.detalle.cancelarFechas") }}
+            </button>
+          </div>
+        </div>
+      </template>
       <p class="mt-5 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("reglasAgenda.detalle.cambiar") }}
       </p>

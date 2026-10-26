@@ -1535,6 +1535,8 @@ export default {
     lleno: "Lleno",
     cupoAbierto: "Cupo abierto",
     creditos: "1 crédito | {n} créditos",
+    // En citas un bono incluye sesiones (ADR 0130).
+    creditosCitas: "1 sesión | {n} sesiones",
     ilimitado: "Ilimitado",
     // Planes para comparar antes de comprar (M03/B03).
     planes: {
@@ -1550,6 +1552,7 @@ export default {
       deSede: "Planes que valen en {sede}.",
       verTodos: "Ver todos",
       porMes: "1 crédito al mes | {n} créditos al mes",
+      porMesCitas: "1 sesión al mes | {n} sesiones al mes",
       paraActividad: "Para {actividad}",
       vence: "Si lo pagas hoy, se puede usar hasta el {fecha}",
       renueva: "Se renueva cada mes mientras la pagues",
@@ -1578,6 +1581,7 @@ export default {
       tipos: {
         membresia: "Membresía",
         paquete: "Paquete",
+        paqueteCitas: "Bono",
         pase_dia: "Pase del día",
         sesion_individual: "Sesión individual",
         add_on: "Extra",
@@ -1912,6 +1916,15 @@ export default {
     titulo: "Saldos de apertura",
     subtitulo:
       "El plan, los créditos y la vigencia con que cada alumno llega de tu sistema anterior.",
+    // En citas lo que trae cada alumno es un bono con sus sesiones (ADR 0130).
+    subtituloCitas:
+      "El bono, las sesiones y la vigencia con que cada alumno llega de tu sistema anterior.",
+    instruccionesCitas:
+      "Si vienes de otro sistema, carga aquí el bono, las sesiones que le quedan y la vigencia que cada alumno trae al corte acordado. No se registran ventas ni pagos: el saldo aparece en su estado de cuenta como «Saldo de apertura», con la evidencia que indiques.",
+    pasoPlanesCitas:
+      "Crea los bonos con el mismo nombre que usarás en el archivo.",
+    colPlanCitas: "Bono",
+    colCreditosCitas: "Sesiones",
     ir: "Cargar saldos de apertura",
     instrucciones:
       "Si vienes de otro sistema, carga aquí el plan, los créditos y la vigencia que cada alumno trae al corte acordado. No se registran ventas ni pagos: el saldo aparece en su estado de cuenta como «Saldo de apertura», con la evidencia que indiques.",
@@ -1966,6 +1979,7 @@ export default {
     canalEmail: "Correo",
     asuntoLabel: "Asunto",
     asuntoPh: "Ej. Tu membresía está por vencer",
+    asuntoPhCitas: "Ej. Tu bono está por vencer",
     cuerpoLabel: "Mensaje",
     cuerpoPh: "Hola Rocío, te escribimos para recordarte…",
     marcadores:
@@ -1987,18 +2001,25 @@ export default {
     // Segmentos rotulados por su clave (`comunicaciones.segmentos.${clave}.etiqueta`);
     // el texto del API queda de respaldo.
     segmentos: {
+      // En citas no hay membresías ni padrón (ADR 0104): sus variantes «…Citas».
       todos: {
         etiqueta: "Todos los alumnos",
         descripcion: "Todos los alumnos activos del padrón.",
+        descripcionCitas: "Todos tus alumnos activos.",
       },
       por_vencer: {
         etiqueta: "Membresía por vencer",
         descripcion: "Alumnos cuya membresía vence en los próximos 14 días.",
+        etiquetaCitas: "Bono por vencer",
+        descripcionCitas: "Alumnos cuyo bono vence en los próximos 14 días.",
       },
       vencidos: {
         etiqueta: "Membresía vencida",
         descripcion:
           "Alumnos cuya membresía venció hace 14 días o menos (se pueden recuperar).",
+        etiquetaCitas: "Bono vencido",
+        descripcionCitas:
+          "Alumnos cuyo bono venció hace 14 días o menos (se pueden recuperar).",
       },
       primerizos: {
         etiqueta: "Primerizos (sin asistir aún)",
@@ -2008,15 +2029,23 @@ export default {
         etiqueta: "Con plan y sin venir",
         descripcion:
           "Tienen un plan en vigor y no vienen desde hace los días que fija tu negocio en Seguimiento.",
+        etiquetaCitas: "Con bono y sin venir",
+        descripcionCitas:
+          "Tienen un bono en vigor y no vienen desde hace los días que fija tu negocio en Seguimiento.",
       },
       sin_iniciar: {
         etiqueta: "Compró y no ha iniciado",
         descripcion:
           "Tienen un plan en vigor, nunca han venido y no tienen nada reservado.",
+        descripcionCitas:
+          "Tienen un bono en vigor, nunca han venido y no tienen cita.",
       },
       saldo_por_vencer: {
         etiqueta: "Paquete por vencer con saldo",
         descripcion: "Su paquete vence pronto y aún les queda saldo sin usar.",
+        etiquetaCitas: "Bono por vencer con saldo",
+        descripcionCitas:
+          "Su bono vence pronto y aún les quedan sesiones sin usar.",
       },
       vino_sin_comprar: {
         etiqueta: "Vino y no ha comprado",
@@ -2249,6 +2278,10 @@ export default {
       revertir: "Revertir créditos",
       revertirAyuda:
         "Quita los créditos otorgados por esta compra. Si la pagó otro cobro o es una renovación, se devuelve solo el dinero: para quitarle el periodo, pausa o da de baja la membresía.",
+      // En citas lo que da una compra son sesiones de un bono (ADR 0130).
+      revertirCitas: "Quitar las sesiones del bono",
+      revertirAyudaCitas:
+        "Quita las sesiones que dio esta compra. Si la pagó otro cobro, se devuelve solo el dinero.",
       confirmar: "Reembolsar",
       procesando: "Reembolsando…",
     },
@@ -2262,6 +2295,8 @@ export default {
     alta: "Alta",
     sucursal: "Sucursal",
     membresia: "Membresía",
+    // En citas lo que se vende son bonos, no membresías (ADR 0130).
+    membresiaCitas: "Bono",
     saldo: "Saldo",
     creditos: "1 crédito | {n} créditos",
     proxima: "Próxima reserva",
@@ -2270,11 +2305,14 @@ export default {
     documentos: "Documentos pendientes",
     derechos: {
       titulo: "Membresías y paquetes",
+      tituloCitas: "Bonos",
       vacio: "Sin membresías ni paquetes.",
+      vacioCitas: "Sin bonos.",
       // Saldo de lo vigente (lo que puede usar y lo ya reservado); lo vencido o
       // cancelado es historial (aparte).
       saldoVigente: "Saldo vigente: {saldo}",
       sinVigente: "Sin membresía ni paquete vigente.",
+      sinVigenteCitas: "Sin bono vigente.",
       sinSaldo: "Sin saldo vigente",
       apartadas: "1 apartada | {n} apartadas",
       historial: "Historial",
@@ -2327,6 +2365,12 @@ export default {
       titulo: "Vender",
       subtitulo: "Vende un plan o paquete a un alumno.",
       administrarPlanes: "Administrar planes y paquetes",
+      // En citas lo que se vende son bonos de sesiones (ADR 0130).
+      subtituloCitas: "Vende un bono a un alumno.",
+      administrarPlanesCitas: "Administrar bonos",
+      exitoPackCitas:
+        "Vendido. {persona} tiene 1 sesión en su bono. | Vendido. {persona} tiene {saldo} sesiones en su bono.",
+      exitoMembresiaCitas: "Vendido. {persona} tiene un bono activo.",
       miembro: "Alumno",
       producto: "Producto",
       metodo: "Método de pago",
@@ -3159,6 +3203,8 @@ export default {
       total: "Total",
       sinCosto:
         "{n} asistencia(s) sin valor unitario (membresías ilimitadas o cortesías); no suman ingreso.",
+      sinCostoCitas:
+        "{n} cita(s) sin valor unitario (cortesías); no suman ingreso.",
     },
     demanda: {
       titulo: "Demanda por horario",
@@ -3245,7 +3291,7 @@ export default {
       citas: "1 cita | {n} citas",
       total: "Total",
       leyenda:
-        "Ocupación: horas agendadas dentro de su horario de atención entre las disponibles, sin días cerrados ni bloqueos. El valor atendido es el precio de lo que se atendió (o los créditos que se usaron); el pago sale de su esquema en Nómina, incluidas las clases que cubre o donde apoya.",
+        "Ocupación: horas agendadas dentro de su horario de atención entre las disponibles, sin días cerrados ni bloqueos. El valor atendido es el precio de lo que se atendió (o el de las sesiones de bono que se usaron); el pago sale de su esquema en Nómina, incluidas las clases que cubre o donde apoya.",
       leyendaClases:
         "El valor atendido es el precio de lo que se atendió (o los créditos que se usaron); el pago sale de su esquema en Nómina, incluidas las clases que cubre o donde apoya.",
     },
@@ -3452,6 +3498,9 @@ export default {
       membresia_pausada: "Membresía en pausa",
       sin_acceso: "Sin plan para reservar",
       documentos: "Documentos pendientes",
+      // En citas lo que se vende son bonos, no membresías (ADR 0130).
+      membresia_vencidaCitas: "Bono vencido",
+      membresia_pausadaCitas: "Bono en pausa",
     },
     membresia: {
       sin: "Sin membresía ni paquete",
@@ -3459,10 +3508,13 @@ export default {
       por_vencer: "Por vencer",
       vencida: "Vencida",
       pausada: "En pausa",
+      sinCitas: "Sin bono",
+      vencidaCitas: "Vencido",
     },
     miembro: {
       sinAlertas: "Todo en orden",
       membresia: "Membresía",
+      membresiaCitas: "Bono",
       saldo: "Saldo",
       creditos: "1 disponible | {n} disponibles",
       ilimitado: "Ilimitado",
@@ -3472,6 +3524,7 @@ export default {
       documentos: "Documentos pendientes",
       vender: "Vender / cobrar",
       elegirProducto: "Elige un producto o membresía",
+      elegirProductoCitas: "Elige un bono",
       // Se suma al plan si es su alta o regresa tras un tiempo (B04).
       conInscripcion: "Más inscripción de {monto}: se cobran {total}.",
       efectivo: "Efectivo",
@@ -3531,11 +3584,23 @@ export default {
       diasSemana: "¿Qué días se repite?",
       repetirHasta: "Repetir hasta (opcional)",
       repetirAyuda:
-        "Si lo dejas vacío, se programan las clases hasta el 31 de diciembre de {anio}.",
+        "Si lo dejas vacío, se repite sin fecha final: siempre hay clases programadas por adelantado.",
     },
     sesion: {
       reservas: "Reservas",
       cancelar: "Cancelar clase",
+    },
+    // El cupo y la sala de esta fecha (ADR 0223).
+    cupoSala: {
+      titulo: "Cupo y sala de esta fecha",
+      cupo: "Lugares",
+      sinTope: "Sin tope",
+      sala: "Sala",
+      sinSala: "Sin sala",
+      guardar: "Guardar cupo y sala",
+      guardado: "Cupo y sala guardados.",
+      ayuda:
+        "Solo cambia esta fecha. El cupo no puede quedar por debajo de los lugares ya ocupados.",
     },
     staff: {
       titulo: "Equipo",
@@ -3543,6 +3608,7 @@ export default {
       rolLabel: "Rol",
       sustituye: "Sustituye a",
       asignar: "Asignar",
+      quitar: "Quitar de la clase",
       rol: {
         instructor: "Instructor",
         asistente: "Asistente",
@@ -3760,6 +3826,8 @@ export default {
       comprar: "Comprar",
       comprando: "Creando…",
       creada: "Compra creada. Completa el pago para activar tus créditos.",
+      // En citas lo que se compra es un bono de sesiones (ADR 0130).
+      creadaCitas: "Compra creada. Completa el pago para activar tu bono.",
       destacado: "Recomendado",
       primeraVez: "Para tu primera vez",
       vence: "Si la pagas hoy, se puede usar hasta el {fecha}.",
@@ -3767,9 +3835,11 @@ export default {
       conAnualidad: "Con este plan se cobra también la anualidad del negocio.",
       aceptoCondiciones: "Leí y acepto estas condiciones",
       creditos: "1 crédito | {n} créditos",
+      creditosCitas: "1 sesión | {n} sesiones",
       tipos: {
         membresia: "Membresía",
         paquete: "Paquete",
+        paqueteCitas: "Bono",
         pase_dia: "Pase del día",
         sesion_individual: "Sesión individual",
         add_on: "Extra",

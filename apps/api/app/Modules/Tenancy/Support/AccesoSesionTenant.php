@@ -6,8 +6,10 @@ namespace App\Modules\Tenancy\Support;
 
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\RolesTenant;
+use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Politica de acceso a una sesion segun el usuario tenant-local. Un instructor solo
@@ -26,7 +28,25 @@ class AccesoSesionTenant
 
     public function puedeOperar(SesionTenant $sesion, ?Usuario $usuario): bool
     {
-        return $this->puedeOperarEn((int) $sesion->sucursal_id, $sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, $usuario);
+        if ($this->puedeOperarEn((int) $sesion->sucursal_id, $sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, $usuario)) {
+            return true;
+        }
+
+        // Quien la cubre (sustituto o asistente asignado, R17) también la opera (ADR 0223).
+        return $usuario instanceof Usuario && $this->esInstructorAcotado($usuario)
+            && AsignacionSesionTenant::query()->where('sesion_id', $sesion->getKey())->where('usuario_id', $usuario->getKey())->exists();
+    }
+
+    /**
+     * Acota una consulta de sesiones a las de quien imparte: las suyas y las que cubre
+     * (sustituto o asistente asignado).
+     *
+     * @param  Builder<SesionTenant>  $consulta
+     */
+    public function soloLasSuyas(Builder $consulta, Usuario $usuario): void
+    {
+        $consulta->where(fn (Builder $q) => $q->where('instructor_id', $usuario->getKey())
+            ->orWhereIn('id', AsignacionSesionTenant::query()->select('sesion_id')->where('usuario_id', $usuario->getKey())));
     }
 
     /**

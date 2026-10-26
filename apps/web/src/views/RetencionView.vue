@@ -249,7 +249,13 @@ watch(pestana, cargarTabla, { immediate: true });
 <template>
   <section class="tu-pagina">
     <EncabezadoSeccion
-      :titulo="$t('operacion.renovaciones.titulo')"
+      :titulo="
+        $t(
+          sesion.esCitas
+            ? 'operacion.renovaciones.tituloCitas'
+            : 'operacion.renovaciones.titulo',
+        )
+      "
       :subtitulo="
         $t(
           sesion.esCitas

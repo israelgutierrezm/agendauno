@@ -51,6 +51,8 @@ class GruposTenantController
                 'id' => $g->ulid,
                 'nombre' => $g->nombre,
                 'oferta' => $g->plantilla?->oferta?->nombre,
+                // La clase recurrente que sigue (la nueva, si se partió la serie).
+                'plantilla_id' => $g->plantilla?->ulid,
                 'inscritos' => (int) ($g->getAttribute('inscripciones_count') ?? 0),
                 'activo' => $g->activo,
                 'cerrado_en' => $g->cerrado_en?->toIso8601String(),

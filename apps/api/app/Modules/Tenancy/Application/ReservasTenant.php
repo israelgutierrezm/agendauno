@@ -220,7 +220,11 @@ class ReservasTenant
         ]);
     }
 
-    public function crear(SesionTenant $sesion, PersonaTenant $persona, ?string $idempotencyKey = null, bool $permitirEspera = false, ?int $unidades = null, string $canal = 'directo', ?int $lugar = null): ReservaTenant
+    /**
+     * @param  bool  $porElNegocio  la reserva la hace el equipo: quien llega tarde se
+     *                              registra hasta que termina la clase (ADR 0223)
+     */
+    public function crear(SesionTenant $sesion, PersonaTenant $persona, ?string $idempotencyKey = null, bool $permitirEspera = false, ?int $unidades = null, string $canal = 'directo', ?int $lugar = null, bool $porElNegocio = false): ReservaTenant
     {
         $costo = $unidades ?? self::UNIDADES_POR_SESION;
 
@@ -233,7 +237,7 @@ class ReservasTenant
         // Pre-check con el motor: decision estructurada + fail-fast. Traduce el codigo
         // estable a la excepcion de dominio. La transaccion re-valida lo critico bajo
         // lock (concurrencia). Ver evaluar() y docs/BOOKING_ENGINE.md.
-        $decision = $this->evaluar($sesion, $persona, $costo, $permitirEspera, $canal, $lugar);
+        $decision = $this->evaluar($sesion, $persona, $costo, $permitirEspera, $canal, $lugar, $porElNegocio);
         if (! $decision->permitida) {
             throw $this->excepcionDe((string) $decision->codigo, (string) $decision->mensaje);
         }
@@ -384,7 +388,7 @@ class ReservasTenant
      *
      * @param  int|null  $unidades  costo en unidades escaladas (por defecto 1 credito)
      */
-    public function evaluar(SesionTenant $sesion, PersonaTenant $persona, ?int $unidades = null, bool $permitirEspera = false, string $canal = 'directo', ?int $lugar = null): DecisionReserva
+    public function evaluar(SesionTenant $sesion, PersonaTenant $persona, ?int $unidades = null, bool $permitirEspera = false, string $canal = 'directo', ?int $lugar = null, bool $porElNegocio = false): DecisionReserva
     {
         $costo = $unidades ?? self::UNIDADES_POR_SESION;
         $reglas = [];
@@ -394,9 +398,12 @@ class ReservasTenant
             return DecisionReserva::rechazar('SESSION_NOT_BOOKABLE', 'La sesion no admite reservas.', $reglas);
         }
 
-        $reglas['dentro_de_ventana'] = $enVentana = ! $sesion->inicia_en->isPast();
+        // El cliente reserva antes de que empiece; el equipo registra a quien llega tarde
+        // mientras dura (ADR 0223).
+        $reglas['dentro_de_ventana'] = $enVentana = ! $sesion->inicia_en->isPast()
+            || ($porElNegocio && $sesion->termina_en->isFuture());
         if (! $enVentana) {
-            return DecisionReserva::rechazar('BOOKING_NOT_OPEN', 'La sesion ya inicio.', $reglas);
+            return DecisionReserva::rechazar('BOOKING_NOT_OPEN', $porElNegocio ? 'La sesion ya termino.' : 'La sesion ya inicio.', $reglas);
         }
 
         $duplicada = ReservaTenant::query()

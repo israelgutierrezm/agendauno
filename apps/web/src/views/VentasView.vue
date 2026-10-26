@@ -15,6 +15,7 @@ import TarjetasIndicadores, {
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { claveSegunModalidad } from "@/lib/menu";
 import { crearVenta } from "@/lib/venta";
 import {
   queIncluyePlan,
@@ -56,6 +57,15 @@ const METODOS = ["efectivo", "tarjeta", "transferencia", "ventanilla"] as const;
 
 const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas lo que se vende son bonos (ADR 0130): la variante «…Citas» si existe.
+function tm(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, sesion.esCitas, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
@@ -134,7 +144,7 @@ function dinero(minor: number, moneda = sesion.moneda): string {
   return dineroDelPais(minor, moneda, sesion.pais);
 }
 function queIncluye(p: Plan): string {
-  return queIncluyePlan(p, t);
+  return queIncluyePlan(p, tm);
 }
 function nombreMetodo(m: string | null | undefined): string {
   if (!m) {
@@ -312,12 +322,13 @@ async function vender(): Promise<void> {
     }>(`${base.value}/miembros/${persona.id}/derechos`);
     const ultimo = der.data.data[0];
     if (ultimo) {
+      const saldo = Math.round((ultimo.saldo ?? 0) / 1000);
+      // En citas: el bono y sus sesiones (ADR 0130).
       mensaje = ultimo.ilimitado
-        ? t("ventas.vender.exitoMembresia", { persona: nombre })
-        : t("ventas.vender.exitoPack", {
-            persona: nombre,
-            saldo: Math.round((ultimo.saldo ?? 0) / 1000),
-          });
+        ? tm("ventas.vender.exitoMembresia", { persona: nombre })
+        : sesion.esCitas
+          ? t("ventas.vender.exitoPackCitas", { persona: nombre, saldo }, saldo)
+          : t("ventas.vender.exitoPack", { persona: nombre, saldo });
     }
   } catch {
     // Sin el detalle del derecho basta con confirmar la venta.
@@ -359,7 +370,7 @@ const indicadores = computed<Indicador[]>(() => [
   },
   {
     clave: "planes",
-    etiqueta: t("ventasVisual.kpi.planes"),
+    etiqueta: tm("ventasVisual.kpi.planes"),
     valor: String(productosVendibles.value.length),
     icono: "etiqueta",
   },
@@ -376,7 +387,7 @@ onMounted(cargar);
           ? $t('ventasVisual.tituloCitas')
           : $t('ventasVisual.titulo')
       "
-      :subtitulo="$t('ventas.vender.subtitulo')"
+      :subtitulo="tm('ventas.vender.subtitulo')"
     />
     <!-- Qué se vende se define en otra sección: se llega con un enlace. -->
     <p
@@ -385,7 +396,7 @@ onMounted(cargar);
       data-prueba="administrar-planes"
     >
       <RouterLink :to="{ name: 'planes' }" class="tu-enlace">
-        {{ $t("ventas.vender.administrarPlanes") }}
+        {{ tm("ventas.vender.administrarPlanes") }}
       </RouterLink>
     </p>
 
@@ -491,7 +502,7 @@ onMounted(cargar);
                   }}
                 </p>
               </template>
-              <p v-else class="vv-sub">{{ $t("ventasVisual.eligePlan") }}</p>
+              <p v-else class="vv-sub">{{ tm("ventasVisual.eligePlan") }}</p>
             </div>
 
             <div>
@@ -695,7 +706,7 @@ onMounted(cargar);
                 <th class="text-right">{{ $t("ventas.ordenes.colTotal") }}</th>
                 <th>{{ $t("ventasVisual.col.cuando") }}</th>
                 <th class="hidden md:table-cell">
-                  {{ $t("ventasVisual.col.plan") }}
+                  {{ tm("ventasVisual.col.plan") }}
                 </th>
                 <th class="hidden sm:table-cell">
                   {{ $t("ventas.vender.metodo") }}
@@ -724,7 +735,7 @@ onMounted(cargar);
                   {{ cuando(o.pagada_en) }}
                 </td>
                 <td
-                  :data-etiqueta="$t('ventasVisual.col.plan')"
+                  :data-etiqueta="tm('ventasVisual.col.plan')"
                   class="hidden md:table-cell"
                 >
                   {{

@@ -16,6 +16,7 @@ import PlantillasWhatsAppNegocio, {
 } from "@/components/PlantillasWhatsAppNegocio.vue";
 import RangoFechas from "@/components/RangoFechas.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { claveSegunModalidad } from "@/lib/menu";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
 import { eventosPorArea, useEventosNegocio } from "@/lib/eventosNegocio";
@@ -409,7 +410,11 @@ function textoSegmento(
   campo: "etiqueta" | "descripcion",
   respaldo: string,
 ): string {
-  const llave = `comunicaciones.segmentos.${clave}.${campo}`;
+  const llave = claveSegunModalidad(
+    `comunicaciones.segmentos.${clave}.${campo}`,
+    sesion.modalidad === "citas",
+    te,
+  );
   return te(llave) ? t(llave) : conTerminosActuales(respaldo);
 }
 
@@ -648,8 +653,22 @@ const MARCADORES_POR_EVENTO: Record<string, string[]> = {
   ],
 };
 
+// En citas, los avisos de la cita llevan el enlace para cancelarla o cambiarla sin
+// cuenta (ADR 0221).
+const CON_ENLACE_CITA = new Set([
+  "reserva.confirmada",
+  "reserva.recordatorio_24h",
+  "reserva.recordatorio_2h",
+  "reserva.reprogramada",
+]);
 const marcadoresAuto = computed(() => {
-  const propios = MARCADORES_POR_EVENTO[editor.value.clave];
+  const base = MARCADORES_POR_EVENTO[editor.value.clave];
+  const propios =
+    base &&
+    sesion.modalidad === "citas" &&
+    CON_ENLACE_CITA.has(editor.value.clave)
+      ? [...base, "enlace_cita"]
+      : base;
   return propios
     ? t("comunicacionesAuto.marcadoresLista", {
         lista: propios.map((m) => `{{${m}}}`).join(", "),
@@ -975,8 +994,8 @@ onMounted(cargar);
         {{ $t("comunicaciones.enviada", { n: exito }) }}
       </div>
 
-      <!-- Redactar difusión -->
-      <div class="mt-6 tu-card p-6">
+      <!-- Redactar difusión: solo quien gestiona; con «ver», el historial (ADR 0223). -->
+      <div v-if="puedeAutomaticos" class="mt-6 tu-card p-6">
         <h3 class="text-sm font-semibold">
           {{ $t("comunicaciones.segmentoLabel") }}
         </h3>
@@ -1084,7 +1103,15 @@ onMounted(cargar);
             type="text"
             maxlength="255"
             class="tu-input mt-1 w-full"
-            :placeholder="$t('comunicaciones.asuntoPh')"
+            :placeholder="
+              $t(
+                claveSegunModalidad(
+                  'comunicaciones.asuntoPh',
+                  sesion.modalidad === 'citas',
+                  te,
+                ),
+              )
+            "
           />
 
           <label class="block mt-4 text-sm font-semibold" for="com-cuerpo">{{
@@ -1430,7 +1457,15 @@ onMounted(cargar);
           :data-prueba="`area-${g.area}`"
         >
           <h3 class="com-area-titulo">
-            {{ $t(`comunicacionPantalla.areas.${g.area}`) }}
+            {{
+              $t(
+                claveSegunModalidad(
+                  `comunicacionPantalla.areas.${g.area}`,
+                  sesion.modalidad === "citas",
+                  te,
+                ),
+              )
+            }}
           </h3>
           <ul>
             <li

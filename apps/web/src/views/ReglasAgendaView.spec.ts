@@ -16,6 +16,8 @@ const mocks = await vi.hoisted(async () => {
   const { reactive } = await import("vue");
   return {
     get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn(),
     ruta: reactive({ hash: "", query: {} as Record<string, string> }),
     // La pestaña es el ancla: cambiarla reemplaza la dirección (sin sumar historial).
@@ -25,7 +27,12 @@ const mocks = await vi.hoisted(async () => {
   };
 });
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get, post: vi.fn(), put: vi.fn(), delete: mocks.delete },
+  api: {
+    get: mocks.get,
+    post: mocks.post,
+    put: mocks.put,
+    delete: mocks.delete,
+  },
   mensajeDeError: () => "Error",
 }));
 vi.mock("@/stores/sesionTenant", () => ({
@@ -41,7 +48,7 @@ vi.mock("@/stores/sesionTenant", () => ({
   }),
 }));
 vi.mock("@/stores/toast", () => ({
-  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("vue-router", () => ({
@@ -196,6 +203,37 @@ describe("reglas de la agenda", () => {
     );
   });
 
+  it("al cerrar un día con clases dice cuántas hay y, si se pide, las cancela (ADR 0223)", async () => {
+    mocks.ruta.hash = "#cierres";
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/afectadas") ? { sesiones: 2, reservas: 3 } : [],
+        },
+      }),
+    );
+    mocks.post.mockResolvedValue({
+      data: { meta: { cancelacion: { canceladas: 2 } } },
+    });
+    const w = montar();
+    await flushPromises();
+
+    await w.get("#ra-fecha").setValue("2099-12-24");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/excepciones-horario/afectadas",
+      { params: { fecha: "2099-12-24" } },
+    );
+    expect(w.get('[data-prueba="afectadas-dia"]').text()).toContain("2 clases");
+    await w.get('[data-prueba="cancelar-del-dia"]').setValue(true);
+    await w.get("#ra-fecha").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/excepciones-horario",
+      expect.objectContaining({ fecha: "2099-12-24", cancelar_sesiones: true }),
+    );
+  });
+
   it("en citas no ofrece la programación recurrente ni la pide (ADR 0104)", async () => {
     mocks.sesion.esCitas = true;
     mocks.get.mockResolvedValue({ data: { data: [] } });
@@ -285,6 +323,54 @@ describe("reglas de la agenda", () => {
     await flushPromises();
     expect(mocks.delete).toHaveBeenCalledWith(
       "/api/v1/app/demo/plantillas-horario/s1",
+    );
+  });
+
+  it("cancelar sus fechas desde un día dice a cuántos afecta antes de hacerlo (ADR 0223)", async () => {
+    mocks.ruta.hash = "#programacion";
+    mocks.post.mockImplementation(
+      (_url: string, cuerpo: { previsualizar?: boolean }) =>
+        Promise.resolve({
+          data: {
+            data: cuerpo.previsualizar
+              ? { sesiones: 4, reservas: 2 }
+              : { canceladas: 4 },
+          },
+        }),
+    );
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-dia="3"]').get(".ps-clase").trigger("click");
+
+    await w.get("#ps-cancelar-desde").setValue("2099-01-10");
+    mocks.confirmar.mockResolvedValueOnce(false);
+    await w.get('[data-prueba="cancelar-fechas"]').trigger("click");
+    await flushPromises();
+    expect(String(mocks.confirmar.mock.calls[0]![0])).toContain("4 fechas");
+    expect(String(mocks.confirmar.mock.calls[0]![0])).toContain("2 personas");
+    // Sin confirmar, solo se previsualizó.
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+
+    await w.get('[data-prueba="cancelar-fechas"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/plantillas-horario/s1/terminar",
+      { desde: "2099-01-10" },
+    );
+  });
+
+  it("una serie sin fecha final se guarda así; con fecha, hasta ese día (ADR 0223)", async () => {
+    mocks.ruta.hash = "#programacion";
+    mocks.put.mockResolvedValue({ data: { data: { vigente_hasta: null } } });
+    const w = montar();
+    await flushPromises();
+    await w.get('[data-dia="3"]').get(".ps-clase").trigger("click");
+
+    await w.get('[data-prueba="guardar-fin"]').trigger("click");
+    await flushPromises();
+    expect(mocks.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/plantillas-horario/s1/fin",
+      { vigente_hasta: null },
     );
   });
 });

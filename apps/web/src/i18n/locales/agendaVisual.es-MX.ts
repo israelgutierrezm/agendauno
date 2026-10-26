@@ -92,7 +92,7 @@ export default {
     duracion: "Minutos",
     duracionDelServicio: "La fija el servicio.",
     seCobraEnCaja: "Queda confirmada y se cobra en caja: {monto}.",
-    consumeCredito: "Queda confirmada y usa un crédito de su membresía.",
+    consumeCredito: "Queda confirmada y usa una sesión de su bono.",
     agendar: "Agendar cita",
     agendando: "Agendando…",
     agendada: "Cita agendada: {cliente} a las {hora}.",
@@ -143,12 +143,12 @@ export default {
       "¿Registrar el cobro de {monto} en {metodo} a {cliente}? La cita queda pagada.",
     confirmarLlegada: "¿Marcar que {cliente} llegó a su cita?",
     confirmarNoAsistio:
-      "¿Marcar que {cliente} no asistió? Según la política del negocio, puede perder el crédito o el pago de la cita.",
+      "¿Marcar que {cliente} no asistió? Según la política del negocio, puede perder la sesión de su bono o el pago de la cita.",
     confirmarNoAsistioCon: "¿Marcar que {cliente} no asistió? {efecto}",
     // Después de cancelarla: qué pasó con su crédito, su pago o su anticipo.
     cancelada: "Se canceló la cita. {efecto}",
     confirmarCorreccion:
-      "{cliente} está marcado como «{antes}». ¿Cambiarlo a «{ahora}»? Si aplica, el crédito se ajusta en su saldo.",
+      "{cliente} está marcado como «{antes}». ¿Cambiarlo a «{ahora}»? Si aplica, la sesión de su bono se ajusta.",
     corregirANoAsistio: "Corregir: no asistió",
     corregirALlego: "Corregir: sí llegó",
     okCorregida: "Asistencia corregida.",

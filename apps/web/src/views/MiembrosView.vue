@@ -44,13 +44,14 @@ import {
   estadoMembresia,
   type ResumenTarjeta,
 } from "@/lib/resumenTarjeta";
+import { claveSegunModalidad } from "@/lib/menu";
 import { esInstructor } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const toast = useToastStore();
 
 interface Miembro {
@@ -88,6 +89,15 @@ interface Meta {
 }
 
 const sesion = useSesionTenantStore();
+// En citas sus planes son bonos (ADR 0130): la variante «…Citas» si existe.
+function tm(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, sesion.esCitas, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
 // Familias y responsables (ADR 0123): con el módulo encendido por el superadmin, las
@@ -261,7 +271,7 @@ const columnasDisponibles = computed(() => [
   { clave: "app", texto: t("operacion.clientes.app") },
   ...(hayPlanes.value
     ? [
-        { clave: "plan", texto: t("operacion.clientes.plan") },
+        { clave: "plan", texto: tm("operacion.clientes.plan") },
         { clave: "saldo", texto: t("operacion.clientes.saldo") },
       ]
     : []),
@@ -969,6 +979,7 @@ onMounted(() => {
                     :mostrar-plan="
                       !sesion.esCitas || Boolean(m.resumen?.membresia.plan)
                     "
+                    :citas="sesion.esCitas"
                   >
                     <template #nombre>
                       <button
@@ -1042,7 +1053,7 @@ onMounted(() => {
                       v-if="ver('plan')"
                       class="whitespace-nowrap hidden sm:table-cell"
                     >
-                      {{ $t("operacion.clientes.plan") }}
+                      {{ tm("operacion.clientes.plan") }}
                     </th>
                     <th
                       v-if="ver('saldo')"
@@ -1192,13 +1203,13 @@ onMounted(() => {
                     <td
                       v-if="ver('plan')"
                       class="hidden sm:table-cell"
-                      :data-etiqueta="$t('operacion.clientes.plan')"
+                      :data-etiqueta="tm('operacion.clientes.plan')"
                     >
                       <div>
                         <span class="flex max-w-[16rem] items-center gap-1.5">
                           <span class="truncate">{{
                             m.resumen?.membresia.plan ??
-                            $t("tarjetas.sinMembresia")
+                            tm("tarjetas.sinMembresia")
                           }}</span>
                           <span
                             v-if="
@@ -1223,16 +1234,16 @@ onMounted(() => {
                         <span
                           v-if="
                             m.resumen?.membresia.plan &&
-                            estadoMembresia(m.resumen.membresia, t)
+                            estadoMembresia(m.resumen.membresia, tm)
                           "
                           class="block text-xs"
                           :style="{
                             color:
-                              estadoMembresia(m.resumen.membresia, t)!.color ??
+                              estadoMembresia(m.resumen.membresia, tm)!.color ??
                               'var(--texto-suave)',
                           }"
                           >{{
-                            estadoMembresia(m.resumen.membresia, t)!.texto
+                            estadoMembresia(m.resumen.membresia, tm)!.texto
                           }}</span
                         >
                       </div>

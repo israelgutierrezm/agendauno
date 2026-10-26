@@ -90,7 +90,9 @@ export const POLITICAS: Record<string, Politica> = {
   // Presupuestos (ADR 0127): de los negocios de citas.
   presupuestos: { permiso: "presupuestos.ver", modalidad: "citas" },
   "presupuesto-impreso": { permiso: "presupuestos.ver", modalidad: "citas" },
-  comunicaciones: { permiso: "comunicaciones.gestionar", funcion: "mensajes" },
+  // Con «ver» se entra al historial y a la bandeja de salida; redactar y los
+  // automáticos piden «gestionar» (ADR 0223).
+  comunicaciones: { permiso: "comunicaciones.ver", funcion: "mensajes" },
   // La bandeja de WhatsApp e Instagram (ADR 0200).
   bandeja: { permiso: "mensajes.atender", funcion: "mensajes" },
   promociones: { permiso: "promociones.gestionar", funcion: "promociones" },

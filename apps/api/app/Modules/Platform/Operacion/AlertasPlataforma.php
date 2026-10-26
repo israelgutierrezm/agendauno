@@ -32,7 +32,7 @@ class AlertasPlataforma
      */
     public const PIDEN_ATENCION = [
         'modulo_solicitado', 'wellhub_solicitud', 'renta_cobrada_dos_veces', 'renta_devuelta', 'renta_en_disputa',
-        'evento_outbox_aparcado',
+        'evento_outbox_aparcado', 'aprovisionamiento_fallido',
     ];
 
     /**

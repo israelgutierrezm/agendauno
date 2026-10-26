@@ -293,7 +293,7 @@ it('revisa las pasarelas habilitadas para la renta, no solo Stripe', function ()
         ->expectsOutputToContain('AVISO Ya llegó un aviso de pago de Mercado Pago')
         ->expectsOutputToContain('FALTA Llaves de OpenPay para cobrar la renta — Faltan: private_key.')
         ->expectsOutputToContain('FALTA OpenPay en modo producción')
-        ->expectsOutputToContain('AVISO Domiciliación de la renta (Stripe)')
+        ->expectsOutputToContain('AVISO Domiciliación de la renta, timbres y WhatsApp (Stripe)')
         ->doesntExpectOutputToContain('Stripe en modo producción')
         ->doesntExpectOutputToContain('Secreto del webhook de Stripe')
         ->assertFailed();

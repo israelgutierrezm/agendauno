@@ -209,6 +209,9 @@ return [
         'intentos_codigo' => (int) env('PLATFORM_CODIGO_INTENTOS', 5),
         // Cuánto dura una sesión del superadmin.
         'horas_sesion' => (int) env('PLATFORM_SESION_HORAS', 12),
+        // La base de un negocio recién registrado se crea en la cola (ADR 0222): en
+        // producción son cientos de migraciones. En desarrollo y pruebas, en línea.
+        'aprovisionar_en_cola' => (bool) env('APROVISIONAR_EN_COLA', ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)),
     ],
 
     /*

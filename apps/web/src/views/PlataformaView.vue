@@ -126,6 +126,12 @@ interface Cargo {
   condonable?: boolean;
   // Con qué se pagó y su factura con detalle (ADR 0214).
   metodo_pago?: string | null;
+  // El cobro a la tarjeta domiciliada: rechazos y próximo intento.
+  cobro_automatico?: {
+    intentos: number;
+    error: string | null;
+    proximo_intento_en: string | null;
+  } | null;
   factura_detalle?: FacturaRenta | null;
 }
 interface FichaApi extends Omit<Estudio, "uso"> {
@@ -139,6 +145,8 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     cuenta_activa?: boolean | null;
   };
   onboarding_completo: boolean;
+  // Lo más que se extiende su prueba de una vez (parámetro de la plataforma).
+  extender_prueba_max?: number;
   // Quién lo suspendió por última vez, cuándo y por qué (ADR 0132).
   ultima_suspension?: {
     fecha: string;
@@ -445,6 +453,11 @@ const edit = ref({
   desde: "",
 });
 const diasPrueba = ref(15);
+// Las opciones de siempre hasta el máximo de la plataforma, y el máximo mismo.
+const opcionesPrueba = computed(() => {
+  const max = ficha.value?.extender_prueba_max ?? 90;
+  return [...new Set([...[7, 15, 30, 60].filter((d) => d < max), max])];
+});
 // Por qué se suspende (opcional): se escribe en la ficha, junto a las acciones.
 const motivoSuspension = ref("");
 // Por qué se da de baja (obligatorio, ADR 0213).
@@ -676,6 +689,23 @@ function reenviarActivacion(): void {
     t("plataformaAdmin.ficha.activacionReenviada", {
       correo: f.contacto.email ?? "",
     }),
+  );
+}
+
+// Su base se quedó a medias al registrarse: se vuelve a intentar en la cola (ADR 0222).
+function aprovisionar(): void {
+  const f = ficha.value;
+  if (f === null) {
+    return;
+  }
+  void accion(
+    () =>
+      cliente.post(
+        `/api/v1/plataforma/estudios/${f.slug}/aprovisionar`,
+        {},
+        encabezados(),
+      ),
+    t("plataformaAdmin.ficha.aprovisionando"),
   );
 }
 
@@ -2834,6 +2864,26 @@ function borrar(): void {
                   {{ $t("plataformaAdmin.ficha.reenviarActivacion") }}
                 </button>
               </div>
+              <!-- Su base no se terminó de crear al registrarse (ADR 0222). -->
+              <div
+                v-if="ficha.estado === 'provisioning'"
+                class="mt-2 flex flex-wrap items-center gap-2"
+                data-prueba="sin-base"
+              >
+                <span
+                  class="tu-estado text-xs"
+                  :style="{ '--tono': 'var(--aviso)' }"
+                  >{{ $t("plataformaAdmin.ficha.sinBase") }}</span
+                >
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-secundario tu-btn-chico"
+                  :disabled="accionando"
+                  @click="aprovisionar"
+                >
+                  {{ $t("plataformaAdmin.ficha.reintentarBase") }}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -2870,6 +2920,17 @@ function borrar(): void {
             >
               {{ $t("plataformaAdmin.ficha.cargos") }}
             </h3>
+            <p
+              class="mt-1 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="domiciliacion"
+            >
+              {{
+                ficha.domiciliado
+                  ? $t("plataformaAdmin.ficha.conDomiciliacion")
+                  : $t("plataformaAdmin.ficha.sinDomiciliacion")
+              }}
+            </p>
             <CargoManualPlataforma
               :api-url="apiUrl"
               :token="token"
@@ -2901,6 +2962,26 @@ function borrar(): void {
                     class="tu-estado flex justify-end text-xs"
                     :style="{ '--tono': colorCargo(c) }"
                     >{{ estadoCargo(c) }}</span
+                  >
+                  <span
+                    v-if="c.cobro_automatico && c.estado === 'pendiente'"
+                    class="block text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    data-prueba="cobro-automatico"
+                    >{{
+                      $t(
+                        "plataformaAdmin.ficha.tarjetaRechazada",
+                        { n: c.cobro_automatico.intentos },
+                        c.cobro_automatico.intentos,
+                      )
+                    }}<template v-if="c.cobro_automatico.proximo_intento_en">
+                      ·
+                      {{
+                        $t("plataformaAdmin.ficha.proximoIntento", {
+                          fecha: fecha(c.cobro_automatico.proximo_intento_en),
+                        })
+                      }}</template
+                    ></span
                   >
                 </dd>
                 <div v-if="c.condonable" class="pl-condonar">
@@ -3127,7 +3208,7 @@ function borrar(): void {
                 class="tu-input w-auto"
                 :aria-label="$t('plataformaAdmin.ficha.extender')"
               >
-                <option v-for="d in [7, 15, 30, 60]" :key="d" :value="d">
+                <option v-for="d in opcionesPrueba" :key="d" :value="d">
                   {{ $t("plataformaAdmin.ficha.dias", { n: d }) }}
                 </option>
               </select>

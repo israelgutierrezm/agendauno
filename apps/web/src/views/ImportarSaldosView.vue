@@ -15,6 +15,7 @@ import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { claveSegunModalidad } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import PaginacionListado from "@/components/PaginacionListado.vue";
@@ -40,7 +41,11 @@ interface Resultado {
 }
 
 const sesion = useSesionTenantStore();
-const { t } = useI18n();
+const { t, te } = useI18n();
+// En citas lo que trae cada alumno es un bono con sus sesiones (ADR 0130).
+function tm(clave: string): string {
+  return t(claveSegunModalidad(clave, sesion.esCitas, te));
+}
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 // El corte, por omisión «hoy» del negocio (no del navegador de quien carga).
@@ -220,7 +225,7 @@ function descargarPlantilla(): void {
     <EncabezadoSeccion
       class="mt-4"
       :titulo="$t('importarSaldos.titulo')"
-      :subtitulo="$t('importarSaldos.subtitulo')"
+      :subtitulo="tm('importarSaldos.subtitulo')"
     />
 
     <!-- Éxito -->
@@ -249,14 +254,14 @@ function descargarPlantilla(): void {
     <template v-else>
       <div class="mt-6 tu-card p-6">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("importarSaldos.instrucciones") }}
+          {{ tm("importarSaldos.instrucciones") }}
         </p>
         <ul
           class="mt-2 list-disc pl-5 text-sm space-y-1"
           :style="{ color: 'var(--texto-suave)' }"
         >
           <li>{{ $t("importarSaldos.pasoMiembros") }}</li>
-          <li>{{ $t("importarSaldos.pasoPlanes") }}</li>
+          <li>{{ tm("importarSaldos.pasoPlanes") }}</li>
           <li>{{ $t("importarSaldos.pasoCorte") }}</li>
           <li>
             {{
@@ -378,9 +383,9 @@ function descargarPlantilla(): void {
             <thead>
               <tr>
                 <th>{{ $t("importarSaldos.colAlumno") }}</th>
-                <th>{{ $t("importarSaldos.colPlan") }}</th>
+                <th>{{ tm("importarSaldos.colPlan") }}</th>
                 <th class="hidden sm:table-cell text-right">
-                  {{ $t("importarSaldos.colCreditos") }}
+                  {{ tm("importarSaldos.colCreditos") }}
                 </th>
                 <th class="hidden sm:table-cell">
                   {{ $t("importarSaldos.colVence") }}
@@ -396,12 +401,12 @@ function descargarPlantilla(): void {
                     $t("importar.filaN", { n: f.fila })
                   }}</span>
                 </td>
-                <td :data-etiqueta="$t('importarSaldos.colPlan')">
+                <td :data-etiqueta="tm('importarSaldos.colPlan')">
                   {{ texto(f.datos.plan) }}
                 </td>
                 <td
                   class="hidden sm:table-cell text-right"
-                  :data-etiqueta="$t('importarSaldos.colCreditos')"
+                  :data-etiqueta="tm('importarSaldos.colCreditos')"
                 >
                   {{ texto(f.datos.creditos) }}
                 </td>

@@ -17,6 +17,8 @@ export default {
     clasesServiciosClases: "Clases",
   },
   titulo: "Planes y paquetes",
+  // En citas lo que se vende son bonos de sesiones (ADR 0130).
+  tituloCitas: "Bonos",
   // Planes «socio» (ADR 0182): se congelan en cada venta.
   socio: {
     titulo: "Reglas de reserva",
@@ -38,8 +40,12 @@ export default {
   },
   subtitulo:
     "Lo que tus alumnos compran para reservar: cuántas clases incluye, cuánto dura y para qué clases sirve.",
+  subtituloCitas:
+    "Lo que tus alumnos compran por adelantado: cuántas sesiones incluye, cuánto dura y para qué servicios sirve.",
   nuevo: "Nuevo plan",
+  nuevoCitas: "Nuevo bono",
   vacio: "Aún no tienes planes. Crea el primero.",
+  vacioCitas: "Aún no tienes bonos. Crea el primero.",
   editar: "Editar",
   archivado: "Archivado",
   verArchivados: "Ver archivados",
@@ -95,6 +101,7 @@ export default {
   },
   resumen: {
     clases: "1 clase | {n} clases",
+    clasesCitas: "1 sesión | {n} sesiones",
     ilimitado: "Ilimitado",
     porMes: "1 clase al mes | {n} clases al mes",
     sinVencimiento: "No vence",
@@ -110,7 +117,9 @@ export default {
   editor: {
     guardadoNombre: "«{nombre}» quedó guardado.",
     tituloNuevo: "Nuevo plan",
+    tituloNuevoCitas: "Nuevo bono",
     tituloEditar: "Editar plan",
+    tituloEditarCitas: "Editar bono",
     queEs: "¿Qué es?",
     otro: "Otro",
     nombre: "Nombre",
@@ -273,7 +282,9 @@ export default {
   },
   corte: {
     titulo: "Mis planes",
+    tituloCitas: "Mis bonos",
     tituloEquipo: "Planes",
+    tituloEquipoCitas: "Bonos",
     vacio: "Aún no tienes planes.",
     estados: {
       vigente: "Vigente",

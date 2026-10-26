@@ -155,7 +155,8 @@ class ResumenDelDiaTenant
                         ->where('inicia_en', '<', $local->addDay()->utc()));
                 }
             })
-            ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $q->where('instructor_id', $usuario->getKey()))
+            // Las suyas y las que cubre (sustituto o asistente).
+            ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $this->acceso->soloLasSuyas($q, $usuario))
             ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->withCount([
                 // Los lugares ocupados con la regla única de cupo (reservas y plataformas),

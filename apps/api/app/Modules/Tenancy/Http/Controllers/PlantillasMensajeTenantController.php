@@ -32,14 +32,17 @@ class PlantillasMensajeTenantController
     {
         $canales = CanalComunicacion::disponibles();
         $conWhatsApp = in_array(CanalComunicacion::WhatsApp, $canales, true);
+        $eventos = EventoDeDominioTenant::tiposPara($this->modalidad());
         $plantillas = PlantillaMensajeTenant::query()
             ->when(! $conWhatsApp, fn ($q) => $q->where('canal', '!=', CanalComunicacion::WhatsApp->value))
+            // En citas no se ven los avisos de membresías ni de la lista de espera.
+            ->whereIn('clave', $eventos)
             ->orderBy('clave')
             ->get();
 
         return response()->json([
             'data' => $plantillas->map(fn (PlantillaMensajeTenant $p): array => $this->presentar($p))->all(),
-            'eventos_disponibles' => EventoDeDominioTenant::TIPOS,
+            'eventos_disponibles' => $eventos,
             // Push solo aparece si la plataforma tiene FCM configurado; WhatsApp, si la
             // plataforma lo encendió.
             'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, $canales),
@@ -49,7 +52,8 @@ class PlantillasMensajeTenantController
                 ->all() : null,
             // Qué eventos se pueden avisar al profesional de la cita y al equipo.
             'destinatarios' => [
-                'profesional' => DestinatarioMensaje::Profesional->eventos(),
+                // El profesional de la cita: solo en citas (en clases nunca se envía).
+                'profesional' => $this->modalidad() === ModalidadServicio::Citas ? DestinatarioMensaje::Profesional->eventos() : [],
                 'equipo' => DestinatarioMensaje::Equipo->eventos(),
             ],
         ]);

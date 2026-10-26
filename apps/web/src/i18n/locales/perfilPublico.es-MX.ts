@@ -221,6 +221,15 @@ export default {
     cambiarProfesional: "Cambiar quién te atiende",
     cambiarSucursal: "Cambiar sucursal",
     precioServicio: "Precio del servicio",
+    // Hasta cuándo se cancela o se cambia (ADR 0221).
+    politica: {
+      cancelar:
+        "Puedes cancelar hasta {horas} h antes; después puede aplicar penalización.",
+      cancelarAntes: "Puedes cancelar antes de que empiece tu cita.",
+      cambiar:
+        "Puedes cambiar el horario una vez hasta {horas} h antes. | Puedes cambiar el horario hasta {n} veces, hasta {horas} h antes.",
+      enlace: "En tu correo te llega el enlace para hacerlo.",
+    },
     // Servicios que se toman con bono (ADR 0091/0093/0130).
     avisoBono:
       "¿Tienes un bono? Entra a tu cuenta para usarlo: ahí aparecen los servicios que incluye.",

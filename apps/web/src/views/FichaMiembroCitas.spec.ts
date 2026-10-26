@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
+import { creditosFicha, pausaMembresia } from "@/i18n/locales/gestion.es-MX";
 import FichaMiembroView from "./FichaMiembroView.vue";
 
 /**
@@ -103,7 +104,15 @@ function respuestas(ordenes: unknown[] | null, pendientes: unknown[] | null) {
 function montar() {
   return mount(FichaMiembroView, {
     global: {
-      plugins: [createI18n({ legacy: false, locale: "es", messages: { es } })],
+      plugins: [
+        createI18n({
+          legacy: false,
+          locale: "es",
+          missingWarn: false,
+          fallbackWarn: false,
+          messages: { es: { ...es, creditosFicha, pausaMembresia } },
+        }),
+      ],
       stubs: {
         PanelMiembro: true,
         VentasMostrador: true,
@@ -167,6 +176,46 @@ describe("ficha de un cliente de citas", () => {
       "/api/v1/app/demo/ordenes/o1/liquidar",
       { metodo: "efectivo", referencia: null },
     );
+  });
+
+  it("con un bono habla de bonos y sesiones, no de membresías ni créditos", async () => {
+    respuestas([], []);
+    const original = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation(async (url: string) => {
+      const r = (await original(url)) as {
+        data: { data: Record<string, unknown> };
+      };
+      if (url.endsWith("/resumen")) {
+        r.data.data.membresia = {
+          estado: "vigente",
+          valido_hasta: "2099-12-31",
+          plan: "Bono 5 cortes",
+        };
+      } else {
+        r.data.data.derechos = [
+          {
+            id: "d1",
+            producto: "Bono 5 cortes",
+            estado: "activo",
+            ilimitado: false,
+            saldo_creditos: 3,
+            saldo_unidades: 3000,
+            disponible_unidades: 3000,
+            valido_hasta: "2099-12-31",
+            acuerdo_id: "a1",
+            pausa_hasta: null,
+          },
+        ];
+      }
+      return r;
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text()).toContain("Bonos");
+    expect(w.text()).toContain("Agregar sesiones");
+    expect(w.text()).not.toMatch(/membres[ií]a/i);
+    expect(w.text()).not.toMatch(/cr[eé]dito/i);
   });
 
   it("sin permiso para ver órdenes no hay compras ni pendientes", async () => {

@@ -8,6 +8,7 @@ import { RouterLink } from "vue-router";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { claveSegunModalidad } from "@/lib/menu";
 import { type Plan } from "@/lib/planes";
 import { crearVenta } from "@/lib/venta";
 import {
@@ -63,9 +64,18 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "cerrar"): void }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesionStore = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesionStore.slug}`);
+// En citas se habla de bonos, no de membresías: la variante «…Citas» si existe.
+function tm(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, sesionStore.esCitas, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 // Vender también lista los productos: hacen falta los dos permisos.
 const puedeVender = computed(
   () =>
@@ -242,11 +252,11 @@ const pastilla = computed<{ texto: string; aviso: boolean } | null>(() => {
   ) {
     return null;
   }
-  const estado = t(`recepcion.membresia.${m.estado}`);
+  const estado = tm(`recepcion.membresia.${m.estado}`);
   const texto =
     m.estado === "sin"
       ? estado
-      : `${t("recepcion.miembro.membresia")} ${estado.toLowerCase()}`;
+      : `${tm("recepcion.miembro.membresia")} ${estado.toLowerCase()}`;
   // En pausa, la fecha que importa es cuándo vuelve.
   const limite = m.estado === "pausada" ? m.pausada_hasta : m.valido_hasta;
   const hasta = limite
@@ -366,7 +376,7 @@ function cancelarVenta(): void {
             class="h-1.5 w-1.5 rounded-full"
             :style="{ background: colorAlerta(a) }"
             aria-hidden="true"
-          />{{ $t(`recepcion.alertas.${a}`) }}</span
+          />{{ tm(`recepcion.alertas.${a}`) }}</span
         >
       </p>
     </template>
@@ -570,7 +580,7 @@ function cancelarVenta(): void {
         <div v-else class="space-y-2">
           <select v-model="productoSel" class="tu-input">
             <option value="" disabled>
-              {{ $t("recepcion.miembro.elegirProducto") }}
+              {{ tm("recepcion.miembro.elegirProducto") }}
             </option>
             <option v-for="p in vendibles" :key="p.id" :value="p.id">
               {{ p.nombre }} — {{ dinero(p.precio_minor, p.moneda) }}
@@ -583,7 +593,7 @@ function cancelarVenta(): void {
             :style="{ color: 'var(--texto-suave)' }"
             data-prueba="detalle-venta"
           >
-            <p>{{ queIncluyePlan(elegido, $t) }}</p>
+            <p>{{ queIncluyePlan(elegido, tm) }}</p>
             <p v-for="r in reglas" :key="r">{{ r }}</p>
             <p v-if="inscripcion > 0" data-prueba="inscripcion-venta">
               {{

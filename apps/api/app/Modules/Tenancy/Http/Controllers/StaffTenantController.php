@@ -74,6 +74,18 @@ class StaffTenantController
         return response()->json(['data' => $this->presentarAsignacion($asignacion->load('usuario'))], 201);
     }
 
+    /** Quita a alguien de la clase (sustituto, asistente…; ADR 0223). */
+    public function quitar(Request $request): JsonResponse
+    {
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless($this->acceso->puedeOperar($sesion, $actor instanceof Usuario ? $actor : null), 403, 'Esa clase no es de tus sucursales.');
+        $usuario = Usuario::query()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
+        AsignacionSesionTenant::query()->where('sesion_id', $sesion->getKey())->where('usuario_id', $usuario->getKey())->delete();
+
+        return response()->json(status: 204);
+    }
+
     public function staffDeSesion(Request $request): JsonResponse
     {
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
@@ -191,8 +203,10 @@ class StaffTenantController
         return [
             'id' => $asignacion->ulid,
             'usuario' => $asignacion->usuario?->name,
+            // Por su ULID (para quitarlo de la clase): nunca el id interno.
+            'usuario_id' => $asignacion->usuario?->ulid,
             'rol' => $asignacion->rol->value,
-            'sustituye_a' => $asignacion->sustituye_a,
+            'sustituye_a' => $asignacion->sustituye_a !== null ? Usuario::query()->whereKey($asignacion->sustituye_a)->value('ulid') : null,
         ];
     }
 }

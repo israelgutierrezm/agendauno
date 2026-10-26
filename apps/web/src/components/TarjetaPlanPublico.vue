@@ -3,6 +3,7 @@ import { useI18n } from "vue-i18n";
 
 import { textoCobertura } from "@/lib/cobertura";
 import { dinero as dineroDelPais } from "@/lib/formato";
+import { claveSegunModalidad } from "@/lib/menu";
 import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
 
 /**
@@ -40,12 +41,24 @@ const props = withDefaults(
     // La etiqueta «Primera visita» arriba (si los planes no van agrupados).
     marcarPrimeraVez?: boolean;
     boton: string;
+    // Negocio de citas: lo que vende son bonos de sesiones (ADR 0130).
+    citas?: boolean;
   }>(),
-  { terminos: null, pais: null, variasSedes: false, marcarPrimeraVez: true },
+  {
+    terminos: null,
+    pais: null,
+    variasSedes: false,
+    marcarPrimeraVez: true,
+    citas: false,
+  },
 );
 const emit = defineEmits<{ elegir: [] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+// La variante «…Citas» del texto, si la hay.
+function tc(clave: string): string {
+  return claveSegunModalidad(clave, props.citas, te);
+}
 function tn(
   clave: string,
   valores?: Record<string, unknown> | number,
@@ -80,7 +93,7 @@ function fechaDia(iso: string): string {
   >
     <div class="flex flex-wrap gap-2">
       <span class="tu-badge">{{
-        tn(`escaparate.registro.tipos.${plan.tipo}`)
+        tn(tc(`escaparate.registro.tipos.${plan.tipo}`))
       }}</span>
       <span
         v-if="plan.destacado"
@@ -115,14 +128,14 @@ function fechaDia(iso: string): string {
       }}</template>
       <template v-else-if="plan.creditos_incluidos">{{
         $t(
-          "escaparate.creditos",
+          tc("escaparate.creditos"),
           { n: plan.creditos_incluidos / 1000 },
           plan.creditos_incluidos === 1000 ? 1 : 2,
         )
       }}</template>
       <template v-else-if="plan.unidades_por_ciclo">{{
         $t(
-          "escaparate.planes.porMes",
+          tc("escaparate.planes.porMes"),
           { n: plan.unidades_por_ciclo / 1000 },
           plan.unidades_por_ciclo === 1000 ? 1 : 2,
         )

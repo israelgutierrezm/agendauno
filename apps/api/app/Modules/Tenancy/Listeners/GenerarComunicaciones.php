@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
+use App\Modules\Tenancy\Application\EnlaceDeCitaTenant;
 use App\Modules\Tenancy\Application\EntregarPushTenant;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Application\FamiliasTenant;
@@ -44,6 +45,7 @@ class GenerarComunicaciones
         private readonly ClienteWhatsApp $whatsapp,
         private readonly RegionNegocioTenant $region,
         private readonly FamiliasTenant $familias,
+        private readonly EnlaceDeCitaTenant $enlaces,
     ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
@@ -300,6 +302,12 @@ class GenerarComunicaciones
         if ($persona instanceof PersonaTenant) {
             $contexto['persona_nombre'] = (string) $persona->nombre;
             $contexto['persona_email'] = (string) ($persona->email ?? '');
+        }
+
+        // Los avisos de una cita llevan el enlace para cancelarla o cambiarla sin cuenta
+        // (ADR 0221). Se arma al escribir el aviso: no viaja en el evento.
+        if ($evento->agregadoTipo === 'reserva' && $evento->agregadoId !== null && ($evento->payload['tipo'] ?? null) === 'cita') {
+            $contexto['enlace_cita'] = (string) $this->enlaces->url($evento->agregadoId);
         }
 
         return $contexto;

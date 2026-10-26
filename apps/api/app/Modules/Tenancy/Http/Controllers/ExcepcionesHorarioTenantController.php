@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CancelarFechasTenant;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -38,11 +40,27 @@ class ExcepcionesHorarioTenantController
         ]);
     }
 
-    public function crear(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
+    /**
+     * Antes de cerrar un día (ADR 0223): cuántas clases o citas programadas tiene y
+     * cuántas personas con lugar.
+     */
+    public function afectadas(Request $request, CancelarFechasTenant $cancelar): JsonResponse
+    {
+        $validado = $request->validate(['fecha' => ['required', 'date_format:Y-m-d']]);
+
+        return response()->json(['data' => $cancelar->resumen($cancelar->delDia((string) $validado['fecha']))]);
+    }
+
+    /**
+     * Cierra un día: ya no se generan fechas ahí. Con `cancelar_sesiones`, también se
+     * cancelan las que ya estaban programadas (cada una devuelve créditos y avisa).
+     */
+    public function crear(Request $request, EliminacionesTenant $eliminaciones, CancelarFechasTenant $cancelar): JsonResponse
     {
         $validado = $request->validate([
             'fecha' => ['required', 'date'],
             'motivo' => ['nullable', 'string', 'max:255'],
+            'cancelar_sesiones' => ['sometimes', 'boolean'],
         ]);
 
         // Un día cerrado por fecha (la columna guarda también la hora: se compara el
@@ -59,11 +77,17 @@ class ExcepcionesHorarioTenantController
             $excepcion = ExcepcionHorarioTenant::query()->create(['fecha' => $fecha, 'motivo' => $validado['motivo'] ?? null]);
         }
 
+        $cancelacion = null;
+        if ((bool) ($validado['cancelar_sesiones'] ?? false)) {
+            $actor = $request->attributes->get('usuario_tenant');
+            $cancelacion = $cancelar->cancelar($cancelar->delDia($fecha), $actor instanceof Usuario ? $actor : null);
+        }
+
         return response()->json(['data' => [
             'id' => $excepcion->ulid,
             'fecha' => $excepcion->fecha->toDateString(),
             'motivo' => $excepcion->motivo,
-        ]], 201);
+        ], 'meta' => ['cancelacion' => $cancelacion]], 201);
     }
 
     public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse

@@ -18,6 +18,11 @@ export default {
   agregar: "Agregar",
   pausar:
     "¿Pausar la membresía hasta el {fecha}? Mientras tanto no puede reservar.",
+  // En citas el saldo es de sesiones de un bono (ADR 0130).
+  recargarCitas:
+    "¿Agregar {n} sesiones a su bono? Queda en sus movimientos con el motivo.",
+  pausarCitas:
+    "¿Pausar el bono hasta el {fecha}? Mientras tanto no puede usarlo.",
   pausarAceptar: "Pausar",
   canjear: "¿Canjear la recompensa? Se le descuentan los puntos.",
   canjearAceptar: "Canjear",
@@ -62,6 +67,14 @@ export default {
       noPenaliza:
         "Su política no cobra las faltas: el crédito vuelve a su saldo.",
       sinCredito: "No usó créditos en esta reserva: su saldo no cambia.",
+      // En citas lo que se usa es una sesión de su bono (ADR 0130).
+      pierdeCitas:
+        "Pierde 1 sesión de su bono. | Pierde {n} sesiones de su bono.",
+      toleradaCitas:
+        "Esta falta entra en la tolerancia de su política: no pierde la sesión de su bono.",
+      noPenalizaCitas:
+        "Su política no cobra las faltas: la sesión vuelve a su bono.",
+      sinCreditoCitas: "No usó su bono en esta cita: su saldo no cambia.",
       // Lo mismo dice la app del equipo (cita_sheet y pase de lista).
       conservaAnticipo:
         "El anticipo de {monto} no se devuelve: el negocio lo conserva.",

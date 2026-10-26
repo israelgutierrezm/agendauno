@@ -79,6 +79,31 @@ class RespaldosEstudio
     }
 
     /**
+     * El respaldo más reciente de cada negocio, con un solo listado de la carpeta de
+     * respaldos (no uno por negocio: con cientos, abrir Operación no se acerca al límite
+     * de la petición). Por slug; los nombres llevan la fecha, el mayor es el último.
+     *
+     * @return array<string, string>
+     */
+    public function ultimosPorNegocio(): array
+    {
+        $raiz = rtrim($this->volcado->carpeta(''), '/');
+        $ultimos = [];
+        foreach ($this->volcado->disco()->allFiles($raiz) as $archivo) {
+            $partes = explode('/', substr($archivo, strlen($raiz) + 1));
+            if (count($partes) !== 2 || str_ends_with($archivo, VolcadoBaseDatos::SUMA) || str_ends_with($archivo, VolcadoBaseDatos::INVENTARIO)) {
+                continue;
+            }
+            $slug = $partes[0];
+            if (! isset($ultimos[$slug]) || strcmp($archivo, $ultimos[$slug]) > 0) {
+                $ultimos[$slug] = $archivo;
+            }
+        }
+
+        return $ultimos;
+    }
+
+    /**
      * Reemplaza la base del estudio con el respaldo dado (ruta en el disco),
      * comprobando antes su suma de verificación.
      */

@@ -22,6 +22,7 @@ import { confirmar } from "@/lib/confirmar";
 import { textoAlcance, type AlcancePlan } from "@/lib/cobertura";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
+import { claveSegunModalidad } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -133,8 +134,12 @@ const emit = defineEmits<{
   baja: [];
 }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas sus planes son bonos (ADR 0130): la variante «…Citas» si existe.
+function tm(clave: string): string {
+  return t(claveSegunModalidad(clave, sesion.esCitas, te));
+}
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -206,7 +211,12 @@ const visitas = computed(() => plural(sesion.terminologia.sesion));
 const pestanas = computed<{ clave: Pestana; texto: string }[]>(() => [
   { clave: "resumen" as const, texto: t("detalleMiembro.pestanas.resumen") },
   ...(puedeVerPlanes.value && conPlanes.value
-    ? [{ clave: "planes" as const, texto: t("detalleMiembro.pestanas.planes") }]
+    ? [
+        {
+          clave: "planes" as const,
+          texto: tm("detalleMiembro.pestanas.planes"),
+        },
+      ]
     : []),
   { clave: "historial" as const, texto: visitas.value },
   ...(ficha.value?.ordenes !== null && sesion.puede("ordenes.ver")
@@ -668,7 +678,7 @@ function colorAlerta(codigo: string): string {
               class="h-1.5 w-1.5 rounded-full"
               :style="{ background: colorAlerta(a) }"
               aria-hidden="true"
-            />{{ $t(`recepcion.alertas.${a}`) }}</span
+            />{{ tm(`recepcion.alertas.${a}`) }}</span
           >
         </p>
 
@@ -678,7 +688,7 @@ function colorAlerta(codigo: string): string {
             class="dm-tarjeta"
             data-prueba="plan-vigente"
           >
-            <h3 class="dm-titulo">{{ $t("detalleMiembro.plan.titulo") }}</h3>
+            <h3 class="dm-titulo">{{ tm("detalleMiembro.plan.titulo") }}</h3>
             <div class="dm-dato">
               <span class="dm-icono" aria-hidden="true"
                 ><IconoNav nombre="etiqueta" :tam="22"
@@ -686,7 +696,7 @@ function colorAlerta(codigo: string): string {
               <div class="min-w-0">
                 <p class="dm-valor">
                   {{
-                    resumen.membresia.plan ?? $t("detalleMiembro.plan.sinPlan")
+                    resumen.membresia.plan ?? tm("detalleMiembro.plan.sinPlan")
                   }}
                 </p>
                 <p v-if="planTexto" class="dm-suave">{{ planTexto }}</p>

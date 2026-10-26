@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EliminacionesTenant;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Integraciones\ValidarDestinoWebhook;
 use App\Modules\Tenancy\Models\EntregaWebhookTenant;
@@ -32,7 +33,8 @@ class WebhooksSalientesTenantController
 
         return response()->json([
             'data' => $webhooks->map(fn (WebhookSalienteTenant $w): array => $this->presentar($w))->all(),
-            'eventos_disponibles' => EventoDeDominioTenant::TIPOS,
+            // Los de la modalidad del negocio (en citas, sin membresías ni lista de espera).
+            'eventos_disponibles' => EventoDeDominioTenant::tiposPara(app(GestorDeConexionTenant::class)->actual()?->modalidad()),
         ]);
     }
 

@@ -32,6 +32,7 @@ use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CategoriasArticuloTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
+use App\Modules\Tenancy\Http\Controllers\CitaSinCuentaController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CobroDeCitaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ComplementosNegocioController;
@@ -149,6 +150,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteRentabilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteTendenciasTenantController;
+use App\Modules\Tenancy\Http\Controllers\ReprogramarCitaSinCuentaController;
 use App\Modules\Tenancy\Http\Controllers\ReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResenasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasPlataformaTenantController;
@@ -333,6 +335,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
         Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
         Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
+        // Reintentar crear la base de un negocio que se quedó a medias (ADR 0222).
+        Route::post('/estudios/{estudio}/aprovisionar', [PlataformaEstudiosController::class, 'aprovisionar'])->name('estudios.aprovisionar');
         // Dar de baja un negocio o revertir su baja (ADR 0213).
         Route::post('/estudios/{estudio}/baja', [PlataformaEstudiosController::class, 'darDeBaja'])->name('estudios.baja');
         Route::post('/estudios/{estudio}/revertir-baja', [PlataformaEstudiosController::class, 'revertirBaja'])->name('estudios.revertir-baja');
@@ -482,6 +486,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.disponibilidad');
         Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.dias');
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.agendar');
+        // La cita desde el enlace firmado de sus avisos, sin cuenta (ADR 0221): verla,
+        // cancelarla y cambiarla con las reglas de siempre.
+        Route::get('/citas/enlace/{reserva}', [CitaSinCuentaController::class, 'mostrar'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.enlace');
+        Route::post('/citas/enlace/{reserva}/cancelar', [CitaSinCuentaController::class, 'cancelar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.enlace.cancelar');
+        Route::get('/citas/enlace/{reserva}/reprogramar', [ReprogramarCitaSinCuentaController::class, 'opciones'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.enlace.reprogramar.opciones');
+        Route::post('/citas/enlace/{reserva}/reprogramar', [ReprogramarCitaSinCuentaController::class, 'reprogramar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.enlace.reprogramar');
         // Cuánto descuenta un cupón antes de agendar (ADR 0220).
         Route::get('/citas/cupon', [PublicoCitasController::class, 'cupon'])->middleware(['throttle:20,1,cupon-citas', 'modalidad:citas'])->name('citas.cupon');
         // Pagar y ver la orden de una sesión por el enlace del correo: también la clase
@@ -989,6 +999,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/sesiones/verificar', [AgendaTenantController::class, 'verificar'])->middleware('puede:agenda.gestionar')->name('sesiones.verificar');
             Route::post('/sesiones', [AgendaTenantController::class, 'crearSesion'])->middleware('puede:agenda.gestionar')->name('sesiones.store');
             Route::post('/sesiones/{sesion}/reprogramar', [ReprogramarTenantController::class, 'sesion'])->middleware('puede:agenda.gestionar')->name('sesiones.reprogramar');
+            // El cupo y la sala de una fecha ya programada (ADR 0223).
+            Route::put('/sesiones/{sesion}/cupo', [ReprogramarTenantController::class, 'cupo'])->middleware('puede:agenda.gestionar')->name('sesiones.cupo');
             Route::post('/sesiones/{sesion}/cancelar', [AgendaTenantController::class, 'cancelar'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelar');
             Route::get('/sesiones/{sesion}/cancelacion', [AgendaTenantController::class, 'previsualizarCancelacion'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelacion');
             // El negocio agenda una cita para un cliente (recepción/teléfono): confirmada,
@@ -1012,12 +1024,17 @@ Route::prefix('v1')->group(function (): void {
             // "Esta y las siguientes" (2.5), con vista previa.
             Route::post('/plantillas-horario/{plantilla}/cambiar', [PlantillasHorarioTenantController::class, 'cambiar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.cambiar');
             Route::post('/plantillas-horario/{plantilla}/generar', [PlantillasHorarioTenantController::class, 'generar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.generar');
+            // Hasta cuándo se repite y «cancelar esta y las siguientes» (ADR 0223).
+            Route::put('/plantillas-horario/{plantilla}/fin', [PlantillasHorarioTenantController::class, 'fin'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.fin');
+            Route::post('/plantillas-horario/{plantilla}/terminar', [PlantillasHorarioTenantController::class, 'terminar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.terminar');
             // Bloqueos (2.2): comida/vacaciones de un profesional, cierre de sede, sala en mantenimiento.
             Route::get('/bloqueos', [BloqueosAgendaTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('bloqueos.index');
             Route::post('/bloqueos/previsualizar', [BloqueosAgendaTenantController::class, 'previsualizar'])->middleware('puede:agenda.gestionar')->name('bloqueos.previsualizar');
             Route::post('/bloqueos', [BloqueosAgendaTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('bloqueos.store');
             Route::delete('/bloqueos/{bloqueo}', [BloqueosAgendaTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('bloqueos.eliminar');
             Route::get('/excepciones-horario', [ExcepcionesHorarioTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('excepciones-horario.index');
+            // Antes de cerrar un día: lo que ya estaba programado (ADR 0223).
+            Route::get('/excepciones-horario/afectadas', [ExcepcionesHorarioTenantController::class, 'afectadas'])->middleware('puede:agenda.gestionar')->name('excepciones-horario.afectadas');
             Route::post('/excepciones-horario', [ExcepcionesHorarioTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('excepciones-horario.store');
             Route::delete('/excepciones-horario/{excepcion}', [ExcepcionesHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('excepciones-horario.eliminar');
 
@@ -1025,6 +1042,7 @@ Route::prefix('v1')->group(function (): void {
             // sustitucion), esquema de pago por staff y nomina de un periodo.
             Route::get('/sesiones/{sesion}/staff', [StaffTenantController::class, 'staffDeSesion'])->middleware('puede:agenda.ver')->name('sesiones.staff.index');
             Route::post('/sesiones/{sesion}/staff', [StaffTenantController::class, 'asignar'])->middleware('puede:agenda.gestionar')->name('sesiones.staff.store');
+            Route::delete('/sesiones/{sesion}/staff/{usuario}', [StaffTenantController::class, 'quitar'])->middleware('puede:agenda.gestionar')->name('sesiones.staff.destroy');
             Route::put('/staff/{usuario}/esquema-pago', [StaffTenantController::class, 'esquemaPago'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('staff.esquema-pago');
             Route::get('/nomina', [StaffTenantController::class, 'nomina'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina');
             // Lo que lleva ganado el profesional: su comisión y sus propinas (ADR 0219).
@@ -1398,6 +1416,9 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware(['estudio.llave', 'throttle:tenant', 'plan:integraciones'])->prefix('integracion')->name('integracion.')->group(function (): void {
             Route::get('/miembros', [IntegracionApiTenantController::class, 'miembros'])->middleware('alcance:miembros.ver')->name('miembros');
             Route::get('/sesiones', [IntegracionApiTenantController::class, 'sesiones'])->middleware('alcance:agenda.ver')->name('sesiones');
+            Route::get('/reservas', [IntegracionApiTenantController::class, 'reservas'])->middleware('alcance:reservas.ver')->name('reservas');
+            Route::get('/derechos', [IntegracionApiTenantController::class, 'derechos'])->middleware('alcance:derechos.ver')->name('derechos');
+            Route::get('/ordenes', [IntegracionApiTenantController::class, 'ordenes'])->middleware('alcance:ordenes.ver')->name('ordenes');
         });
     };
 

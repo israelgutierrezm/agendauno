@@ -104,6 +104,8 @@ export default {
       captacion: "Captación",
       clientes: "Alumnos",
       membresias: "Membresías y catálogo",
+      // En citas lo que se vende son bonos (ADR 0130).
+      membresiasCitas: "Bonos y catálogo",
       cobros: "Cobros",
       punto_venta: "Punto de venta",
       equipo: "Equipo",
@@ -134,7 +136,10 @@ export default {
         gestionar: "Dar de alta y editar alumnos",
         eliminar: "Dar de baja alumnos",
       },
-      derechos: { ver: "Ver paquetes y créditos de cada alumno" },
+      derechos: {
+        ver: "Ver paquetes y créditos de cada alumno",
+        verCitas: "Ver los bonos de cada alumno",
+      },
       // La bandeja de WhatsApp e Instagram (ADR 0200).
       mensajes: {
         atender: "Leer y contestar los mensajes de WhatsApp e Instagram",
@@ -161,18 +166,28 @@ export default {
       },
       catalogo: {
         ver: "Ver clases y servicios",
+        verCitas: "Ver servicios",
         gestionar: "Crear y editar clases y servicios",
+        gestionarCitas: "Crear y editar servicios",
       },
       productos: {
         ver: "Ver planes y paquetes",
+        verCitas: "Ver bonos",
         gestionar: "Crear y editar planes y paquetes",
+        gestionarCitas: "Crear y editar bonos",
         eliminar: "Archivar planes y paquetes",
+        eliminarCitas: "Archivar bonos",
       },
       membresias: {
         gestionar: "Vender y administrar membresías",
+        gestionarCitas: "Vender y administrar bonos",
         cortesia: "Dar planes de cortesía (sin cobro)",
+        cortesiaCitas: "Dar bonos de cortesía (sin cobro)",
       },
-      creditos: { gestionar: "Ajustar créditos" },
+      creditos: {
+        gestionar: "Ajustar créditos",
+        gestionarCitas: "Ajustar las sesiones de los bonos",
+      },
       promociones: {
         gestionar: "Crear promociones",
         eliminar: "Borrar promociones",
@@ -388,6 +403,7 @@ export default {
     estadoAyudaAlumno:
       "Si es alumno activo del negocio (no se refiere a su cuenta).",
     plan: "Plan vigente",
+    planCitas: "Bono vigente",
     saldo: "Saldo",
     proxima: "Próxima reserva",
     estado: "Estado",
@@ -863,8 +879,10 @@ export default {
     subtitulo:
       "Membresías y paquetes por vencer o recién vencidos, para contactar a tiempo.",
     vacio: "No hay membresías por vencer ni recién vencidas.",
+    // En citas no hay membresías que renovar: bonos por vencer y a quién recuperar.
+    tituloCitas: "Retención",
     subtituloCitas:
-      "Bonos por vencer o recién vencidos, para contactar a tiempo.",
+      "Bonos por vencer o recién vencidos y a quién recuperar, para contactar a tiempo.",
     vacioCitas: "No hay bonos por vencer ni recién vencidos.",
     errorCarga:
       "No pudimos consultar las renovaciones. Intenta de nuevo en un momento.",

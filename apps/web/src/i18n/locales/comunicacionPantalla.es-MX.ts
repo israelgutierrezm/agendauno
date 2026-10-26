@@ -52,6 +52,8 @@ export default {
   areas: {
     reservas: "Reservas y asistencia",
     pagos: "Pagos y membresías",
+    // En citas no hay membresías (ADR 0104).
+    pagosCitas: "Pagos",
     cuenta: "Cuenta, privacidad y reseñas",
     prospectos: "Prospectos y mensajes",
     otros: "Otros avisos",

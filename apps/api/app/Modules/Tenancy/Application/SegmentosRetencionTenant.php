@@ -78,6 +78,8 @@ class SegmentosRetencionTenant
     {
         return match ($clave) {
             'vino_sin_comprar' => ! $citas,
+            // El cobro automático es de las membresías: en citas no hay (ADR 0104).
+            'pago_fallido' => ! $citas,
             'debe_regresar' => $citas,
             default => array_key_exists($clave, self::SEGMENTOS),
         };

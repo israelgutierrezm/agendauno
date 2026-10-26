@@ -1665,6 +1665,7 @@ onBeforeUnmount(() => {
                         :varias-sedes="variasSedes"
                         :marcar-primera-vez="gruposPrecios.length === 1"
                         :boton="tn('escaparate.planes.loQuiero')"
+                        :citas="usaCitas"
                         @elegir="
                           elegirPlan(p);
                           abrirAcceso('price_card', {

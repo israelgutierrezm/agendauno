@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\GrupoTenant;
 use App\Modules\Tenancy\Models\HorarioPlataformaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -52,7 +53,7 @@ class CambiarSerieTenant
     ) {}
 
     /**
-     * @param  array{dias_semana?: list<int>, hora_local?: string, duracion_minutos?: int, instructor_id?: int|null, recurso_id?: int|null}  $cambios
+     * @param  array{dias_semana?: list<int>, hora_local?: string, duracion_minutos?: int, instructor_id?: int|null, recurso_id?: int|null, capacidad?: int|null}  $cambios
      */
     public function desde(PlantillaHorarioTenant $plantilla, string $fecha, array $cambios, ?Usuario $actor, bool $aplicar): CambioDeSerie
     {
@@ -71,7 +72,7 @@ class CambiarSerieTenant
     }
 
     /**
-     * @param  array{dias_semana?: list<int>, hora_local?: string, duracion_minutos?: int, instructor_id?: int|null, recurso_id?: int|null}  $cambios
+     * @param  array{dias_semana?: list<int>, hora_local?: string, duracion_minutos?: int, instructor_id?: int|null, recurso_id?: int|null, capacidad?: int|null}  $cambios
      */
     private function aplicar(PlantillaHorarioTenant $plantilla, string $fecha, array $cambios, ?Usuario $actor): CambioDeSerie
     {
@@ -86,7 +87,7 @@ class CambiarSerieTenant
             throw ValidationException::withMessages(['desde' => ['Esa fecha ya no es de esta clase recurrente.']]);
         }
 
-        $nuevos = array_intersect_key($cambios, array_flip(['dias_semana', 'hora_local', 'duracion_minutos', 'instructor_id', 'recurso_id']));
+        $nuevos = array_intersect_key($cambios, array_flip(['dias_semana', 'hora_local', 'duracion_minutos', 'instructor_id', 'recurso_id', 'capacidad']));
         $cambianDias = isset($nuevos['dias_semana'])
             && $nuevos['dias_semana'] !== $this->dias($bloqueada);
         // Hasta dónde estaba generada: los días nuevos llegan igual de lejos.
@@ -98,6 +99,9 @@ class CambiarSerieTenant
             $serie->fill([...$nuevos, 'vigente_desde' => $fecha, 'vigente_hasta' => $bloqueada->vigente_hasta?->toDateString()]);
             $serie->save();
             $bloqueada->update(['vigente_hasta' => CarbonImmutable::parse($fecha)->subDay()->toDateString()]);
+            // Sus grupos siguen a las fechas que vienen: inscribir, dar de baja y las
+            // fechas nuevas reservan a los inscritos en la serie nueva.
+            GrupoTenant::query()->where('plantilla_id', $bloqueada->getKey())->update(['plantilla_id' => $serie->getKey()]);
         } else {
             $bloqueada->update($nuevos);
             $serie = $bloqueada;
@@ -147,6 +151,18 @@ class CambiarSerieTenant
                 $conservadas[] = ['fecha' => $dia, 'motivo' => $protegida];
 
                 continue;
+            }
+
+            // El cupo nuevo (ADR 0223), no por debajo de lo ya ocupado en esa fecha.
+            if (array_key_exists('capacidad', $nuevos)) {
+                $ocupadas = app(CupoDeSesionTenant::class)->ocupadas($sesion);
+                if ($nuevos['capacidad'] !== null && $nuevos['capacidad'] < $ocupadas) {
+                    $sesion->save();
+                    $conservadas[] = ['fecha' => $dia, 'motivo' => "Ya tiene {$ocupadas} lugares ocupados: no cabe el cupo nuevo."];
+
+                    continue;
+                }
+                $sesion->capacidad = $nuevos['capacidad'];
             }
 
             $inicia = CarbonImmutable::parse($dia.' '.$serie->hora_local, $zona)->utc();

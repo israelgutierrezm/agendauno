@@ -169,8 +169,13 @@ class AppServiceProvider extends ServiceProvider
         // pero sí varias peticiones seguidas de un teléfono al registrar sus pases.
         RateLimiter::for('wallet', fn (Request $request): Limit => Limit::perMinute(120)->by((string) $request->ip()));
 
-        // Superadmin: va antes de validar su token (para frenar a quien lo adivina).
-        RateLimiter::for('plataforma', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
+        // Superadmin: va antes de validar su token (para frenar a quien lo adivina). Cuenta
+        // por sesión: varios operadores detrás de una IP no se frenan entre sí; por IP, más
+        // holgado, para quien prueba muchos tokens.
+        RateLimiter::for('plataforma', fn (Request $request): array => [
+            Limit::perMinute(60)->by('sesion|'.hash('sha256', (string) ($request->bearerToken() ?? $request->ip()))),
+            Limit::perMinute(300)->by('ip|'.$request->ip()),
+        ]);
         // Entrar al superadmin (ADR 0126): pocos intentos por IP y por correo.
         RateLimiter::for('plataforma-acceso', fn (Request $request): array => [
             Limit::perMinute(20)->by('ip|'.$request->ip()),

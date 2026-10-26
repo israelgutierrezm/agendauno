@@ -22,6 +22,7 @@ import {
 } from "@/lib/planes";
 import { useContenedorEditor } from "@/lib/editorFormulario";
 import { opcionEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
+import { claveSegunModalidad } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -31,8 +32,17 @@ import { useToastStore } from "@/stores/toast";
  * dura, para qué sirve y si está a la venta; en el teléfono, una ficha por plan. Se
  * crean y editan en un diálogo (EditorPlan) con Guardar y Cancelar en su pie.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas lo que se vende son bonos de sesiones (ADR 0130): la variante «…Citas».
+function tm(
+  clave: string,
+  valores: Record<string, unknown> = {},
+  cuantos?: number,
+): string {
+  const llave = claveSegunModalidad(clave, sesion.esCitas, te);
+  return cuantos === undefined ? t(llave, valores) : t(llave, valores, cuantos);
+}
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeEditar = computed(() => sesion.puede("productos.gestionar"));
 
@@ -99,7 +109,7 @@ function clases(p: Plan): string {
     return t("planes.resumen.ilimitado");
   }
   const n = clasesDe(p.creditos_incluidos);
-  return t("planes.resumen.clases", { n }, n);
+  return tm("planes.resumen.clases", { n }, n);
 }
 function vigencia(p: Plan): string {
   if (p.tipo === "add_on") {
@@ -175,7 +185,7 @@ const indicadores = computed<Indicador[]>(() => {
   return [
     {
       clave: "venta",
-      etiqueta: t("planesVisual.kpi.aLaVenta"),
+      etiqueta: tm("planesVisual.kpi.aLaVenta"),
       valor: String(aLaVenta.length),
       icono: "etiqueta",
     },
@@ -278,8 +288,8 @@ onMounted(cargar);
 <template>
   <section class="tu-pagina">
     <EncabezadoSeccion
-      :titulo="$t('planes.titulo')"
-      :subtitulo="$t('planes.subtitulo')"
+      :titulo="tm('planes.titulo')"
+      :subtitulo="tm('planes.subtitulo')"
     >
       <template #acciones>
         <button
@@ -298,7 +308,7 @@ onMounted(cargar);
           data-prueba="nuevo-plan"
           @click="abrir(null)"
         >
-          {{ $t("planes.nuevo") }}
+          {{ tm("planes.nuevo") }}
         </button>
       </template>
     </EncabezadoSeccion>
@@ -322,7 +332,7 @@ onMounted(cargar);
       v-else-if="planes.length === 0"
       class="tu-card mt-6"
       icono="etiqueta"
-      :titulo="$t('planes.vacio')"
+      :titulo="tm('planes.vacio')"
     />
 
     <template v-else>
@@ -358,8 +368,8 @@ onMounted(cargar);
               v-model="busqueda"
               type="search"
               class="tu-input"
-              :placeholder="$t('planesVisual.buscar')"
-              :aria-label="$t('planesVisual.buscar')"
+              :placeholder="tm('planesVisual.buscar')"
+              :aria-label="tm('planesVisual.buscar')"
             />
           </label>
           <div
@@ -399,7 +409,7 @@ onMounted(cargar);
           <table class="tu-tabla">
             <thead>
               <tr>
-                <th>{{ $t("planesVisual.col.plan") }}</th>
+                <th>{{ tm("planesVisual.col.plan") }}</th>
                 <th class="text-right">{{ $t("planesVisual.col.precio") }}</th>
                 <th class="hidden sm:table-cell">
                   {{ $t("planesVisual.col.incluye") }}
@@ -425,7 +435,7 @@ onMounted(cargar);
                 :class="{ 'pv-archivado': p.archivado }"
                 data-prueba="plan"
               >
-                <td :data-etiqueta="$t('planesVisual.col.plan')">
+                <td :data-etiqueta="tm('planesVisual.col.plan')">
                   <!-- Tocar el nombre abre el plan, igual que «Editar». -->
                   <button
                     v-if="puedeEditar"
@@ -535,7 +545,7 @@ onMounted(cargar);
             </tbody>
           </table>
           <p v-if="visibles.length === 0" class="tu-sin-resultados">
-            {{ $t("planesVisual.sinResultados") }}
+            {{ tm("planesVisual.sinResultados") }}
           </p>
         </div>
       </div>
@@ -545,8 +555,8 @@ onMounted(cargar);
       :abierto="abierto"
       :titulo="
         editando
-          ? $t('planes.editor.tituloEditar')
-          : $t('planes.editor.tituloNuevo')
+          ? tm('planes.editor.tituloEditar')
+          : tm('planes.editor.tituloNuevo')
       "
       tam="xl"
       icono="etiqueta"

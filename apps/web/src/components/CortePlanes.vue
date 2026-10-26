@@ -5,7 +5,9 @@ import { useI18n } from "vue-i18n";
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { textoCobertura } from "@/lib/cobertura";
+import { claveSegunModalidad } from "@/lib/menu";
 import { fechaCorta } from "@/lib/planes";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * Corte de planes (ADR 0050): por cada paquete o membresía, qué incluía, sus clases
@@ -65,7 +67,12 @@ interface PlanCorte {
 }
 
 const props = defineProps<{ url: string; equipo?: boolean }>();
-const { t } = useI18n();
+const { t, te } = useI18n();
+const sesion = useSesionTenantStore();
+// En citas sus planes son bonos (ADR 0130): la variante «…Citas» si existe.
+function tm(clave: string): string {
+  return t(claveSegunModalidad(clave, sesion.esCitas, te));
+}
 
 const planes = ref<PlanCorte[]>([]);
 const cargando = ref(true);
@@ -236,7 +243,7 @@ defineExpose({ cargar });
 <template>
   <section class="tu-card p-5">
     <h2 class="font-semibold">
-      {{ equipo ? $t("planes.corte.tituloEquipo") : $t("planes.corte.titulo") }}
+      {{ equipo ? tm("planes.corte.tituloEquipo") : tm("planes.corte.titulo") }}
     </h2>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}

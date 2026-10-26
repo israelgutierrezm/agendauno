@@ -467,6 +467,40 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
 - `POST /pagos/{pago}/reembolsos` de un pago mixto pide `metodo` (la forma por la que
   sale), sin pasar de lo que entró por ella.
 
+## Agenda de clases completa (ADR 0223)
+
+- `POST /plantillas-horario/{p}/generar`: sin `hasta`, hasta el horizonte del negocio
+  (`agenda.dias_a_generar`). Una serie sin fecha final lleva `vigente_hasta = null`.
+- `PUT /plantillas-horario/{p}/fin` (`vigente_hasta` o null): solo la alarga (422 si
+  quedaría antes de sus fechas ya programadas); genera hasta el nuevo fin o el horizonte.
+- `POST /plantillas-horario/{p}/terminar` (`desde` ≥ hoy, `previsualizar`): con
+  `previsualizar` responde `{sesiones, reservas}`; sin él deja de repetirla desde `desde`
+  y cancela sus fechas programadas (`{canceladas, conservadas[]}`).
+- `GET /excepciones-horario/afectadas?fecha=` → `{sesiones, reservas}`; `POST
+  /excepciones-horario` acepta `cancelar_sesiones` y responde `meta.cancelacion`.
+- `POST /plantillas-horario/{p}/cambiar` acepta `capacidad` (null = sin tope); la fecha
+  con más ocupados que el cupo nuevo se conserva y se dice.
+- `PUT /sesiones/{s}/cupo` (`capacidad`, `recurso_id`; `agenda.gestionar`).
+- `GET /sesiones/{s}/reservas` trae `meta.libres` (null = sin tope).
+- `POST /sesiones/{s}/reservas` (el equipo) admite a quien llega tarde mientras dura la
+  clase; terminada, 422 «La sesion ya termino.».
+- `DELETE /sesiones/{s}/staff/{usuario}`; la asignación trae `usuario_id` y `sustituye_a`
+  por ULID.
+- API de integración: `GET /integracion/reservas` (`reservas.ver`), `/integracion/derechos`
+  (`derechos.ver`) y `/integracion/ordenes` (`ordenes.ver`), 200 registros como máximo.
+
+## Cita sin cuenta: cancelar o cambiar desde el enlace (ADR 0221)
+
+- Los avisos de una cita traen `{{enlace_cita}}`: `{web}/cita/{slug}/{reserva}?f={firma}`.
+- `GET /citas/enlace/{reserva}?f=`: la cita (`servicio`, `con`, `sucursal`, `direccion`,
+  `inicia_en`, `zona_horaria`, `estado`) y qué pasa si se cancela ahora (`cancelar`,
+  como `GET /mi/reservas/{reserva}/cancelacion`).
+- `POST /citas/enlace/{reserva}/cancelar` (`f`): la cancela como el cliente; fuera de
+  tiempo, 422 con el motivo.
+- `GET /citas/enlace/{reserva}/reprogramar?f=&fecha=` y `POST` (`f`, `inicia_en_local`):
+  como `/mi/reservas/{reserva}/reprogramar`.
+- Una firma que no corresponde responde 404. Solo en negocios de citas.
+
 ## Cupones en citas y en el mostrador (ADR 0220)
 
 - `cupon` (opcional, hasta 64 caracteres) en `POST /citas`, `POST /mi/citas`,
@@ -1312,6 +1346,14 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
 - Sesiones: `GET /plataforma/sesiones` (con `actual`) y `DELETE /plataforma/sesiones/{id}`.
 - `GET /plataforma/estudios`: `adeudos[]` por moneda (`{moneda, minor}`). La ficha trae
   `ultima_suspension`.
+- La ficha también trae `extender_prueba_max` (parámetro `negocios.dias_max_extender_prueba`;
+  `POST /plataforma/estudios/{e}/extender-prueba` no acepta más) y, en cada cargo,
+  `cobro_automatico` (`intentos`, `error`, `proximo_intento_en`) si la tarjeta lo rechazó
+  (ADR 0222).
+- `POST /plataforma/estudios/{e}/aprovisionar`: vuelve a intentar en la cola la base de un
+  negocio en `provisioning` (202); con su base creada, 422 (ADR 0222). En producción el
+  registro responde `provisioning` y la activación sale al terminar la cola.
+- El límite del superadmin cuenta por sesión (60 por minuto) y por IP (300).
 - `PUT /plataforma/pasarelas/stripe`: si las llaves cambian de modo, 409
   `GATEWAY_MODE_CHANGE_UNCONFIRMED` hasta mandar `confirmar_cambio_modo: true`.
 

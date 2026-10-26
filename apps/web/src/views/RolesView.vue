@@ -11,6 +11,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { filtrarOpciones } from "@/lib/buscable";
 import { confirmar } from "@/lib/confirmar";
 import { useEditorFormulario } from "@/lib/editorFormulario";
+import { claveSegunModalidad } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -95,12 +96,21 @@ function textoLegible(clave: string): string {
 }
 
 function etiquetaPermiso(clave: string): string {
-  const llave = `operacion.rolesPropios.permiso.${clave}`;
+  // En citas se venden bonos, no membresías (ADR 0130): su variante «…Citas».
+  const llave = claveSegunModalidad(
+    `operacion.rolesPropios.permiso.${clave}`,
+    sesion.esCitas,
+    te,
+  );
   return te(llave) ? t(llave) : textoLegible(clave);
 }
 
 function etiquetaGrupo(grupo: string): string {
-  const llave = `operacion.rolesPropios.grupos.${grupo}`;
+  const llave = claveSegunModalidad(
+    `operacion.rolesPropios.grupos.${grupo}`,
+    sesion.esCitas,
+    te,
+  );
   return te(llave) ? t(llave) : textoLegible(grupo);
 }
 

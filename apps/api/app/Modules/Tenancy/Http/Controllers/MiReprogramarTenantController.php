@@ -196,7 +196,8 @@ class MiReprogramarTenantController
         return $this->reprogramar->moverAClase($reserva, $destino, $actor);
     }
 
-    private function reservaPropia(Request $request): ReservaTenant
+    /** La reserva a cambiar; la cita del enlace, sin cuenta (ADR 0221), la resuelve otra. */
+    protected function reservaPropia(Request $request): ReservaTenant
     {
         // La suya o la de una persona a su cargo (B05).
         $persona = $this->cuenta->persona($request);

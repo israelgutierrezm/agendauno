@@ -512,6 +512,24 @@ describe("agenda pública por pasos", () => {
     vista.unmount();
   });
 
+  it("antes de agendar dice hasta cuándo se cancela o se cambia y ofrece el cupón (ADR 0220/0221)", async () => {
+    const conPolitica = opciones(1);
+    Object.assign(conPolitica.data.data, {
+      politica: { cancelar_horas: 12, cambiar_horas: 6, cambios: 1 },
+    });
+    api(conPolitica);
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    const politica = vista.get('[data-prueba="politica-cita"]').text();
+    expect(politica).toContain("cancelar hasta 12 h antes");
+    expect(politica).toContain("una vez hasta 6 h antes");
+    expect(vista.find('[data-prueba="campo-cupon"]').exists()).toBe(true);
+    vista.unmount();
+  });
+
   it("solo deja volver a los pasos hechos y no continúa sin hora", async () => {
     api(opciones(1));
     const vista = montar();

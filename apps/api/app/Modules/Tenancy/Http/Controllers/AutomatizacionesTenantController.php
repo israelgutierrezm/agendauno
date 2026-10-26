@@ -7,6 +7,8 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\ReglaAutomatizacionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +28,11 @@ class AutomatizacionesTenantController
         return response()->json([
             'data' => $reglas->map(fn (ReglaAutomatizacionTenant $r): array => $this->presentar($r))->all(),
             'catalogo' => [
-                'eventos' => array_map(fn (EventoAutomatizacion $e): string => $e->value, EventoAutomatizacion::cases()),
+                // Los de la modalidad del negocio (en citas, sin membresías ni lista de espera).
+                'eventos' => array_values(array_intersect(
+                    array_map(fn (EventoAutomatizacion $e): string => $e->value, EventoAutomatizacion::cases()),
+                    EventoDeDominioTenant::tiposPara(app(GestorDeConexionTenant::class)->actual()?->modalidad()),
+                )),
                 'acciones' => array_map(fn (AccionAutomatizacion $a): string => $a->value, AccionAutomatizacion::cases()),
             ],
         ]);

@@ -535,3 +535,24 @@ it('volver a inscribir a quien entra después por un cambio de grupo no le adela
     expect($this->getJson("{$app}/grupos/{$destino}/inscripciones", $dueno)->json('data.0.alta_desde'))->toBe($dia4)
         ->and(disponibleDeAlumnaEnGrupo($e, $beto['persona']))->toBe(13000);
 });
+
+it('al partir la serie («esta y las siguientes») el grupo la sigue: la baja cancela lo que viene', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $grupo = grupoConSesiones($e, $semilla);
+    $vp = venderPackAMiembroTenant($e, 8000);
+    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
+    $inscripcion = (string) $this->getJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones", conBearer($e['bearer']))->json('data.0.id');
+    $serie = (string) $this->getJson("/api/v1/app/{$e['slug']}/grupos", conBearer($e['bearer']))->json('data.0.plantilla_id');
+
+    // Desde el tercer día la clase cambia de hora: la serie se parte en dos.
+    $this->postJson("/api/v1/app/{$e['slug']}/plantillas-horario/{$serie}/cambiar", [
+        'desde' => Carbon::now()->addDays(3)->toDateString(), 'hora_local' => '19:00',
+    ], conBearer($e['bearer']))->assertOk();
+    expect($this->getJson("/api/v1/app/{$e['slug']}/grupos", conBearer($e['bearer']))->json('data.0.plantilla_id'))->not->toBe($serie);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/grupos/{$grupo}/inscripciones/{$inscripcion}/baja", [
+        'desde' => Carbon::now()->addDays(4)->toDateString(),
+    ], conBearer($e['bearer']))->assertOk()->assertJsonPath('meta.canceladas', 4);
+    expect(disponibleDeAlumnaEnGrupo($e, $vp['persona']))->toBe(5000);
+});

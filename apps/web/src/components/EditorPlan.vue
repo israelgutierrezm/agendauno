@@ -265,7 +265,14 @@ const resumen = computed<FilaResumen[]>(() => {
       ? t("planes.resumen.clases", { n: 1 }, 1)
       : esExtra.value
         ? ra("sumaClases", clasesN)
-        : t("planes.resumen.clases", { n: clasesN }, clasesN);
+        : t(
+            // Un bono (citas) incluye sesiones (ADR 0130).
+            esCitas.value
+              ? "planes.resumen.clasesCitas"
+              : "planes.resumen.clases",
+            { n: clasesN },
+            clasesN,
+          );
 
   let vigencia: string;
   if (esExtra.value) {

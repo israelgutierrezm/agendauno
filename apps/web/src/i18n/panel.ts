@@ -142,6 +142,7 @@ import datosNegocio from "./locales/datosNegocio.es-MX";
 import legalesNuevos from "./locales/legalesNuevos.es-MX";
 import misComisiones from "./locales/misComisiones.es-MX";
 import cupon from "./locales/cupon.es-MX";
+import citaSinCuenta from "./locales/citaSinCuenta.es-MX";
 
 export const mensajesPanel = {
   adminUsabilidad,
@@ -273,4 +274,5 @@ export const mensajesPanel = {
   legalesNuevos,
   misComisiones,
   cupon,
+  citaSinCuenta,
 };
