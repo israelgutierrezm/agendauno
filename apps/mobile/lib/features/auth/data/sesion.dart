@@ -248,6 +248,7 @@ class Sesion {
     this.whatsappClientes = false,
     this.accesoAbierto = false,
     this.facturaPosible = false,
+    this.descuentoContadoPct = 0,
   });
 
   final String slug;
@@ -318,6 +319,11 @@ class Sesion {
   /// plataforma lista)? Solo entonces el cliente guarda sus datos para facturar,
   /// como en la web (`factura_posible` y `facturacion_disponible` del negocio).
   final bool facturaPosible;
+
+  /// Precio por forma de pago (ADR 0191): el descuento (%) al cobrar en caja todo en
+  /// efectivo o por transferencia (`estudio.descuento_contado_pct`; 0 sin él). Se
+  /// dice antes de cobrar; lo aplica el servidor.
+  final int descuentoContadoPct;
 
   /// Estado del negocio en la plataforma (`estudio.estado`: trialing, active,
   /// suspended…; null si el API no lo mandó).
@@ -442,6 +448,7 @@ class Sesion {
     'whatsapp_clientes': whatsappClientes,
     'acceso_abierto': accesoAbierto,
     'factura_posible': facturaPosible,
+    'descuento_contado_pct': descuentoContadoPct,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -493,6 +500,7 @@ class Sesion {
       whatsappClientes: (datos['whatsapp_clientes'] ?? false) as bool,
       accesoAbierto: (datos['acceso_abierto'] ?? false) as bool,
       facturaPosible: (datos['factura_posible'] ?? false) as bool,
+      descuentoContadoPct: _porcentaje(datos['descuento_contado_pct']),
     );
   }
 
@@ -557,6 +565,7 @@ class Sesion {
       facturaPosible:
           estudio?['factura_posible'] == true &&
           estudio?['facturacion_disponible'] != false,
+      descuentoContadoPct: _porcentaje(estudio?['descuento_contado_pct']),
     );
   }
 
@@ -634,6 +643,10 @@ class Sesion {
         (estudio?['whatsapp_clientes'] ?? whatsappClientes) as bool,
     accesoAbierto: accesoAbierto,
     facturaPosible: facturaPosible,
+    descuentoContadoPct:
+        estudio != null && estudio.containsKey('descuento_contado_pct')
+        ? _porcentaje(estudio['descuento_contado_pct'])
+        : descuentoContadoPct,
   );
 
   /// La terminología que mandó el servidor (o la guardada); sin ella, null: la
@@ -650,6 +663,12 @@ class Sesion {
         ? color
         : null;
   }
+
+  /// Un porcentaje entero de 0 a 100; otro valor, 0.
+  static int _porcentaje(Object? valor) => switch (valor) {
+    final num n when n > 0 => n.toInt().clamp(0, 100),
+    _ => 0,
+  };
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.
   static String _version(Object? valor) =>

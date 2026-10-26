@@ -57,6 +57,13 @@ class AvisoAbierto extends Notifier<DestinoPush?> {
     state = DestinoPush.de(datos['tipo'] as String?);
   }
 
+  /// Lleva a [destino] sin notificación (p. ej. al volver del pago a Pagos).
+  void irA(DestinoPush destino) {
+    if (ref.read(sesionProvider) != null) {
+      state = destino;
+    }
+  }
+
   void atendido() => state = null;
 }
 

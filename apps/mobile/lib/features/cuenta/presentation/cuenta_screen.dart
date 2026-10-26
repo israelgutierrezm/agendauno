@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/error_de_carga.dart';
@@ -247,8 +248,30 @@ Future<void> pagarEnLinea(
   String ordenId, {
   String metodo = 'tarjeta',
   bool domiciliar = false,
+}) => _pagarEnLinea(
+  context,
+  ref.read,
+  ordenId,
+  metodo: metodo,
+  domiciliar: domiciliar,
+);
+
+/// Lo mismo, desde algo que ya no está en pantalla (p. ej. el aviso que queda al
+/// cerrar la hoja de agendar): con el contenedor de la app.
+Future<void> pagarEnLineaDesde(
+  BuildContext context,
+  ProviderContainer contenedor,
+  String ordenId,
+) => _pagarEnLinea(context, contenedor.read, ordenId);
+
+Future<void> _pagarEnLinea(
+  BuildContext context,
+  T Function<T>(ProviderListenable<T>) leer,
+  String ordenId, {
+  String metodo = 'tarjeta',
+  bool domiciliar = false,
 }) async {
-  final repo = ref.read(cuentaRepositoryProvider);
+  final repo = leer(cuentaRepositoryProvider);
   if (repo == null) {
     return;
   }
@@ -275,12 +298,12 @@ Future<void> pagarEnLinea(
           ),
         );
       case FichaDePago ficha:
-        await ref.read(cuentaProvider.notifier).recargar();
+        await leer(cuentaProvider.notifier).recargar();
         if (context.mounted) {
           await mostrarFichaDePago(context, ficha);
         }
       case PagoPorConfirmar():
-        await ref.read(cuentaProvider.notifier).recargar();
+        await leer(cuentaProvider.notifier).recargar();
         messenger.showSnackBar(
           const SnackBar(
             content: Text(

@@ -551,6 +551,19 @@ class ClaseMiembro {
   /// Se puede reservar (sin dato de cobertura, se intenta).
   bool get reservable => cobertura?.reservable ?? true;
 
+  /// Clase en línea (ADR 0184; `clase.en_linea`).
+  bool get enLinea => clase?.enLinea ?? false;
+
+  /// Clase en línea que se paga suelta: la app no la vende (contenido digital). Se
+  /// reserva con un plan que ya la incluya.
+  bool get pagoDigital =>
+      enLinea && ((clase?.dePago ?? false) || cobertura?.estado == 'de_pago');
+
+  /// Cómo queda para él, en una palabra: su cobertura o, si es en línea de pago,
+  /// solo que es en línea (sin precio ni invitación a comprar).
+  String? get coberturaTexto =>
+      pagoDigital ? 'Clase en línea' : cobertura?.texto;
+
   factory ClaseMiembro.desdeJson(Map<String, dynamic> j) {
     // Aquí solo hay clases; un API anterior no mandaba el tipo.
     if (j.containsKey('tipo') &&
@@ -732,11 +745,20 @@ class OrdenPorPagar {
     this.pagoEnProceso,
     this.estado = 'pendiente',
     this.fecha,
+    this.digital = false,
   });
 
   final String id;
   final String concepto;
   final int totalMinor;
+
+  /// Es de contenido digital (una clase en línea o videos; `digital` del API): la
+  /// app no lo cobra (reglas 3.1.1 y 3.1.3 de Apple).
+  final bool digital;
+
+  /// Lo que se dice en lugar de «Pagar» en una orden digital: un hecho, sin decir
+  /// dónde pagarla.
+  static const noSePagaAqui = 'Este pago no se hace desde la app.';
 
   /// La de la orden (la del negocio si no la trae).
   final String moneda;
@@ -839,6 +861,7 @@ class OrdenPorPagar {
           : null,
       estado: (j['estado'] as String?) ?? 'pendiente',
       fecha: HoraNegocio.pared(fecha, desfaseMin: desfaseMin),
+      digital: j['digital'] == true,
     );
   }
 }
@@ -1504,6 +1527,7 @@ class AntesDeReservar {
     this.lugaresTotal = 0,
     this.lugaresOcupados = const [],
     this.pasesInvitado = 0,
+    this.enLinea = false,
   });
 
   factory AntesDeReservar.desdeJson(Map<String, dynamic> j) {
@@ -1548,11 +1572,18 @@ class AntesDeReservar {
                 .toList()
           : const [],
       pasesInvitado: (j['pases_invitado'] as num? ?? 0).toInt(),
+      enLinea: j['en_linea'] == true,
     );
   }
 
   /// Pases de invitado que le quedan para esa clase (ADR 0182).
   final int pasesInvitado;
+
+  /// Clase en línea (ADR 0184).
+  final bool enLinea;
+
+  /// Reservarla sería pagar una clase en línea: la app no vende contenido digital.
+  bool get pagoDigital => enLinea && precioMinor != null;
 
   /// Lugares numerados de la clase (0 = no numera) y los ya tomados, sin decir por
   /// quién (B06).

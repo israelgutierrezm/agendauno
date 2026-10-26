@@ -1,6 +1,7 @@
 /// Un video de la biblioteca del negocio (ADR 0184), como lo da `GET /mi/videos`: los
-/// publicados, y el enlace solo de los que incluye uno de sus planes vigentes (de los
-/// demás, el título y qué plan los incluye).
+/// publicados, y el enlace solo de los que incluye uno de sus planes vigentes. La app
+/// no vende contenido digital (decisión del dueño, regla 3.1.1 de Apple): de los demás
+/// solo dice, sin invitar a comprar, que no están en sus planes.
 class VideoMiembro {
   const VideoMiembro({
     required this.id,
@@ -22,7 +23,8 @@ class VideoMiembro {
   final int? duracionMinutos;
   final String? categoria;
 
-  /// Los planes que lo incluyen (vacío: cualquier plan vigente).
+  /// Los planes que lo incluyen (vacío: cualquier plan vigente). La app no los
+  /// muestra: no invita a comprarlos.
   final List<String> planes;
 
   /// ¿Su plan lo incluye?
@@ -33,10 +35,9 @@ class VideoMiembro {
   bool get sePuedeVer =>
       disponible && url != null && Uri.tryParse(url!)?.scheme == 'https';
 
-  /// «Incluido en: Mensual, Pack 8.» o, sin planes, «con un plan vigente».
-  String get comoTenerlo => planes.isEmpty
-      ? 'Disponible con un plan vigente.'
-      : 'Incluido en: ${planes.join(', ')}.';
+  /// Lo que se dice de un video que sus planes no incluyen: un hecho, sin nombrar
+  /// planes ni decir dónde comprarlos (regla 3.1.3 de Apple).
+  static const noIncluido = 'No está incluido en tus planes.';
 
   factory VideoMiembro.desdeJson(Map<String, dynamic> j) => VideoMiembro(
     id: (j['id'] ?? '') as String,

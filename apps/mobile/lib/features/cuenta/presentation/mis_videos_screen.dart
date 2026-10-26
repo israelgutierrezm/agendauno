@@ -24,14 +24,12 @@ final videosProvider = FutureProvider.autoDispose<List<VideoMiembro>>((
   return repo.videos();
 });
 
-/// «Videos» (como en la web): los del negocio por categoría. Los que incluye su plan
-/// se abren (YouTube, Vimeo u otro sitio, en su app o en el navegador); de los demás,
-/// el título y qué plan los incluye, con un atajo a los planes.
+/// «Videos»: los del negocio por categoría. Los que incluye su plan se abren
+/// (YouTube, Vimeo u otro sitio, en su app o en el navegador). La app no vende
+/// contenido digital: de los demás, el título y que no está en sus planes, sin atajo
+/// a comprar ni a otro sitio (reglas 3.1.1 y 3.1.3 de Apple).
 class MisVideosScreen extends ConsumerWidget {
-  const MisVideosScreen({super.key, this.onVerPlanes});
-
-  /// Lleva a Pagos para comprar un plan que los incluya.
-  final VoidCallback? onVerPlanes;
+  const MisVideosScreen({super.key});
 
   Future<void> _abrir(BuildContext context, VideoMiembro v) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -116,24 +114,12 @@ class MisVideosScreen extends ConsumerWidget {
                               child: const Text('Ver video'),
                             )
                           else
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  v.comoTenerlo,
-                                  style: TextStyle(
-                                    color: context.colores.textoSuave,
-                                  ),
-                                ),
-                                if (onVerPlanes != null)
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                      onVerPlanes!();
-                                    },
-                                    child: const Text('Ver planes'),
-                                  ),
-                              ],
+                            Text(
+                              VideoMiembro.noIncluido,
+                              key: Key('no-incluido-${v.id}'),
+                              style: TextStyle(
+                                color: context.colores.textoSuave,
+                              ),
                             ),
                         ],
                       ),

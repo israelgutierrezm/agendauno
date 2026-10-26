@@ -10,6 +10,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/sesion_revocada.dart';
 import '../../../core/storage/almacen_sesion.dart';
 import '../../notificaciones/application/push_controller.dart';
+import '../data/directorio.dart';
 import '../data/sesion.dart';
 
 /// Sesión restaurada del almacén cifrado al abrir la app (la fija `main`).
@@ -24,17 +25,28 @@ enum MotivoFin {
   /// La plataforma pasó el negocio al otro producto (cambio de modalidad): ahora
   /// se entra con la otra app.
   otroProducto,
+
+  /// La persona eliminó su cuenta desde la app (el aviso dice qué sigue).
+  cuentaEliminada,
 }
 
 /// La sesión que el servidor dio por terminada: de qué negocio (slug) y por qué.
 class FinDeSesion {
-  const FinDeSesion(this.slug, [this.motivo = MotivoFin.sesion, this.producto]);
+  const FinDeSesion(
+    this.slug, [
+    this.motivo = MotivoFin.sesion,
+    this.producto,
+    this.mensaje,
+  ]);
 
   final String slug;
   final MotivoFin motivo;
 
   /// Con [MotivoFin.otroProducto]: la app con la que ahora se entra.
   final ProductoApp? producto;
+
+  /// Con [MotivoFin.cuentaEliminada]: lo que dijo el servidor.
+  final String? mensaje;
 }
 
 /// La sesión que el servidor dio por terminada, o null. El login avisa que la
@@ -48,7 +60,8 @@ class SesionTerminada extends Notifier<FinDeSesion?> {
     String slug, [
     MotivoFin motivo = MotivoFin.sesion,
     ProductoApp? producto,
-  ]) => state = FinDeSesion(slug, motivo, producto);
+    String? mensaje,
+  ]) => state = FinDeSesion(slug, motivo, producto, mensaje);
 
   void olvidar() => state = null;
 }
@@ -137,6 +150,22 @@ class SesionController extends Notifier<Sesion?> {
       data['app'] as Map<String, dynamic>?,
     );
     await ref.read(almacenSesionProvider).guardar(sesion.aJson());
+    // Entra rápido la próxima vez: queda entre sus negocios recientes (no en una
+    // marca blanca, que tiene el suyo fijo).
+    if (!AppConfig.marcaBlanca) {
+      unawaited(
+        ref
+            .read(negociosRecientesProvider)
+            .recordar(
+              NegocioDirectorio(
+                slug: slug,
+                nombre: (sesion.estudioNombre ?? '').trim().isEmpty
+                    ? slug
+                    : sesion.estudioNombre!.trim(),
+              ),
+            ),
+      );
+    }
     // Con más de un rol, primero «¿Cómo quieres entrar?».
     state = sesion.tieneVariosRoles
         ? sesion.conUsuario(const {}, eligiendoRol: true)
@@ -464,6 +493,72 @@ class SesionController extends Notifier<Sesion?> {
         ? await dio.post<Map<String, dynamic>>('$ruta/regenerar')
         : await dio.get<Map<String, dynamic>>(ruta);
     return (res.data?['data'] ?? {}) as Map<String, dynamic>;
+  }
+
+  /// Elimina su cuenta en este negocio (`POST /yo/eliminar-cuenta`, lo piden Apple y
+  /// Google para cualquier rol), confirmada con su contraseña. El servidor cierra
+  /// todas sus sesiones; aquí se borra del teléfono sin llamar a /logout y el acceso
+  /// dice lo que respondió el servidor. Si se niega (el único dueño, contraseña
+  /// mala, sin contraseña), lanza el [DioException] y la sesión sigue.
+  Future<void> eliminarCuenta(String password, {String? motivo}) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final razon = motivo?.trim();
+    final res = await ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/eliminar-cuenta',
+          data: {
+            'password': password,
+            if (razon != null && razon.isNotEmpty) 'motivo': razon,
+          },
+        );
+    final data = res.data?['data'];
+    final mensaje = data is Map ? data['mensaje'] as String? : null;
+    if (state?.bearer != actual.bearer) {
+      return;
+    }
+    ref.read(pushProvider).soltar();
+    ref.read(authTokenProvider.notifier).establecer(null);
+    ref
+        .read(sesionTerminadaProvider.notifier)
+        .avisar(
+          actual.slug,
+          MotivoFin.cuentaEliminada,
+          null,
+          mensaje ?? 'Tu cuenta quedó eliminada y ya no puedes entrar.',
+        );
+    state = null;
+    // Ya no es un negocio al que se entre con esta cuenta.
+    if (!AppConfig.marcaBlanca) {
+      unawaited(ref.read(negociosRecientesProvider).olvidar(actual.slug));
+    }
+    await ref.read(almacenSesionProvider).borrar();
+  }
+
+  /// Un enlace de un solo uso (2 minutos) que abre la web en [destino] (una ruta de
+  /// la web, p. ej. `/mi-perfil#mp-preferencias`) con esta misma sesión, para
+  /// lo que se hace allá. Null si el servidor no dio una dirección web.
+  Future<Uri?> enlaceWeb(String destino) async {
+    final actual = state;
+    if (actual == null) {
+      return null;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/enlace-web',
+          data: {'destino': destino},
+        );
+    final data = res.data?['data'];
+    final url = Uri.tryParse(data is Map ? (data['url'] as String? ?? '') : '');
+    return url != null &&
+            (url.scheme == 'https' || url.scheme == 'http') &&
+            url.host.isNotEmpty
+        ? url
+        : null;
   }
 
   /// Cierra la sesión: deja de recibir sus push, revoca el token en el servidor (si

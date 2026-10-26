@@ -10,6 +10,7 @@ import '../../auth/data/sesion.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
+import 'buscar_persona.dart';
 
 /// Lista de una clase para el pase de lista (por sesión).
 final rosterProvider = FutureProvider.autoDispose.family<ListaClase, String>((
@@ -23,8 +24,30 @@ final rosterProvider = FutureProvider.autoDispose.family<ListaClase, String>((
   return repo.roster(sesionId);
 });
 
-/// Pase de lista de una clase: quién llegó (botón grande por persona), con avisos de
-/// primera vez y adeudo. Cada toque registra la asistencia al momento.
+/// Lo que los clientes apartaron para recoger en la clase (ADR 0194), con el
+/// permiso de su ruta (pasar lista). Si no se pudo leer, nada: la lista sigue.
+final apartadosClaseProvider = FutureProvider.autoDispose
+    .family<List<ApartadoClase>, String>((ref, sesionId) async {
+      final repo = ref.watch(agendaRepositoryProvider);
+      final sesion = ref.watch(sesionProvider);
+      if (repo == null ||
+          sesion == null ||
+          sesion.esCitas ||
+          !sesion.puede('asistencia.marcar')) {
+        return const [];
+      }
+      try {
+        return await repo.apartados(sesionId);
+      } on Object {
+        return const [];
+      }
+    });
+
+/// Pase de lista de una clase, como el de la web: quién llegó (botón grande por
+/// persona), con avisos de primera vez y adeudo; los invitados de los clientes y
+/// quien reservó desde Wellhub, TotalPass o Fitpass (ocupan lugar: el cupo los
+/// cuenta); lo apartado para recoger; agregar a quien llegó sin reservar y la lista
+/// de espera. Cada toque registra la asistencia al momento.
 class PaseListaScreen extends ConsumerStatefulWidget {
   const PaseListaScreen({super.key, required this.sesion});
 
@@ -37,6 +60,18 @@ class PaseListaScreen extends ConsumerStatefulWidget {
 class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
   final _marcando = <String>{};
 
+  Terminologia get _terminos =>
+      ref.read(sesionProvider)?.terminologia ?? const Terminologia();
+
+  bool _puede(String permiso) =>
+      ref.watch(sesionProvider)?.puede(permiso) ?? false;
+
+  void _recargar() {
+    ref.invalidate(rosterProvider(widget.sesion.id));
+    ref.invalidate(apartadosClaseProvider(widget.sesion.id));
+    ref.invalidate(agendaProvider);
+  }
+
   Future<void> _terminarLista() async {
     final repo = ref.read(agendaRepositoryProvider);
     if (repo == null) {
@@ -45,8 +80,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     final mensajero = ScaffoldMessenger.of(context);
     try {
       final cuantos = await repo.terminarLista(widget.sesion.id);
-      ref.invalidate(rosterProvider(widget.sesion.id));
-      ref.invalidate(agendaProvider);
+      _recargar();
       mensajero.showSnackBar(
         SnackBar(
           content: Text(
@@ -69,8 +103,12 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     }
   }
 
-  /// Pregunta antes de algo que avisa a alguien o usa su plan.
-  Future<bool> _confirmar(String mensaje, String aceptar) async =>
+  /// Pregunta antes de algo que avisa a alguien, usa su plan o libera un lugar.
+  Future<bool> _confirmar(
+    String mensaje,
+    String aceptar, {
+    bool peligro = false,
+  }) async =>
       await showDialog<bool>(
         context: context,
         builder: (contexto) => AlertDialog(
@@ -81,6 +119,11 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
+              style: peligro
+                  ? FilledButton.styleFrom(
+                      backgroundColor: contexto.colores.error,
+                    )
+                  : null,
               onPressed: () => Navigator.of(contexto).pop(true),
               child: Text(aceptar),
             ),
@@ -100,8 +143,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     final mensajero = ScaffoldMessenger.of(context);
     try {
       final ok = await accion(repo);
-      ref.invalidate(rosterProvider(widget.sesion.id));
-      ref.invalidate(agendaProvider);
+      _recargar();
       if (ok != null) {
         mensajero.showSnackBar(SnackBar(content: Text(ok)));
       }
@@ -126,7 +168,8 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     await _hacer((r) async {
       final n = await r.promover(widget.sesion.id);
       return switch (n) {
-        0 => 'No hay a quién ofrecer en esta clase.',
+        0 =>
+          'No hay a quién ofrecer en esta ${_terminos.sesion.toLowerCase()}.',
         1 => 'Se ofreció 1 lugar a la lista de espera.',
         _ => 'Se ofrecieron $n lugares a la lista de espera.',
       };
@@ -135,9 +178,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
 
   /// Aceptar a su nombre confirma su lugar y usa su plan: se confirma antes.
   Future<void> _aceptar(Asistente a) async {
-    final clase =
-        (ref.read(sesionProvider)?.terminologia ?? const Terminologia()).sesion
-            .toLowerCase();
+    final clase = _terminos.sesion.toLowerCase();
     if (!await _confirmar(
       '¿Aceptar el lugar a nombre de ${a.nombre}? Queda confirmado en la $clase '
           'y se usa su plan, como si lo hubiera aceptado.',
@@ -194,23 +235,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
             '¿Marcar que ${a.nombre} no vino? '
             '${efecto?.texto ?? 'Según la política del negocio, puede perder el crédito.'}';
       }
-      final seguir = await showDialog<bool>(
-        context: context,
-        builder: (contexto) => AlertDialog(
-          content: Text(mensaje),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(contexto).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(contexto).pop(true),
-              child: Text(nombre(estado)),
-            ),
-          ],
-        ),
-      );
-      if (seguir != true || !mounted) {
+      if (!await _confirmar(mensaje, nombre(estado)) || !mounted) {
         return;
       }
     }
@@ -218,8 +243,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     final mensajero = ScaffoldMessenger.of(context);
     try {
       await repo.marcarAsistencia(a.reservaId, estado, retardo: retardo);
-      ref.invalidate(rosterProvider(widget.sesion.id));
-      ref.invalidate(agendaProvider);
+      _recargar();
     } on DioException catch (e) {
       mensajero.showSnackBar(
         SnackBar(
@@ -233,11 +257,96 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     }
   }
 
+  /// Un invitado llegó o no vino (no usa créditos de nadie: usó un pase).
+  Future<void> _marcarInvitado(InvitadoClase i, bool asistio) async {
+    setState(() => _marcando.add(i.id));
+    await _hacer((r) async {
+      await r.marcarInvitado(i.id, asistio: asistio);
+      return null;
+    });
+    if (mounted) {
+      setState(() => _marcando.remove(i.id));
+    }
+  }
+
+  /// Llegó quien reservó desde su plataforma. Fitpass pide revisar su
+  /// identificación oficial antes.
+  Future<void> _llegoDePlataforma(LugarPlataforma l) async {
+    if (l.pideIdentificacion &&
+        !await _confirmar(
+          'Fitpass pide revisar la identificación oficial de quien llega. '
+              '¿Ya la revisaste?',
+          'Sí, la revisé',
+        )) {
+      return;
+    }
+    setState(() => _marcando.add(l.id));
+    await _hacer((r) async {
+      await r.llegoDePlataforma(
+        l.id,
+        identificacionRevisada: l.pideIdentificacion,
+      );
+      return null;
+    });
+    if (mounted) {
+      setState(() => _marcando.remove(l.id));
+    }
+  }
+
+  /// Cancela la reserva de la plataforma: le avisa y el lugar queda libre.
+  Future<void> _cancelarDePlataforma(LugarPlataforma l) async {
+    if (!await _confirmar(
+      '¿Cancelar la reserva de ${l.nombreVisible} (${l.proveedorNombre})? '
+          'La plataforma le avisará que su reserva se canceló y el lugar queda '
+          'libre.',
+      'Cancelar reserva',
+      peligro: true,
+    )) {
+      return;
+    }
+    await _hacer((r) async {
+      await r.cancelarDePlataforma(l.id);
+      return 'Reserva de ${l.nombreVisible} cancelada.';
+    });
+  }
+
+  /// Agregar a quien llegó sin reservar (como en la web): se busca y se reserva
+  /// con su plan; si ya no hay lugar, entra a la lista de espera.
+  Future<void> _agregar({required bool llena}) async {
+    final mensajero = ScaffoldMessenger.of(context);
+    final agregado = await showModalBottomSheet<({String nombre, bool espera})>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => AgregarAClaseSheet(
+        sesionId: widget.sesion.id,
+        llena: llena,
+        terminos: _terminos,
+      ),
+    );
+    if (agregado == null || !mounted) {
+      return;
+    }
+    _recargar();
+    mensajero.showSnackBar(
+      SnackBar(
+        content: Text(
+          agregado.espera
+              ? '${agregado.nombre} quedó en la lista de espera.'
+              : '${agregado.nombre} se agregó a la ${_terminos.sesion.toLowerCase()}.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.sesion;
     final tono = TonoServicio.de(s.ofertaId).en(context.colores);
     final roster = ref.watch(rosterProvider(s.id));
+    final terminos =
+        ref.watch(sesionProvider)?.terminologia ?? const Terminologia();
+    final apartados = ref.watch(apartadosClaseProvider(s.id)).value ?? const [];
     String hhmm(DateTime d) =>
         '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
@@ -256,11 +365,19 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
         data: (lista) {
           final enSala = lista.asistentes.where((a) => a.enSala).toList();
           final enEspera = lista.asistentes.where((a) => !a.enSala).toList();
-          final llegaron = enSala.where((a) => a.llego).length;
           final abierta = lista.abierta(DateTime.now());
-          final gestionar =
-              ref.watch(sesionProvider)?.puede('reservas.gestionar') ?? false;
-          final libres = (s.capacidad ?? 0) - enSala.length;
+          final cancelada = lista.cancelada || s.estado == 'cancelada';
+          final gestionar = _puede('reservas.gestionar') && !cancelada;
+          final marcar = _puede('asistencia.marcar') && !cancelada;
+          // El cupo cuadra con la lista: reservas, invitados y plataformas.
+          final libres = lista.libres(s.capacidad);
+          // Quién ocupa lugar y si ya llegó, para la barra de avance.
+          final llegadas = [
+            for (final a in enSala) a.llego,
+            for (final i in lista.invitados.where((i) => i.ocupaLugar)) i.llego,
+            for (final l in lista.plataforma.where((l) => l.ocupaLugar))
+              l.llego,
+          ];
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
@@ -308,12 +425,19 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                             ],
                           ),
                         ),
-                        Text(
-                          '$llegaron/${enSala.length}',
-                          style: TextStyle(
-                            color: tono.tinta,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
+                        Semantics(
+                          label:
+                              'Llegaron ${lista.llegaron} de ${lista.ocupan}',
+                          child: ExcludeSemantics(
+                            child: Text(
+                              '${lista.llegaron}/${lista.ocupan}',
+                              key: const Key('llegaron-de'),
+                              style: TextStyle(
+                                color: tono.tinta,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -321,7 +445,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        for (final a in enSala)
+                        for (final llego in llegadas)
                           Expanded(
                             child: Container(
                               height: 8,
@@ -329,7 +453,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                                 horizontal: 1.5,
                               ),
                               decoration: BoxDecoration(
-                                color: a.llego
+                                color: llego
                                     ? context.colores.exito
                                     : context.colores.superficie.withValues(
                                         alpha: 0.85,
@@ -340,10 +464,33 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                           ),
                       ],
                     ),
+                    if (libres != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        libres == 0
+                            ? 'Llena'
+                            : (libres == 1
+                                  ? '1 lugar libre'
+                                  : '$libres lugares libres'),
+                        key: const Key('lugares-libres'),
+                        style: TextStyle(
+                          color: tono.tinta,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 12),
+              if (cancelada)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Esta ${terminos.sesion.toLowerCase()} se canceló.',
+                    style: TextStyle(color: context.colores.error),
+                  ),
+                ),
               // Antes de la ventana (ADR 0101), la lista aún no se pasa.
               if (!abierta && lista.asistenciaDesde != null)
                 Padding(
@@ -353,11 +500,28 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                     style: TextStyle(color: context.colores.textoSuave),
                   ),
                 ),
-              if (enSala.isEmpty)
+              // Quien llegó sin reservar (como en la web), con el permiso de
+              // reservar.
+              if (gestionar)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton.icon(
+                      key: const Key('agregar-a-clase'),
+                      onPressed: () => _agregar(llena: libres == 0),
+                      icon: const Icon(Icons.person_add_alt),
+                      label: Text('Agregar ${terminos.miembro.toLowerCase()}'),
+                    ),
+                  ),
+                ),
+              if (enSala.isEmpty &&
+                  lista.invitados.isEmpty &&
+                  lista.plataforma.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    'Nadie reservó esta ${(ref.watch(sesionProvider)?.terminologia ?? const Terminologia()).sesion.toLowerCase()} todavía.',
+                    'Nadie reservó esta ${terminos.sesion.toLowerCase()} todavía.',
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -365,22 +529,129 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                 _fila(
                   a,
                   abierta: abierta,
+                  marcar: marcar,
                   // Empezada la clase, ya no se ofrecen ni se aceptan lugares: el
                   // servidor lo rechaza (ADR 0095).
                   gestionar: gestionar && !lista.empezo,
+                ),
+              // Invitados de los clientes (ADR 0182): no son clientes, ocupan
+              // lugar.
+              if (lista.invitados.isNotEmpty)
+                _Seccion(
+                  key: const Key('invitados-clase'),
+                  titulo: 'Invitados · ${lista.invitados.length}',
+                  ayuda:
+                      'Vienen con el pase de invitado de un ${terminos.miembro.toLowerCase()}: '
+                      'ocupan lugar y no son ${terminos.miembros.toLowerCase()}.',
+                  hijos: [
+                    for (final i in lista.invitados)
+                      _FilaVisitante(
+                        key: ValueKey('invitado-${i.id}'),
+                        nombre: i.nombre,
+                        detalle: i.anfitrion == null
+                            ? null
+                            : 'invitado de ${i.anfitrion}',
+                        estado: i.estadoTexto,
+                        ocupado: _marcando.contains(i.id),
+                        acciones: [
+                          if (marcar && abierta) ...[
+                            TextButton(
+                              onPressed:
+                                  i.estado == 'asistio' ||
+                                      _marcando.contains(i.id)
+                                  ? null
+                                  : () => _marcarInvitado(i, true),
+                              child: const Text('Llegó'),
+                            ),
+                            TextButton(
+                              onPressed:
+                                  i.estado == 'no_asistio' ||
+                                      _marcando.contains(i.id)
+                                  ? null
+                                  : () => _marcarInvitado(i, false),
+                              child: const Text('No vino'),
+                            ),
+                          ],
+                        ],
+                      ),
+                  ],
+                ),
+              // Reservas desde la app de una plataforma (ADR 0202).
+              if (lista.plataforma.isNotEmpty)
+                _Seccion(
+                  key: const Key('plataforma-clase'),
+                  titulo:
+                      'Reservas de plataformas · ${lista.plataforma.length}',
+                  ayuda:
+                      'Reservaron desde la app de su plataforma: ocupan lugar y no '
+                      'son ${terminos.miembros.toLowerCase()} del negocio.',
+                  hijos: [
+                    for (final l in lista.plataforma)
+                      _FilaVisitante(
+                        key: ValueKey('plataforma-${l.id}'),
+                        nombre: l.nombreVisible,
+                        detalle: l.proveedorNombre,
+                        estado: l.estadoTexto,
+                        ocupado: _marcando.contains(l.id),
+                        acciones: [
+                          if (l.porMarcar &&
+                              !cancelada &&
+                              _puede('checkins.registrar'))
+                            l.puedeMarcar
+                                ? TextButton(
+                                    onPressed: _marcando.contains(l.id)
+                                        ? null
+                                        : () => _llegoDePlataforma(l),
+                                    child: const Text('Llegó'),
+                                  )
+                                : Text(
+                                    'Hace check-in en su app',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: context.colores.textoSuave,
+                                    ),
+                                  ),
+                          if (l.porMarcar && gestionar)
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: context.colores.error,
+                              ),
+                              onPressed: _marcando.contains(l.id)
+                                  ? null
+                                  : () => _cancelarDePlataforma(l),
+                              child: const Text('Cancelar reserva'),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+              // Lo apartado para recoger (ADR 0194): se cobra en el mostrador.
+              if (apartados.isNotEmpty)
+                _Seccion(
+                  key: const Key('apartados-clase'),
+                  titulo:
+                      'Apartados para recoger · ${ApartadoClase.porPersona(apartados).length}',
+                  ayuda: 'Se pagan en el mostrador al entregarlos.',
+                  hijos: [
+                    for (final grupo in ApartadoClase.porPersona(apartados))
+                      _FilaVisitante(
+                        key: ValueKey('apartado-${grupo.first.id}'),
+                        nombre: grupo.first.persona ?? '—',
+                        detalle: grupo.map((a) => a.texto).join(' · '),
+                      ),
+                  ],
                 ),
               // Lista de espera: en su orden; al liberarse un lugar se ofrece así.
               if (enEspera.isNotEmpty)
                 _ListaEspera(
                   personas: enEspera,
-                  onPromover: gestionar && libres > 0 && !lista.empezo
+                  onPromover: gestionar && (libres ?? 0) > 0 && !lista.empezo
                       ? _promover
                       : null,
                 ),
               // Ya empezada la clase (lo dice el servidor): quien sigue sin registro
               // queda como «no vino».
-              if ((ref.watch(sesionProvider)?.puede('asistencia.marcar') ??
-                      false) &&
+              if (marcar &&
                   lista.empezo &&
                   enSala.any(
                     (a) => a.estado == 'confirmada' && a.asistencia == null,
@@ -399,13 +670,15 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     );
   }
 
-  Widget _fila(Asistente a, {required bool abierta, required bool gestionar}) {
+  Widget _fila(
+    Asistente a, {
+    required bool abierta,
+    required bool marcar,
+    required bool gestionar,
+  }) {
     // Sin permiso de marcar asistencia, la lista solo se consulta; y solo se marca a
     // quien tiene su lugar confirmado, desde que se abre la lista.
-    final puedeMarcar =
-        (ref.watch(sesionProvider)?.puede('asistencia.marcar') ?? false) &&
-        a.marcable &&
-        abierta;
+    final puedeMarcar = marcar && a.marcable && abierta;
     final ocupado = _marcando.contains(a.reservaId);
     return Card(
       elevation: 0,
@@ -534,6 +807,102 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
   }
 }
 
+/// Una sección de la lista con su título y su ayuda (invitados, plataformas,
+/// apartados), en el mismo estilo de la lista de espera.
+class _Seccion extends StatelessWidget {
+  const _Seccion({
+    super.key,
+    required this.titulo,
+    required this.ayuda,
+    required this.hijos,
+  });
+
+  final String titulo;
+  final String ayuda;
+  final List<Widget> hijos;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    elevation: 0,
+    color: context.colores.superficie,
+    margin: const EdgeInsets.only(top: 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(
+            ayuda,
+            style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
+          ),
+          const SizedBox(height: 6),
+          ...hijos,
+        ],
+      ),
+    ),
+  );
+}
+
+/// Un renglón de un invitado, un visitante de plataforma o un apartado: quién, de
+/// dónde o qué, cómo va y sus acciones.
+class _FilaVisitante extends StatelessWidget {
+  const _FilaVisitante({
+    super.key,
+    required this.nombre,
+    this.detalle,
+    this.estado,
+    this.ocupado = false,
+    this.acciones = const [],
+  });
+
+  final String nombre;
+  final String? detalle;
+  final String? estado;
+  final bool ocupado;
+  final List<Widget> acciones;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                nombre,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (ocupado)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (estado != null)
+              Text(estado!, style: const TextStyle(fontSize: 13)),
+          ],
+        ),
+        if (detalle != null)
+          Text(
+            detalle!,
+            style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
+          ),
+        if (acciones.isNotEmpty)
+          Wrap(
+            spacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: acciones,
+          ),
+      ],
+    ),
+  );
+}
+
 /// La lista de espera de la clase, en su orden, y «Ofrecer lugares» si hay libres
 /// y se pueden gestionar reservas.
 class _ListaEspera extends StatelessWidget {
@@ -583,4 +952,153 @@ class _ListaEspera extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Agregar a la clase a quien llegó sin reservar (`POST /sesiones/{id}/reservas`,
+/// como en la web): se busca, se elige y se reserva con su plan. Si la clase está
+/// llena, entra a la lista de espera. Otro toque o una respuesta perdida no la
+/// agrega dos veces (clave del intento, ADR 0201). Cierra con su nombre y si quedó
+/// en espera.
+class AgregarAClaseSheet extends ConsumerStatefulWidget {
+  const AgregarAClaseSheet({
+    super.key,
+    required this.sesionId,
+    required this.llena,
+    this.terminos = const Terminologia(),
+  });
+
+  final String sesionId;
+  final bool llena;
+  final Terminologia terminos;
+
+  @override
+  ConsumerState<AgregarAClaseSheet> createState() => _AgregarAClaseSheetState();
+}
+
+class _AgregarAClaseSheetState extends ConsumerState<AgregarAClaseSheet> {
+  ClienteAgenda? _persona;
+  var _guardando = false;
+  String? _error;
+
+  Future<void> _agregar() async {
+    final persona = _persona;
+    final repo = ref.read(agendaRepositoryProvider);
+    if (persona == null || repo == null || _guardando) {
+      return;
+    }
+    setState(() {
+      _guardando = true;
+      _error = null;
+    });
+    try {
+      await repo.agregarAClase(
+        widget.sesionId,
+        persona.id,
+        esperar: widget.llena,
+      );
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).pop((nombre: persona.nombre, espera: widget.llena));
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = mensajeDeError(e, porDefecto: 'No se pudo agregar.');
+          _guardando = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clase = widget.terminos.sesion.toLowerCase();
+    final miembro = widget.terminos.miembro.toLowerCase();
+    final persona = _persona;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Agregar a la $clase',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'El $miembro que llegó sin reservar. Se reserva con su plan, '
+                'como cualquier reserva.',
+                style: TextStyle(color: context.colores.textoSuave),
+              ),
+              const SizedBox(height: 12),
+              if (persona == null)
+                BuscarPersona(
+                  habilitado: !_guardando,
+                  onElegir: (c) => setState(() {
+                    _persona = c;
+                    _error = null;
+                  }),
+                )
+              else
+                ListTile(
+                  key: const Key('persona-elegida'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.person_outline),
+                  title: Text(persona.nombre),
+                  subtitle: persona.detalle == null
+                      ? null
+                      : Text(persona.detalle!),
+                  trailing: TextButton(
+                    onPressed: _guardando
+                        ? null
+                        : () => setState(() => _persona = null),
+                    child: const Text('Cambiar'),
+                  ),
+                ),
+              if (widget.llena)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'La $clase está llena: entrará a la lista de espera.',
+                    style: TextStyle(color: context.colores.aviso),
+                  ),
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: context.colores.error),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              FilledButton(
+                key: const Key('confirmar-agregar'),
+                onPressed: persona == null || _guardando ? null : _agregar,
+                child: Text(
+                  _guardando
+                      ? 'Agregando…'
+                      : widget.llena
+                      ? 'Agregar a la lista de espera'
+                      : 'Agregar a la $clase',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

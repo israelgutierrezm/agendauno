@@ -13,8 +13,10 @@ pantalla del rol activo:
 | Rol activo | Pantalla | Qué hace |
 |---|---|---|
 | Alumno o cliente (`miembro`) | `CuentaScreen` | Inicio, reservar clases o agendar citas, reprogramar y cancelar, comprar planes, pagos y pago automático, pase QR, expediente y documentos, privacidad |
-| Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista, su agenda |
-| Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Inicio del día, la agenda, crear y reprogramar citas, escanear el pase QR, la caja y la bandeja de mensajes, según sus permisos |
+| Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista, su agenda y sus bloqueos |
+| Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Inicio del día, la agenda (con bloqueos), crear y reprogramar citas, el pase de lista completo, escanear el pase QR, cobrar lo pendiente y vender un plan, la caja y la bandeja de mensajes, según sus permisos |
+
+Cualquier rol puede **eliminar su cuenta** desde Perfil (ver «Eliminar la cuenta»).
 
 La app del equipo es la operación del día:
 - **Agenda** (`features/agenda`): pase de lista y, en citas, llegada, cobro en caja y
@@ -25,12 +27,30 @@ La app del equipo es la operación del día:
   (`ReprogramarCitaSheet`); el servidor revalida el horario.
 - **Escanear el pase QR** en la entrada (`features/acceso`), en los negocios que
   controlan la entrada (acceso libre, ADR 0105).
+- **Bloqueos** (TurnoUno, `agenda/presentation/bloqueos_agenda.dart`): la línea de
+  tiempo del profesional muestra sus bloqueos (comida, ausencia, vacaciones; los de
+  su Google u Outlook) y los cierres de sede. Con `agenda.gestionar` se crean por
+  horas o por días completos; antes de guardar, la vista previa
+  (`/bloqueos/previsualizar`) dice qué citas ya agendadas caen ahí (no se cancelan).
+  Con `agenda.eliminar` se quitan (los del calendario de la persona, allá).
 - **Caja de la sucursal** (`features/caja`, ADR 0175): abrirla con su fondo, retiros e
   ingresos de efectivo y el cierre con conteo a ciegas.
-- **Bandeja** (`features/bandeja`, ADR 0200): WhatsApp, Instagram y Messenger.
+- **Cobrar y vender** (`features/ventas`): desde «Pendientes» del Inicio, «Por cobrar»
+  lista lo pendiente (`GET /ordenes?estado=pendiente`, `ordenes.ver`) y registra el
+  pago en caja como la web (`POST /ordenes/{id}/liquidar`, `ordenes.gestionar`): forma
+  de pago, sede donde se cobra (con varias, se elige) y referencia; todo en efectivo o
+  por transferencia dice antes el precio de contado (ADR 0191,
+  `estudio.descuento_contado_pct`). «Vender» (con `productos.ver`) es la venta rápida
+  de un plan: persona, plan (bono en TurnoUno), inscripción si le toca, condiciones de
+  permanencia, forma de pago y sede; se vende y se cobra de una vez
+  (`POST /ordenes` con `liquidar` y la clave del intento).
+- **Bandeja** (`features/bandeja`, ADR 0200): WhatsApp, Instagram y Messenger, de 30 en
+  30 conversaciones, los mensajes anteriores por tandas (`hay_anteriores`) y, por
+  WhatsApp fuera de las 24 horas, una plantilla aprobada con sus datos y su vista
+  previa (`/bandeja/plantillas`).
 
-Siguen en la web: agregar a alguien a una clase desde la agenda, registrar las visitas
-de Wellhub/TotalPass y la administración (catálogo, reportes, configuración).
+Siguen en la web: capturar las reservas de Fitpass, cobrar en el mostrador lo apartado
+para una clase y la administración (catálogo, reportes, configuración).
 
 **Cuenta del cliente** (`features/cuenta`, ADR 0133), como en la web:
 - Por pagar:
@@ -41,10 +61,32 @@ de Wellhub/TotalPass y la administración (catálogo, reportes, configuración).
 - La inscripción, antes de comprar.
 - Las fichas de datos (formularios) en el Expediente.
 - En citas, la pestaña dice «Citas» y nada dice «reserva» ni «clase»: cancelar,
-  cambiar de horario, el Inicio, el calendario y el widget hablan de citas.
+  cambiar de horario, el Inicio, el calendario y el widget hablan de citas. Lo que
+  pasa al no asistir habla de su cita y su bono («Pierde 1 cita de su bono»), y el
+  corte del bono dice «Agendadas», no «Reservadas».
+- Al agendar una cita que se paga para apartarla (o con anticipo), el aviso trae
+  «Pagar ahora» si el negocio cobra en línea.
+- En el Expediente sube fotos o un PDF (el selector del sistema, sin permisos; hasta
+  8 MB como el servidor; canal `agendauno/archivos`, método `elegirPdf`).
+- El pase de la cartera se renueva («Si pierdes tu teléfono, renuévalo»;
+  `POST /mi/pase/wallet/renovar`).
+- «Págala en el negocio o desde la web» solo si el negocio cobra en línea.
 
-**Pase de lista:** la lista de espera en su orden, «Ofrecer lugares» y aceptar el
-lugar ofrecido a nombre de la persona.
+**Pase de lista** (clases, `agenda/presentation/pase_lista_screen.dart`), como la web:
+- quien reservó, con «Llegó», «Llegó tarde» y «No vino» (con su efecto);
+- los invitados de los clientes (ADR 0182; «Llegó» / «No vino»,
+  `PUT /invitados/{id}/asistencia`);
+- quien reservó desde Wellhub, TotalPass o Fitpass (ADR 0202; «Llegó» con
+  `checkins.registrar`, TotalPass hace check-in en su app, Fitpass pide revisar la
+  identificación; «Cancelar reserva» con `reservas.gestionar`);
+- lo apartado para recoger (ADR 0194), por persona: se cobra en el mostrador;
+- el cupo cuadra con la lista: ocupan lugar las reservas, los invitados y los
+  visitantes de plataformas, como los cuenta el servidor;
+- «Agregar <miembro>» (con `reservas.gestionar`): se busca a quien llegó sin reservar
+  y se reserva con su plan (`POST /sesiones/{id}/reservas`, clave del intento); llena,
+  entra a la lista de espera;
+- la lista de espera en su orden, «Ofrecer lugares» y aceptar el lugar ofrecido a
+  nombre de la persona.
 
 **Agenda del equipo** (`features/agenda`, ADR 0133):
 - La semana se recorre con flechas; «Hoy» regresa. El día vuelve a hoy al cambiar de
@@ -66,18 +108,85 @@ Quien tiene varios roles elige con cuál entrar (`ElegirRolScreen`, con el de la
 última vez marcado) y cambia desde Perfil → «Cambiar de rol» (ADR 0055). Los
 permisos los decide la API con el rol activo.
 
+## Contenido digital: se ve, no se vende (reglas 3.1.1 y 3.1.3 de Apple)
+
+Decisión del dueño: las apps no venden contenido digital (los videos y las clases solo
+en línea). Lo ya comprado se ve; se compra en la web, sin decirlo ni enlazarlo en la
+app.
+- **Videos:** se abren los que incluye su plan; de los demás solo dice «No está
+  incluido en tus planes.» (sin nombrar planes ni «Ver planes»).
+- **Clase en línea de pago** (`clase.en_linea` con `de_pago`, o `en_linea` en
+  antes-de-reservar): no se ofrece reservar ni pagar; dice «Esta clase en línea no se
+  reserva desde la app.». Si su plan la incluye, se reserva como siempre.
+- **Orden digital** (`digital` en `/mi/ordenes*`): no hay «Pagar» ni OXXO; dice «Este
+  pago no se hace desde la app.». El servidor, con `X-App-Producto`, también lo niega.
+
+Lo presencial (planes, bonos, citas, clases en el local) sí se paga en la app: Apple
+lo permite fuera de su sistema de compras (3.1.3(e)).
+
+## Entrada
+
+Sin login global (cada negocio con su cuenta), como `/entrar` de la web:
+- «Tus negocios»: los últimos 5 que se abrieron en el teléfono (en el almacén cifrado,
+  una lista por producto: TurnoUno no ve los de AgendaUno). Un toque deja su
+  dirección; se pueden quitar.
+- «Buscar mi negocio por nombre»: el directorio de esta app
+  (`GET /api/v1/directorio?producto=<clave>&q=…`, los primeros 8).
+- O su dirección (slug), como siempre.
+En iPhone no se entra con Google (regla 4.8): el acceso dice que quien solo usaba
+Google cree su contraseña con «¿Olvidaste tu contraseña?». La marca blanca abre
+directo en su negocio.
+
+## Eliminar la cuenta
+
+Perfil → «Eliminar mi cuenta», para cualquier rol (lo piden Apple y Google). Antes de
+confirmar se dice el efecto y el plazo: se cierra en todos sus dispositivos y ya no
+entra con ella (app ni web); si es cliente, el negocio borra sus datos en el plazo de
+la ley y conserva solo lo obligado (pagos y facturas); no se deshace y es solo de ese
+negocio. Se confirma con la contraseña (`POST /yo/eliminar-cuenta`
+`{password, motivo?}`). Con 200 se cierra la sesión en el teléfono (sin /logout) y el
+acceso muestra el mensaje del servidor. El único dueño recibe 422: primero da de baja
+el negocio. Quien solo entra con Google crea antes su contraseña (en Perfil o con
+«¿Olvidaste tu contraseña?»).
+
+## Abrir en la web
+
+Lo que se hace en la web se abre con la misma sesión, sin escribir la contraseña:
+`POST /yo/enlace-web {destino}` da un enlace de un solo uso (2 minutos) que se abre en
+el navegador (`abrirEnLaWeb`, `DestinosWeb`):
+- el pago automático con una pasarela que captura la tarjeta con su formulario web
+  (OpenPay): `/mi-cuenta/pagos#pago-automatico`;
+- conectar Google Calendar u Outlook (Perfil, para quien atiende):
+  `/mi-perfil#mp-preferencias`.
+
+## Volver a la app después de pagar
+
+Cada app tiene su esquema: `agendauno`, `turnouno` y, en una marca blanca, su
+`ANDROID_ID` en minúsculas con «-» en lugar de «_» (`AppConfig.esquemaApp`; Gradle
+valida que quede en `^[a-z][a-z0-9.+-]{2,40}$`). Android lo declara en el
+intent-filter de `MainActivity` (`${esquemaApp}`, host `pagos`) e iOS en
+`CFBundleURLTypes` (`$(APP_URL_SCHEME)` de cada configuración de Runner).
+- Al iniciar un pago (`POST /mi/ordenes/{id}/cobrar`) la app manda
+  `volver_app: <esquema>`; la página de regreso de la web ofrece «Volver a la app»
+  con `<esquema>://pagos?ref=<pago>&pago=exito|pendiente|cancelado`.
+- Al abrirse con ese enlace (cerrada o en segundo plano) la app va a Pagos, vuelve a
+  leer la cuenta y dice cómo quedó (`core/enlaces/regreso_pago.dart`). Flutter entrega
+  el enlace (deep linking activado en Android e iOS) y la app lo atiende antes que el
+  Navigator.
+
 ## Arquitectura
 
 ```
 lib/
 ├── core/        config, red (Dio + bearer), almacenamiento seguro, tema, calendario,
-│                avisos legales
+│                avisos legales, enlaces que abren la app (regreso del pago)
 └── features/
     ├── auth/           login, elegir rol, sesión (sin registro: ADR 0093)
     ├── cuenta/         la cuenta del alumno o cliente
     ├── agenda/         agenda, cita (nueva, reprogramar, cobrar), pase de lista
     ├── acceso/         escáner del pase QR en la entrada
     ├── caja/           la caja de la sucursal
+    ├── ventas/         cobrar lo pendiente y vender un plan (equipo)
     ├── bandeja/        mensajes de WhatsApp, Instagram y Messenger
     ├── instructor/     portal de quien imparte
     ├── inicio/         inicio del equipo
@@ -180,6 +289,14 @@ dice cuál descargar.
 - La pantalla de arranque usa el fondo del sistema (`systemBackground`): en modo
   oscuro no destella en blanco.
 
+- `ProximoWidget`: el widget de inicio como Widget Extension (ver `ios/WIDGET.md`), con
+  sus mismas nueve configuraciones, su id (`<id de la app>.ProximoWidget`), su
+  `APP_GROUP_ID` y su `FLAVOR`; Runner lo copia (*Embed Foundation Extensions*, antes
+  de *Thin Binary*) y depende de él.
+- `Runner.entitlements` y `ProximoWidget.entitlements` llevan el App Group del sabor
+  (`$(APP_GROUP_ID)`).
+- `APP_URL_SCHEME` (`agendauno` o `turnouno`): el esquema para volver del pago.
+
 ```bash
 flutter build ipa --flavor agendauno
 flutter build ipa --flavor turnouno
@@ -201,11 +318,39 @@ en una Mac de GitHub y revisa el id, el nombre, el ícono y que sea solo para iP
   (`/estudio/<slug>/aviso-de-privacidad`; si el negocio aún no lo publica, la página lo
   dice), y el acceso de una marca blanca, el de su negocio. `core/legales/`.
 - **iOS:** `PrivacyInfo.xcprivacy` declara que la app no rastrea, los datos que
-  recolecta para funcionar (nombre, correo, teléfono, foto, fecha de nacimiento y
-  género, el token de push y los reportes de fallas) y el uso de `UserDefaults` (los
-  suyos y los del App Group del widget). La «Privacidad de la app» de cada ficha en
-  App Store Connect (y la «Seguridad de los datos» de Google Play) debe decir lo mismo;
-  si la app empieza a recolectar algo más, se agrega en los tres lugares.
+  recolecta para funcionar y el uso de `UserDefaults` (los suyos y los del App Group
+  del widget). La «Privacidad de la app» de cada ficha en App Store Connect y la
+  «Seguridad de los datos» de Google Play deben decir lo mismo (tabla de abajo); si la
+  app empieza a recolectar algo más, se agrega en los tres lugares.
+
+### Qué declarar en las tiendas
+
+Todo es **para que la app funcione**, **ligado a la cuenta** (salvo las fallas), **sin
+rastreo** ni publicidad, y no se vende ni se comparte con terceros para sus fines
+(Firebase y la pasarela actúan por cuenta del negocio). Se cifra en tránsito y la
+persona puede pedir que se borre (eliminar la cuenta, y ARCO en Privacidad).
+
+| Dato | App Store Connect (Privacidad de la app) | Google Play (Seguridad de los datos) |
+|---|---|---|
+| Nombre | Información de contacto › Nombre | Información personal › Nombre |
+| Correo | Información de contacto › Correo electrónico | Información personal › Dirección de correo |
+| Teléfono | Información de contacto › Número de teléfono | Información personal › Número de teléfono |
+| Código postal de facturación | Información de contacto › Dirección física | Información personal › Dirección |
+| Fecha de nacimiento y género | Información de contacto › Otra información de contacto | Información personal › Otra información |
+| Foto de perfil, fotos de documentos | Contenido del usuario › Fotos o videos | Fotos y videos › Fotos |
+| Documentos, fichas de datos, reseñas, notas | Contenido del usuario › Otro contenido del usuario | Archivos y documentos; Actividad en la app › Otro contenido generado por el usuario |
+| Mensajes de la bandeja (equipo) | Contenido del usuario › Correos o mensajes de texto | Mensajes › Otros mensajes en la app |
+| Salud (fichas de un negocio de salud, certificado médico) | Salud y actividad física › Salud | Salud y actividad física › Información de salud |
+| Compras y pagos | Compras › Historial de compras | Información financiera › Historial de compras |
+| RFC / id fiscal, razón social, régimen | Información financiera › Otra información financiera | Información financiera › Otra información financiera |
+| Id de su cuenta | Identificadores › Id de usuario | Información personal › Ids de usuario |
+| Token de push | Identificadores › Id del dispositivo | Identificadores del dispositivo u otros identificadores |
+| Fallas (sin la persona) | Diagnóstico › Datos de fallas (no ligado) | Información y rendimiento de la app › Registros de fallas |
+
+La app no captura tarjetas (se pagan en la página de la pasarela), no lee la
+ubicación ni los contactos. En Google Play, además: la cuenta se elimina desde la app
+(Perfil) y desde la web; el enlace para pedirlo sin la app es el aviso de privacidad
+del producto.
 
 ## Marca blanca (solo AgendaUno, solo Android, preparada, sin publicar)
 
@@ -243,6 +388,9 @@ Gradle (`android/app/build.gradle.kts`) se detiene, con lo que falta, si:
 - `NEGOCIO` no es un slug, el sabor es `turnouno`, `PRODUCTO` no es `agendauno`,
   falta `ANDROID_ID` (o es el de una app oficial), `APP_NOMBRE` está vacío o
   `COLOR_MARCA` no es `#RRGGBB`;
+- `ANDROID_ID` no tiene forma de id de Android (segmentos separados por puntos, al
+  menos dos, cada uno empieza con letra y sigue con letras, números o «_») o es tan
+  largo que su esquema de regreso pasa de 41 caracteres;
 - el fondo del ícono viene dos veces (`COLOR_MARCA` y `values/colors.xml`);
 - en release: falta cualquiera de sus íconos (abajo) o sus datos de Firebase.
 
@@ -271,7 +419,9 @@ nombres: no hace falta copiarlo.
    `flutter run --flavor agendauno --dart-define-from-file=…`.
 2. **Firma:** cada marca blanca tiene su propia llave de subida (como en «Firma de
    release»), guardada fuera del repositorio; `android/key.properties` apunta a la de la
-   app que se compila.
+   app que se compila. En GitHub: el entorno `marca-blanca-<negocio>` con sus cuatro
+   secretos `ANDROID_*`, y el flujo «Apps móviles» con `marca_blanca: <negocio>`
+   (solo Android y AgendaUno) firma su `.aab` con su archivo (ver «Compilar en GitHub»).
 3. **Google Play:** una app nueva en la cuenta de desarrollador que corresponda (la del
    negocio o la de la plataforma, según el contrato), con su `ANDROID_ID`, su ficha, su
    «Seguridad de los datos» (la misma que la app oficial) y la firma de apps de Google
@@ -362,7 +512,13 @@ La app funciona sin Firebase; solo no recibe push. Para activarlas (ADR 0025):
    opcional, `FCM_PROJECT_ID`.
 
 Al entrar, la app registra el token del teléfono en el negocio
-(`dispositivos_push`); al salir lo borra.
+(`dispositivos_push`); al salir lo borra. También al volver a la app (la persona pudo
+activar los avisos en Ajustes), sin mandarlo otra vez si no cambió. En iPhone, Firebase
+da su token solo cuando ya tiene el de APNs: la app lo espera con reintentos
+(`PushController.esperarApns`) y, si no llega, lo intenta la próxima vez. En Android
+las notificaciones van en el canal propio de la app («Avisos del negocio»,
+`res/values/avisos.xml`; lo crea `MainActivity` y FCM lo usa con
+`default_notification_channel_id`).
 
 Al tocar una notificación, la app abre lo suyo, según su `tipo` (la clave de su
 plantilla), también cuando la abrió desde cerrada:
@@ -373,6 +529,25 @@ plantilla), también cuando la abrió desde cerrada:
 - lo demás, el Inicio.
 
 Una notificación de otro negocio no cambia la pantalla.
+
+## Compilar en GitHub (Apps móviles)
+
+`.github/workflows/apps-moviles.yml`, solo a mano. No sube nada a las tiendas.
+
+| Entorno | Para | Secretos y variables |
+|---|---|---|
+| `android-agendauno`, `android-turnouno` | el `.aab` firmado de la app oficial | `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`; `FIREBASE_API_KEY`, `FIREBASE_APP_ID` (o `FIREBASE_ANDROID_APP_ID`), `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID`; variable opcional `GOOGLE_SERVER_CLIENT_ID` |
+| `marca-blanca-<negocio>` | el `.aab` firmado de una marca blanca (`marca_blanca: <negocio>`) | los cuatro `ANDROID_*` de su llave; su Firebase va en su archivo `configuraciones/marca_blanca/<negocio>.json` |
+| `ios-agendauno`, `ios-turnouno` | la compilación de iOS sin firmar, con lo que lleva al App Store | variable `APP_STORE_ID` (el id numérico de su ficha); `FIREBASE_API_KEY` (o `FIREBASE_IOS_API_KEY`), `FIREBASE_IOS_APP_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID` |
+
+- Un paquete para la tienda sin Firebase no se compila: la app saldría sin
+  notificaciones push (antes solo era un aviso).
+- iOS exige `APP_STORE_ID` de su sabor (la pantalla «Actualiza la app» abre su ficha) y
+  revisa en lo compilado: id, nombre, ícono, solo iPhone, el esquema de regreso, el
+  widget (`PlugIns/ProximoWidget.appex` con su id, su App Group y su sabor) y el
+  manifiesto de privacidad.
+- La marca blanca: el flujo revisa antes que su archivo exista, que su `NEGOCIO` sea
+  el pedido y que traiga su Firebase; Gradle revisa lo demás.
 
 ## Firma de release (Android)
 
@@ -401,6 +576,10 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
   Xcode). iOS mínimo: 15. En Xcode, la capacidad **Push Notifications** (ya está
   `Runner.entitlements` con `aps-environment`) y, en Firebase, la llave APNs del
   equipo de Apple; sin ella las notificaciones no llegan a iPhone.
+- Los App Groups (`group.com.agendauno.app`, `group.com.turnouno.app`) en el portal de
+  Apple, activados en los App IDs de las dos apps y de sus widgets
+  (`….ProximoWidget`), y verificar el widget en una Mac (`ios/WIDGET.md`).
+- Los entornos de GitHub de «Compilar en GitHub» (arriba).
 - Compilar firmado y probar la versión de iOS en una Mac, con los esquemas de las dos
   apps (arriba): firma y `com.turnouno.app` en el portal de Apple.
 - Llenar la «Privacidad de la app» de App Store Connect y la «Seguridad de los datos» de

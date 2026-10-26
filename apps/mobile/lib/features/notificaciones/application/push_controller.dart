@@ -30,6 +30,10 @@ class PushController {
   bool _listo = false;
   Sesion? _sesion;
 
+  /// El token que ya quedó registrado para esta sesión (negocio y bearer): al
+  /// volver a la app no se manda otra vez si no cambió.
+  String? _registrado;
+
   /// ¿La app puede recibir push? (Firebase configurado y teléfono Android/iOS).
   bool get disponible => _opciones != null && _esTelefono;
 
@@ -86,7 +90,11 @@ class PushController {
     });
   }
 
-  /// Pide permiso (la primera vez) y registra este teléfono para la sesión.
+  /// Pide permiso (la primera vez) y registra este teléfono para la sesión. Se
+  /// llama al entrar y al volver a la app (la persona pudo activar los avisos en
+  /// Ajustes mientras tanto); si el mismo token ya quedó registrado, no se manda otra
+  /// vez. En iPhone, Firebase da su token solo cuando ya tiene el de APNs: se espera
+  /// con reintentos (si no llega, se intenta la próxima vez que vuelva a la app).
   Future<void> registrar(Sesion sesion) async {
     if (!_listo) {
       return;
@@ -97,8 +105,12 @@ class PushController {
       if (permiso.authorizationStatus == AuthorizationStatus.denied) {
         return;
       }
+      if (defaultTargetPlatform == TargetPlatform.iOS &&
+          await esperarApns(FirebaseMessaging.instance.getAPNSToken) == null) {
+        return;
+      }
       final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
+      if (token != null && _registrado != _clave(sesion, token)) {
         await _registrarToken(sesion, token);
       }
     } on Exception {
@@ -106,9 +118,38 @@ class PushController {
     }
   }
 
+  /// El token de APNs (iPhone), esperándolo: recién abierta la app puede tardar en
+  /// llegar y, sin él, `getToken` falla. Hasta [intentos] veces, con pausas que
+  /// crecen ([espera], 2×[espera]…). Null si no llegó.
+  static Future<String?> esperarApns(
+    Future<String?> Function() leer, {
+    int intentos = 6,
+    Duration espera = const Duration(milliseconds: 500),
+    Future<void> Function(Duration) dormir = Future<void>.delayed,
+  }) async {
+    for (var i = 0; i < intentos; i++) {
+      try {
+        final token = await leer();
+        if (token != null && token.isNotEmpty) {
+          return token;
+        }
+      } on Exception {
+        // Aún no está: se reintenta.
+      }
+      if (i < intentos - 1) {
+        await dormir(espera * (i + 1));
+      }
+    }
+    return null;
+  }
+
+  static String _clave(Sesion sesion, String token) =>
+      '${sesion.slug}|${sesion.bearer}|$token';
+
   /// Deja de recibir push de esta sesión. Va antes de cerrarla (aún autenticada).
   Future<void> olvidar(Sesion sesion) async {
     _sesion = null;
+    _registrado = null;
     if (!_listo) {
       return;
     }
@@ -125,11 +166,15 @@ class PushController {
   /// La sesión terminó en el servidor (token revocado): deja de volver a registrar
   /// el teléfono con ella. Sin token ya no se puede pedir que lo olvide; el
   /// servidor lo reasigna cuando otra sesión lo registre.
-  void soltar() => _sesion = null;
+  void soltar() {
+    _sesion = null;
+    _registrado = null;
+  }
 
   Future<void> _registrarToken(Sesion sesion, String token) async {
     try {
       await _repo.registrar(sesion.slug, token, plataforma);
+      _registrado = _clave(sesion, token);
     } on DioException {
       // Se reintenta en la siguiente apertura o cambio de token.
     }

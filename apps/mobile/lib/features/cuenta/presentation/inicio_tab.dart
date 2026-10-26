@@ -215,7 +215,9 @@ class InicioTab extends ConsumerWidget {
               titulo: esCitas ? 'Mis citas' : 'Mis reservas',
               tono: TonosAcceso.reservas,
               valor: proximas.isEmpty
-                  ? (esCitas ? 'Sin $clases por ahora' : 'Sin reservas próximas')
+                  ? (esCitas
+                        ? 'Sin $clases por ahora'
+                        : 'Sin reservas próximas')
                   : esCitas
                   ? 'Cambiar o cancelar'
                   : (proximas.length == 1
@@ -280,9 +282,7 @@ class InicioTab extends ConsumerWidget {
                         : '$videosDisponibles disponibles',
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => MisVideosScreen(
-                          onVerPlanes: () => onIr(PestanaCuenta.pagos),
-                        ),
+                        builder: (_) => const MisVideosScreen(),
                       ),
                     ),
                   )

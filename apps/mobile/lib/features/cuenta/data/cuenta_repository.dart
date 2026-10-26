@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/archivos/archivos_nativos.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/intento.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/participante_en_uso.dart';
@@ -350,7 +351,13 @@ class CuentaRepository {
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/ordenes/$ordenId/cobrar',
-      data: {'metodo': metodo, 'domiciliar': metodo == 'tarjeta' && domiciliar},
+      data: {
+        'metodo': metodo,
+        'domiciliar': metodo == 'tarjeta' && domiciliar,
+        // Al terminar en el navegador, la web ofrece volver a esta app
+        // (`<esquema>://pagos?ref=…`).
+        'volver_app': AppConfig.esquemaApp,
+      },
     );
     return CheckoutPago.desdeJson(
       ((res.data?['data'] ?? {}) as Map<String, dynamic>)['checkout'],
@@ -551,7 +558,7 @@ class CuentaRepository {
     );
   }
 
-  /// Sube la foto del documento; queda en revisión.
+  /// Sube el documento (una foto o un PDF); queda en revisión.
   Future<void> subirDocumento(
     String tipoId,
     List<int> bytes,
@@ -612,6 +619,11 @@ class CuentaRepository {
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
     return (apple: data['apple'] == true, google: data['google'] == true);
   }
+
+  /// Renueva el pase de la cartera (perdió el teléfono, alguien copió su pase): el
+  /// anterior deja de servir y se vuelve a agregar.
+  Future<void> renovarPaseWallet() =>
+      _dio.post<Map<String, dynamic>>('$_base/mi/pase/wallet/renovar');
 
   /// El enlace «Guardar en Google Wallet» de su pase (un JWT firmado).
   Future<String> urlGoogleWallet() async {
@@ -845,10 +857,11 @@ class CuentaRepository {
     return HorarioCita.deLista(data['slots']);
   }
 
-  /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar)
-  /// y quién la atenderá (sin [profesionalId], el negocio asigna a quien esté libre).
-  /// [pagar] solo en un servicio con anticipo (ADR 0161): `anticipo` o `todo`.
-  Future<({String estado, String? profesional})> agendarCita({
+  /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar),
+  /// la orden a pagar para confirmarla (si la hay) y quién la atenderá (sin
+  /// [profesionalId], el negocio asigna a quien esté libre). [pagar] solo en un
+  /// servicio con anticipo (ADR 0161): `anticipo` o `todo`.
+  Future<({String estado, String? profesional, String? ordenId})> agendarCita({
     required String servicioId,
     required String sucursalId,
     required String? profesionalId,
@@ -883,6 +896,7 @@ class CuentaRepository {
     return (
       estado: (data['estado'] ?? '') as String,
       profesional: profesional?['nombre'] as String?,
+      ordenId: data['orden_id'] as String?,
     );
   }
 }

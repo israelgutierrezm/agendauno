@@ -76,6 +76,14 @@ class AppConfig {
             ? ProductoApp.idAndroidTurnoUno
             : ProductoApp.idAndroidAgendaUno);
 
+  /// El esquema propio de esta app para volver a ella desde el navegador (el regreso
+  /// del pago: `<esquema>://pagos?ref=…`): `agendauno`, `turnouno` o, en una marca
+  /// blanca, su `ANDROID_ID` en minúsculas con «-» en lugar de «_». Es el mismo que
+  /// declaran Android (`esquemaApp` en build.gradle.kts) e iOS (`APP_URL_SCHEME`).
+  static String get esquemaApp => marcaBlanca
+      ? idAndroid.toLowerCase().replaceAll('_', '-')
+      : (ProductoApp.esTurnoUno ? 'turnouno' : 'agendauno');
+
   /// Id numérico de la app en el App Store. Se pasa al compilar para iOS; sin él,
   /// la pantalla de actualizar no ofrece abrir la tienda:
   ///   flutter build ipa --dart-define=APP_STORE_ID=1234567890

@@ -33,12 +33,57 @@ class ArchivoDescargado {
   }
 }
 
+/// Un PDF que se eligió del teléfono para subirlo (con el selector del sistema).
+class PdfElegido {
+  const PdfElegido({required this.bytes, required this.nombre});
+
+  /// Pasa del tope del servidor (8 MB): no se leyó.
+  const PdfElegido.demasiado() : bytes = null, nombre = '';
+
+  final Uint8List? bytes;
+  final String nombre;
+
+  bool get demasiado => bytes == null;
+
+  /// El nombre con su extensión (el servidor la revisa).
+  String get nombreConExtension =>
+      nombre.toLowerCase().endsWith('.pdf') ? nombre : '$nombre.pdf';
+}
+
 /// Lo que la app le pide al teléfono con esos bytes (canal `agendauno/archivos`; en
-/// Android `MainActivity`, en iPhone `AppDelegate`): abrir un documento con su visor
-/// y agregar el pase de entrada a Apple Wallet (ADR 0195). Si el teléfono no puede,
-/// devuelve false (nunca lanza): quien llama lo dice.
+/// Android `MainActivity`, en iPhone `AppDelegate`): abrir un documento con su visor,
+/// agregar el pase de entrada a Apple Wallet (ADR 0195) y elegir un PDF para subirlo.
+/// Si el teléfono no puede, devuelve false o null (nunca lanza): quien llama lo dice.
 abstract final class ArchivosNativos {
   static const canal = MethodChannel('agendauno/archivos');
+
+  /// El selector de documentos del sistema, solo PDF (sin permisos: el sistema da
+  /// acceso solo al que se elige). Null si se canceló o no se pudo leer.
+  static Future<PdfElegido?> elegirPdf() async {
+    try {
+      final r = await canal.invokeMethod<Map<Object?, Object?>>('elegirPdf');
+      if (r == null) {
+        return null;
+      }
+      if (r['demasiado'] == true) {
+        return const PdfElegido.demasiado();
+      }
+      final bytes = r['bytes'];
+      final nombre = r['nombre'];
+      return bytes is Uint8List && bytes.isNotEmpty
+          ? PdfElegido(
+              bytes: bytes,
+              nombre: nombre is String && nombre.trim().isNotEmpty
+                  ? nombre.trim()
+                  : 'documento.pdf',
+            )
+          : null;
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
 
   /// Lo abre con el visor del teléfono (un PDF, por ejemplo).
   static Future<bool> abrir(

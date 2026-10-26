@@ -5,13 +5,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/presentation/abrir_en_la_web.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'cuenta_screen.dart' show hacerConAviso;
 
 /// "Pago automático": sus membresías que se renuevan, cuáles se cobran solas y con
 /// qué tarjeta. La tarjeta se autoriza en la página de la pasarela (en el
-/// navegador); al volver a la app se actualiza.
+/// navegador) o, con una pasarela que la captura con su formulario web (OpenPay), en
+/// la web con la misma sesión («Abrir en la web»); al volver a la app se actualiza.
 class PagoAutomaticoScreen extends ConsumerStatefulWidget {
   const PagoAutomaticoScreen({super.key});
 
@@ -76,13 +78,17 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
       try {
         url = await accion();
       } on RequiereWeb {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Con este negocio la tarjeta se autoriza desde la web: entra a Mi cuenta en el navegador.',
+        // Con un enlace de un solo uso: la web abre con esta sesión.
+        if (mounted &&
+            await abrirEnLaWeb(context, ref, DestinosWeb.pagoAutomatico)) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Autoriza tu tarjeta en la web; al volver lo verás activo.',
+              ),
             ),
-          ),
-        );
+          );
+        }
         return;
       }
       if (url == null) {

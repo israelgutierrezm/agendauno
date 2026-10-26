@@ -1,11 +1,15 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import '../../../core/agenda/contrato_agenda.dart';
 import '../../../core/formato.dart';
 import '../../../core/hora_negocio.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/data/sesion.dart' show Terminologia;
+import 'pase_lista.dart';
 
 export '../../../core/agenda/contrato_agenda.dart';
+export 'pase_lista.dart';
 // La vista previa de una cancelación es la misma que ve el cliente.
 export '../../cuenta/data/cuenta_models.dart' show EfectoCancelacion;
 
@@ -671,30 +675,79 @@ class Asistente {
 
 /// La lista de una clase (GET /sesiones/{id}/reservas): quién reservó y desde cuándo
 /// se pasa lista (ADR 0101). `empezo` lo dice el servidor (no el reloj del teléfono).
+/// En `meta` vienen también los invitados de los clientes y quien reservó desde una
+/// plataforma: ocupan lugar, y el cupo de la lista los cuenta como el servidor.
 class ListaClase {
   const ListaClase({
     required this.asistentes,
     this.asistenciaDesde,
     this.empezo = false,
+    this.invitados = const [],
+    this.plataforma = const [],
+    this.capacidad,
+    this.conCapacidad = false,
+    this.cancelada = false,
   });
 
   final List<Asistente> asistentes;
   final DateTime? asistenciaDesde;
   final bool empezo;
 
+  /// Invitados de los clientes con su pase (ADR 0182).
+  final List<InvitadoClase> invitados;
+
+  /// Quien reservó desde Wellhub, TotalPass o Fitpass (ADR 0202).
+  final List<LugarPlataforma> plataforma;
+
+  /// El cupo de la clase según la lista (`meta.sesion.capacidad`; null: sin cupo).
+  /// [conCapacidad]: el servidor lo dijo (un API anterior no manda `meta.sesion`).
+  final int? capacidad;
+  final bool conCapacidad;
+
+  /// La clase se canceló: no se pasa lista ni se agrega a nadie.
+  final bool cancelada;
+
   /// ¿Ya se puede registrar la asistencia?
   bool abierta(DateTime ahora) =>
       asistenciaDesde == null || !ahora.isBefore(asistenciaDesde!);
 
+  /// Quienes ocupan lugar, como los cuenta el servidor: las reservas confirmadas,
+  /// ofrecidas y por pagar, los invitados y los visitantes de plataformas que siguen
+  /// en pie (reservados o que ya llegaron).
+  int get ocupan =>
+      asistentes.where((a) => a.enSala).length +
+      invitados.where((i) => i.ocupaLugar).length +
+      plataforma.where((l) => l.ocupaLugar).length;
+
+  /// De quienes ocupan lugar, cuántos ya llegaron.
+  int get llegaron =>
+      asistentes.where((a) => a.enSala && a.llego).length +
+      invitados.where((i) => i.llego).length +
+      plataforma.where((l) => l.llego).length;
+
+  /// Lugares libres con el cupo de la lista (o, con un API anterior, [respaldo]: el
+  /// de la agenda). Null sin cupo.
+  int? libres([int? respaldo]) {
+    final cupo = conCapacidad ? capacidad : respaldo;
+    return cupo == null ? null : math.max(0, cupo - ocupan);
+  }
+
   factory ListaClase.desdeJson(Map<String, dynamic> json) {
     final meta = (json['meta'] as Map<String, dynamic>?) ?? const {};
     final desde = meta['asistencia_desde'] as String?;
+    final sesion = meta['sesion'];
+    final conCapacidad = sesion is Map && sesion.containsKey('capacidad');
     return ListaClase(
       asistentes: ((json['data'] ?? []) as List)
           .map((e) => Asistente.desdeJson(e as Map<String, dynamic>))
           .toList(),
       asistenciaDesde: desde == null ? null : DateTime.parse(desde).toLocal(),
       empezo: (meta['empezo'] ?? false) as bool,
+      invitados: InvitadoClase.lista(meta['invitados']),
+      plataforma: LugarPlataforma.lista(meta['plataforma']),
+      capacidad: conCapacidad ? (sesion['capacidad'] as num?)?.toInt() : null,
+      conCapacidad: conCapacidad,
+      cancelada: sesion is Map && sesion['estado'] == 'cancelada',
     );
   }
 }
@@ -784,7 +837,13 @@ class EfectoInasistencia {
 
   /// El efecto en una frase, con las mismas palabras que la web
   /// (`confirmaciones.asistencia.efecto`).
-  String get texto {
+  String get texto => textoCon();
+
+  /// En un negocio de citas ([esCitas]) se habla de su cita y de su bono, con la
+  /// palabra del negocio ([t]: «cita», «sesión»…), no de reservas ni créditos.
+  String textoCon({bool esCitas = false, Terminologia? t}) {
+    final sesion = (t ?? Terminologia.citas).sesion.toLowerCase();
+    final sesiones = (t ?? Terminologia.citas).sesiones.toLowerCase();
     if (!conCredito) {
       final monto = conservaMinor ?? 0;
       if (conserva != null && monto > 0 && moneda != null) {
@@ -801,13 +860,26 @@ class EfectoInasistencia {
             'Devuélvele en caja ${Formato.dinero(enCaja, moneda!)} que pagó de más.',
         ].join(' ');
       }
-      return 'No usó créditos en esta reserva: su saldo no cambia.';
+      return esCitas
+          ? 'No usó su bono en esta $sesion: su saldo no cambia.'
+          : 'No usó créditos en esta reserva: su saldo no cambia.';
     }
     if (pierdeCredito) {
       if (unidades == 1000) {
-        return 'Pierde 1 crédito de su plan.';
+        return esCitas
+            ? 'Pierde 1 $sesion de su bono.'
+            : 'Pierde 1 crédito de su plan.';
       }
-      return 'Pierde ${Formato.creditos(unidades)} créditos de su plan.';
+      final n = Formato.creditos(unidades);
+      return esCitas
+          ? 'Pierde $n $sesiones de su bono.'
+          : 'Pierde $n créditos de su plan.';
+    }
+    if (esCitas) {
+      return tolerada
+          ? 'Esta falta entra en la tolerancia de su política: no pierde la '
+                '$sesion de su bono.'
+          : 'Su política no cobra las faltas: la $sesion vuelve a su bono.';
     }
     return tolerada
         ? 'Esta falta entra en la tolerancia de su política: no pierde el crédito.'

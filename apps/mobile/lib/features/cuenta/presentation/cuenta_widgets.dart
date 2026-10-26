@@ -261,7 +261,8 @@ class _PorPagarTileState extends ConsumerState<PorPagarTile> {
   @override
   Widget build(BuildContext context) {
     final o = widget.o;
-    final pagoEnLinea = widget.pagoEnLinea;
+    // Lo digital (una clase en línea, videos) no se cobra en la app.
+    final pagoEnLinea = widget.pagoEnLinea && !o.digital;
     // Por una persona a su cargo, el pago automático va a la tarjeta del
     // responsable (ADR 0129).
     final aCargo = ref.watch(participanteEnUsoProvider) != null;
@@ -274,7 +275,9 @@ class _PorPagarTileState extends ConsumerState<PorPagarTile> {
             subtitle: Text(
               [
                 if (o.detalle != null && o.detalle!.isNotEmpty) o.detalle!,
-                pagoEnLinea
+                o.digital
+                    ? '${Formato.dinero(o.totalMinor, o.moneda)} · ${OrdenPorPagar.noSePagaAqui}'
+                    : pagoEnLinea
                     ? Formato.dinero(o.totalMinor, o.moneda)
                     : '${Formato.dinero(o.totalMinor, o.moneda)} · Págalo en recepción',
               ].join('\n'),
@@ -401,15 +404,19 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
     final anticipo = r.cita?.textoAnticipo(
       ref.watch(sesionProvider)?.moneda ?? 'MXN',
     );
-    // Cuánto paga al tocar «Pagar»: la orden de la reserva entre las por pagar.
-    final porPagar = _sePagaAqui
-        ? ref
+    // La orden de la reserva entre las por pagar: cuánto paga al tocar «Pagar» y
+    // si es digital (una clase en línea: la app no la cobra).
+    final ordenReserva = r.ordenId == null
+        ? null
+        : ref
               .watch(cuentaProvider)
               .value
               ?.porPagar
               .where((o) => o.id == r.ordenId)
-              .firstOrNull
-        : null;
+              .firstOrNull;
+    final digital = ordenReserva?.digital ?? false;
+    final sePagaAqui = _sePagaAqui && !digital;
+    final porPagar = sePagaAqui ? ordenReserva : null;
     // Al terminar una acción, se cierra la hoja (la cuenta ya se recargó).
     Future<void> y(Future<void> Function() accion, String exito) async {
       if (_ocupado) {
@@ -500,11 +507,18 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
                   style: TextStyle(color: context.colores.aviso),
                 ),
               ),
-            if (r.estado == 'pendiente_pago' && !_sePagaAqui)
+            // «Desde la web» solo si el negocio cobra en línea; lo digital, sin
+            // decir dónde.
+            if (r.estado == 'pendiente_pago' && !sePagaAqui)
               Padding(
+                key: const Key('pagar-fuera-de-la-app'),
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
-                  'Págala en el negocio o desde la web para confirmarla.',
+                  digital
+                      ? OrdenPorPagar.noSePagaAqui
+                      : widget.pagoEnLinea
+                      ? 'Págala en el negocio o desde la web para confirmarla.'
+                      : 'Págala en el negocio para confirmarla.',
                   style: TextStyle(
                     color: context.colores.textoSuave,
                     fontSize: 13,
@@ -539,7 +553,7 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
               spacing: 8,
               runSpacing: 4,
               children: [
-                if (_sePagaAqui)
+                if (sePagaAqui)
                   FilledButton(
                     key: const Key('pagar-reserva'),
                     // Cierra la hoja con la orden a pagar ([mostrarDetalleReserva]
@@ -772,15 +786,19 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: EstadoPunto(
-                  c.cobertura!.texto,
+                  c.coberturaTexto!,
                   color: colorCobertura(context, c.cobertura!),
                 ),
               ),
+            // En una clase en línea no se invita a comprar un plan en la app
+            // (contenido digital).
             if (c.cobertura?.motivoTexto != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  '${c.cobertura!.motivoTexto!} Consulta los planes en Pagos.',
+                  c.enLinea
+                      ? c.cobertura!.motivoTexto!
+                      : '${c.cobertura!.motivoTexto!} Consulta los planes en Pagos.',
                   style: TextStyle(color: context.colores.textoSuave),
                 ),
               ),
@@ -872,7 +890,15 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                 ),
               ),
             const SizedBox(height: 16),
-            if (antes != null && !antes.puedeReservar)
+            // Una clase en línea de pago es contenido digital: la app no la vende
+            // (reglas 3.1.1 y 3.1.3 de Apple). Se dice sin decir dónde pagarla.
+            if (c.pagoDigital || (antes?.pagoDigital ?? false))
+              Text(
+                'Esta clase en línea no se reserva desde la app.',
+                key: const Key('clase-en-linea-fuera'),
+                style: TextStyle(color: context.colores.textoSuave),
+              )
+            else if (antes != null && !antes.puedeReservar)
               const SizedBox.shrink()
             else if (antes != null)
               SizedBox(

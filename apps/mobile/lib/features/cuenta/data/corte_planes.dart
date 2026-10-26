@@ -140,13 +140,18 @@ class PlanCorte {
 
   /// Los números que se muestran: siempre incluidas, usadas y disponibles (si no
   /// es ilimitado); los demás solo si hay algo.
-  List<(String, String)> get numeros {
+  List<(String, String)> get numeros => numerosCon();
+
+  /// En un bono de citas ([esCitas]) lo apartado son citas agendadas, no
+  /// reservadas.
+  List<(String, String)> numerosCon({bool esCitas = false}) {
     int u(String k) => unidades[k] ?? 0;
     return [
       if (!ilimitado) ('Incluidas', clases(u('incluidas'))),
       if (u('extras') > 0) ('Extras', clases(u('extras'))),
       ('Usadas', clases(u('usadas'))),
-      if (u('apartadas') > 0) ('Reservadas', clases(u('apartadas'))),
+      if (u('apartadas') > 0)
+        (esCitas ? 'Agendadas' : 'Reservadas', clases(u('apartadas'))),
       if (u('devueltas') > 0) ('Devueltas', clases(u('devueltas'))),
       if (u('vencidas') > 0) ('Vencidas', clases(u('vencidas'))),
       if (!ilimitado) ('Disponibles', clases(u('disponibles'))),

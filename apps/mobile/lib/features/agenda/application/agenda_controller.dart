@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
+import '../data/bloqueos.dart';
 
 /// Día que se está viendo en la agenda (hoy por defecto). Vuelve a hoy al cambiar
 /// de sesión: quien entra después no arranca en el día que dejó el anterior. Es un
@@ -52,12 +53,18 @@ final profesionalAgendaProvider =
       ProfesionalAgenda.new,
     );
 
-/// Lo que muestra la agenda de un día: sus sesiones y los profesionales.
+/// Lo que muestra la agenda de un día: sus sesiones, los profesionales y, en citas,
+/// los bloqueos (comida, ausencia, cierre de sede).
 class AgendaDia {
-  const AgendaDia({required this.sesiones, required this.profesionales});
+  const AgendaDia({
+    required this.sesiones,
+    required this.profesionales,
+    this.bloqueos = const [],
+  });
 
   final List<SesionAgenda> sesiones;
   final List<Profesional> profesionales;
+  final List<BloqueoAgenda> bloqueos;
 
   /// El día de hoy en la sucursal (con el desfase de sus sesiones), o null si el
   /// día no trae sesiones con desfase (un día vacío): entonces vale el del negocio
@@ -77,14 +84,34 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
     if (repo == null) {
       return const AgendaDia(sesiones: [], profesionales: []);
     }
+    // Los bloqueos, en citas y con permiso de ver la agenda; si no se pudieron
+    // leer, ninguno: la agenda sigue.
+    final sesion = ref.read(sesionProvider);
+    final conBloqueos =
+        (sesion?.esCitas ?? false) && (sesion?.puede('agenda.ver') ?? false);
     final resultados = await Future.wait([
       repo.sesionesDelDia(dia),
       repo.profesionales(),
+      if (conBloqueos) _bloqueos(repo, dia),
     ]);
     return AgendaDia(
       sesiones: resultados[0] as List<SesionAgenda>,
       profesionales: resultados[1] as List<Profesional>,
+      bloqueos: conBloqueos
+          ? resultados[2] as List<BloqueoAgenda>
+          : const <BloqueoAgenda>[],
     );
+  }
+
+  static Future<List<BloqueoAgenda>> _bloqueos(
+    AgendaRepository repo,
+    DateTime dia,
+  ) async {
+    try {
+      return await repo.bloqueos(dia, dia);
+    } on DioException {
+      return const [];
+    }
   }
 
   Future<void> marcarLlegada(SesionAgenda s, {bool retardo = false}) => _accion(

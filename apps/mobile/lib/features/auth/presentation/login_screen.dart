@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,9 +8,13 @@ import '../../../core/google/google_auth.dart';
 import '../../../core/legales/enlaces_legales.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../application/sesion_controller.dart';
+import '../data/directorio.dart';
+import 'buscar_negocio_sheet.dart';
 
-/// Acceso tenant-local: el usuario escribe la direccion de su estudio (slug) y sus
-/// credenciales. No hay login global ni selector de tenant tras el login.
+/// Acceso tenant-local: el usuario elige su negocio (de los que abrió en este
+/// teléfono, buscándolo por nombre en el directorio de esta app o escribiendo su
+/// dirección) y sus credenciales. No hay login global ni selector de tenant tras el
+/// login.
 ///
 /// En una app de marca blanca (ADR 0111) el negocio ya es fijo: solo se piden las
 /// credenciales.
@@ -37,6 +42,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _cargando = false;
   String? _error;
 
+  /// Los negocios que se abrieron en este teléfono (los últimos primero).
+  List<NegocioDirectorio> _recientes = const [];
+
+  /// El nombre del negocio elegido de la lista (para decir a cuál se entra).
+  NegocioDirectorio? _elegido;
+
   bool get _fijo => widget.negocioFijo.isNotEmpty;
 
   /// La dirección del negocio: la fija de la marca blanca o la escrita.
@@ -49,6 +60,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final terminada = ref.read(sesionTerminadaProvider);
     if (terminada != null && terminada.motivo == MotivoFin.sesion) {
       _slug.text = terminada.slug;
+    }
+    if (!_fijo) {
+      _leerRecientes();
+    }
+  }
+
+  Future<void> _leerRecientes() async {
+    final recientes = await ref.read(negociosRecientesProvider).leer();
+    if (mounted) {
+      setState(() => _recientes = recientes);
+    }
+  }
+
+  /// Elige el negocio (de los recientes o del directorio): queda escrita su
+  /// dirección.
+  void _elegir(NegocioDirectorio n) => setState(() {
+    _slug.text = n.slug;
+    _elegido = n;
+    _error = null;
+  });
+
+  Future<void> _buscar() async {
+    final n = await buscarNegocio(context);
+    if (n != null && mounted) {
+      _elegir(n);
+    }
+  }
+
+  Future<void> _olvidar(NegocioDirectorio n) async {
+    final lista = await ref.read(negociosRecientesProvider).olvidar(n.slug);
+    if (mounted) {
+      setState(() {
+        _recientes = lista;
+        if (_elegido?.slug == n.slug) {
+          _elegido = null;
+        }
+      });
     }
   }
 
@@ -258,19 +306,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         MotivoFin.sesion =>
                           'Tu sesión terminó. Vuelve a iniciar sesión para '
                               'continuar.',
+                        MotivoFin.cuentaEliminada =>
+                          terminada.mensaje ??
+                              'Tu cuenta quedó eliminada y ya no puedes entrar.',
                       }),
                     ),
                     const SizedBox(height: 16),
                   ],
                   if (!_fijo) ...[
+                    // Los que se abrieron en este teléfono, con un toque.
+                    if (_recientes.isNotEmpty) ...[
+                      Text(
+                        'Tus negocios',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      for (final n in _recientes)
+                        ListTile(
+                          key: ValueKey('reciente-${n.slug}'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          selected: _slug.text.trim() == n.slug,
+                          leading: const Icon(Icons.storefront_outlined),
+                          title: Text(n.nombre),
+                          subtitle: n.lugar == null ? null : Text(n.lugar!),
+                          onTap: _cargando ? null : () => _elegir(n),
+                          trailing: IconButton(
+                            tooltip: 'Quitar de la lista',
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: _cargando ? null : () => _olvidar(n),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                    ],
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        key: const Key('buscar-negocio'),
+                        onPressed: _cargando ? null : _buscar,
+                        icon: const Icon(Icons.search),
+                        label: const Text('Buscar mi negocio por nombre'),
+                      ),
+                    ),
                     TextField(
                       key: const Key('direccion-negocio'),
                       controller: _slug,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Dirección del negocio',
                         hintText: 'mi-negocio',
+                        helperText:
+                            _elegido != null &&
+                                _elegido!.slug == _slug.text.trim()
+                            ? 'Entras a ${_elegido!.nombre}'
+                            : null,
                       ),
                       autocorrect: false,
+                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -319,6 +409,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       key: const Key('entrar-google'),
                       onPressed: _cargando ? null : _entrarConGoogle,
                       child: const Text('Entrar con Google'),
+                    ),
+                  ] else if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                    // En iPhone no se entra con Google (regla 4.8 de Apple): quien
+                    // solo entraba así crea su contraseña.
+                    const SizedBox(height: 8),
+                    Text(
+                      '¿Entrabas solo con Google? En iPhone se entra con tu correo y '
+                      'una contraseña: créala con «¿Olvidaste tu contraseña?».',
+                      key: const Key('google-en-iphone'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                   const SizedBox(height: 16),

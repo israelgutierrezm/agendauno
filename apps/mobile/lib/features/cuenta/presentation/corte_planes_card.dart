@@ -164,7 +164,9 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               runSpacing: 8,
               children: [
                 if (p.ilimitado) _numero('Ilimitado', '∞', false),
-                for (final (etiqueta, valor) in p.numeros)
+                for (final (etiqueta, valor) in p.numerosCon(
+                  esCitas: ref.watch(sesionProvider)?.esCitas ?? false,
+                ))
                   _numero(etiqueta, valor, etiqueta == 'Disponibles'),
               ],
             ),

@@ -209,6 +209,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     setState(() => _agendando = true);
     final navegador = Navigator.of(context);
     final mensajero = ScaffoldMessenger.of(context);
+    // Para «Pagar ahora» en el aviso, que queda cuando esta hoja ya se cerró.
+    final contenedor = ProviderScope.containerOf(context);
     // Solo un servicio con anticipo pregunta cuánto pagar ahora.
     final conAnticipo = _anticipo != null;
     final pagar = !conAnticipo
@@ -229,6 +231,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         pagar: pagar,
       );
       await ref.read(cuentaProvider.notifier).recargar();
+      // Si el negocio cobra en línea, la cita apartada se paga desde el aviso.
+      final pagoEnLinea = ref.read(cuentaProvider).value?.pagoEnLinea ?? false;
       navegador.pop();
       // Un solo aviso: si quedó apartada o agendada y, con «cualquiera», con quién.
       final quien = cita.profesional;
@@ -243,7 +247,26 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
           : _servicio!.conPlan
           ? '¡Listo! Agendamos tu cita con tu bono.'
           : '¡Listo! Agendamos tu cita.';
-      mensajero.showSnackBar(SnackBar(content: Text('$aviso$conQuien')));
+      final ordenId = cita.ordenId;
+      final pagarAhora =
+          cita.estado == 'pendiente_pago' && ordenId != null && pagoEnLinea;
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text('$aviso$conQuien'),
+          // Con algo que hacer, el aviso dura más.
+          duration: pagarAhora
+              ? const Duration(seconds: 10)
+              : const Duration(seconds: 4),
+          action: pagarAhora
+              ? SnackBarAction(
+                  key: const Key('pagar-cita-ahora'),
+                  label: 'Pagar ahora',
+                  onPressed: () =>
+                      pagarEnLineaDesde(navegador.context, contenedor, ordenId),
+                )
+              : null,
+        ),
+      );
     });
     if (mounted) {
       setState(() => _agendando = false);

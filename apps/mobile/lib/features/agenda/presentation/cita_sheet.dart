@@ -193,15 +193,17 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
       if (!mounted) {
         return;
       }
+      // Una cita: su bono, no créditos ni reservas (con la palabra del negocio).
+      final terminos = ref.read(sesionProvider)?.terminologia;
       final mensaje = cita.asistencia != null
           ? '$cliente está marcado como «${nombre(cita.asistencia!)}». '
-                '¿Cambiarlo a «${nombre(asistencia)}»? Si aplica, el crédito se '
-                'ajusta en su saldo.'
+                '¿Cambiarlo a «${nombre(asistencia)}»? Si aplica, su bono se '
+                'ajusta.'
           : asistencia == 'presente'
           ? '¿Marcar que $cliente llegó${retardo ? ' tarde' : ''} a su cita?'
           : '¿Marcar que $cliente no asistió? '
-                '${efecto?.texto ?? 'Según la política del negocio, puede perder '
-                        'el crédito o el pago de la cita.'}';
+                '${efecto?.textoCon(esCitas: true, t: terminos) ?? 'Según la política del negocio, puede perder '
+                        'la cita de su bono o el pago de la cita.'}';
       if (!await _confirmar(
         context,
         titulo: 'Asistencia',

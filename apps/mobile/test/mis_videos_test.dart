@@ -13,8 +13,9 @@ import 'package:agendauno/features/cuenta/data/cuenta_repository.dart';
 import 'package:agendauno/features/cuenta/data/videos.dart';
 import 'package:agendauno/features/cuenta/presentation/mis_videos_screen.dart';
 
-/// La biblioteca de videos del negocio en la app (ADR 0184), como en la web: los de
-/// sus planes se abren; de los demás, qué plan los incluye. Solo en clases. Datos
+/// La biblioteca de videos del negocio en la app (ADR 0184): los de sus planes se
+/// abren; de los demás, solo que no están en sus planes (la app no vende contenido
+/// digital: sin «Ver planes» ni nombres de planes). Solo en clases. Datos
 /// sintéticos, sin red real.
 
 final _videos = [
@@ -93,13 +94,13 @@ Sesion _sesion(Modalidad modalidad) => Sesion(
 );
 
 void main() {
-  test('lee cada video: si lo incluye su plan y cuáles lo incluyen', () {
+  test('lee cada video: si lo incluye su plan', () {
     final lista = _videos.map(VideoMiembro.desdeJson).toList();
 
     expect(lista[0].sePuedeVer, isTrue);
     expect(lista[0].duracionMinutos, 12);
     expect(lista[1].sePuedeVer, isFalse);
-    expect(lista[1].comoTenerlo, 'Incluido en: Mensual ilimitado.');
+    expect(lista[1].planes, ['Mensual ilimitado']);
     // Solo https: otro esquema no se abre aunque esté disponible.
     expect(
       VideoMiembro.desdeJson({
@@ -132,11 +133,10 @@ void main() {
     expect(videos, hasLength(3));
   });
 
-  testWidgets('se abren los de su plan; de los demás, qué plan los incluye', (
+  testWidgets('se abren los de su plan; de los demás, un texto neutro', (
     tester,
   ) async {
     final api = _ApiVideos();
-    var aPlanes = 0;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -151,7 +151,7 @@ void main() {
             builder: (context) => TextButton(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => MisVideosScreen(onVerPlanes: () => aPlanes++),
+                  builder: (_) => const MisVideosScreen(),
                 ),
               ),
               child: const Text('Abrir'),
@@ -171,12 +171,13 @@ void main() {
     expect(find.byKey(const Key('ver-video-v1')), findsOneWidget);
     expect(find.byKey(const Key('ver-video-v3')), findsOneWidget);
     expect(find.byKey(const Key('ver-video-v2')), findsNothing);
-    expect(find.text('Incluido en: Mensual ilimitado.'), findsOneWidget);
-
-    await tester.tap(find.text('Ver planes'));
-    await tester.pumpAndSettle();
-    expect(aPlanes, 1);
-    expect(find.byType(MisVideosScreen), findsNothing);
+    // Sin invitar a comprar: ni el plan que lo incluye ni un atajo a Pagos o a la
+    // web (reglas 3.1.1 y 3.1.3 de Apple).
+    expect(find.byKey(const Key('no-incluido-v2')), findsOneWidget);
+    expect(find.text('No está incluido en tus planes.'), findsOneWidget);
+    expect(find.textContaining('Mensual ilimitado'), findsNothing);
+    expect(find.text('Ver planes'), findsNothing);
+    expect(find.textContaining('web'), findsNothing);
   });
 
   test('en un negocio de citas no se piden', () async {

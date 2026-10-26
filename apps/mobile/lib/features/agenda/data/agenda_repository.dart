@@ -6,6 +6,7 @@ import '../../../core/network/dio_client.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../cuenta/data/cuenta_models.dart';
 import 'agenda_models.dart';
+import 'bloqueos.dart';
 
 /// Agenda del staff (`/app/{slug}/…`): sesiones del día, profesionales y las
 /// acciones de recepción sobre una cita (llegada, inasistencia, cobro, cancelación).
@@ -17,6 +18,9 @@ class AgendaRepository {
 
   /// Una cita por intento: reintentar la misma no agenda otra (ADR 0201).
   final _intentoCita = IntentoUnico();
+
+  /// Agregar a alguien a una clase, una vez por intento (ADR 0201).
+  final _intentoAgregar = IntentoUnico();
 
   String get _base => '/api/v1/app/$_slug';
 
@@ -121,6 +125,71 @@ class AgendaRepository {
   Future<void> aceptarLugar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/reservas/$reservaId/aceptar');
 
+  /// Agrega a la clase a quien llegó sin reservar (como en la web): se reserva con
+  /// su plan; con [esperar], a la lista de espera. Reintentar lo mismo devuelve la
+  /// misma reserva (clave del intento).
+  Future<void> agregarAClase(
+    String sesionId,
+    String personaId, {
+    bool esperar = false,
+  }) async {
+    final pedido = {
+      'sesion': sesionId,
+      'persona_id': personaId,
+      'esperar': esperar,
+    };
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '$_base/sesiones/$sesionId/reservas',
+        data: {
+          'persona_id': personaId,
+          'esperar': esperar,
+          'idempotency_key': _intentoAgregar.clave(pedido),
+        },
+      );
+      _intentoAgregar.listo();
+    } on DioException catch (e) {
+      // Con respuesta del servidor (rechazada), lo siguiente es otro intento; sin
+      // ella, se reintenta con la misma clave.
+      if (e.response != null) {
+        _intentoAgregar.listo();
+      }
+      rethrow;
+    }
+  }
+
+  /// Un invitado de un cliente llegó o no vino (ADR 0182).
+  Future<void> marcarInvitado(String invitadoId, {required bool asistio}) =>
+      _dio.put<Map<String, dynamic>>(
+        '$_base/invitados/$invitadoId/asistencia',
+        data: {'asistio': asistio},
+      );
+
+  /// Llegó quien reservó desde su plataforma (ADR 0202). Fitpass pide que se haya
+  /// revisado su identificación oficial.
+  Future<void> llegoDePlataforma(
+    String lugarId, {
+    bool identificacionRevisada = false,
+  }) => _dio.post<Map<String, dynamic>>(
+    '$_base/lugares-plataforma/$lugarId/llego',
+    data: {if (identificacionRevisada) 'identificacion_revisada': true},
+  );
+
+  /// Cancela la reserva de una plataforma: le avisa y el lugar queda libre.
+  Future<void> cancelarDePlataforma(String lugarId) =>
+      _dio.post<Map<String, dynamic>>(
+        '$_base/lugares-plataforma/$lugarId/cancelar',
+        data: const <String, dynamic>{},
+      );
+
+  /// Lo que los clientes apartaron para recoger en la clase (ADR 0194).
+  Future<List<ApartadoClase>> apartados(String sesionId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/sesiones/$sesionId/apartados',
+    );
+    return ApartadoClase.lista(res.data?['data']);
+  }
+
   /// Cobra en caja lo que falta de la cita (el servicio o su saldo, si pagó
   /// anticipo), como en la web. La clave del intento evita cobrar dos veces si la
   /// petición se repite.
@@ -164,6 +233,52 @@ class AgendaRepository {
         .map((e) => HechoCita.desdeJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  // ----------------------------- bloqueos de la agenda (fase 2.2, como la web)
+
+  /// Los bloqueos que tocan esos días (el servidor ensancha un día por lado; la
+  /// pantalla los filtra por el día en el negocio).
+  Future<List<BloqueoAgenda>> bloqueos(DateTime desde, DateTime hasta) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/bloqueos',
+      queryParameters: {'desde': ymd(desde), 'hasta': ymd(hasta)},
+    );
+    return BloqueoAgenda.lista(res.data?['data']);
+  }
+
+  /// Qué ya está agendado en el bloqueo propuesto (no guarda nada).
+  Future<List<SesionAfectada>> previsualizarBloqueo(NuevoBloqueo b) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/bloqueos/previsualizar',
+      data: b.aJson(),
+    );
+    return SesionAfectada.lista(
+      (res.data?['data'] as Map<String, dynamic>?)?['afectadas'],
+    );
+  }
+
+  /// Guarda el bloqueo; devuelve lo que ya estaba agendado ahí (sigue en pie).
+  Future<({BloqueoAgenda? bloqueo, List<SesionAfectada> afectadas})>
+  crearBloqueo(NuevoBloqueo b) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/bloqueos',
+      data: b.aJson(),
+    );
+    final data = res.data?['data'];
+    return (
+      bloqueo:
+          data is Map<String, dynamic> &&
+              data['desde'] is String &&
+              data['hasta'] is String
+          ? BloqueoAgenda.desdeJson(data)
+          : null,
+      afectadas: SesionAfectada.lista(res.data?['afectadas']),
+    );
+  }
+
+  /// Quita un bloqueo: ese horario se puede volver a agendar.
+  Future<void> quitarBloqueo(String bloqueoId) =>
+      _dio.delete<void>('$_base/bloqueos/$bloqueoId');
 
   // ----------------------------- agendar y reprogramar (igual que la web)
 

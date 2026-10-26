@@ -10,6 +10,8 @@ import '../../../core/legales/enlaces_legales.dart';
 import '../../../core/flechas_que_se_mueven.dart';
 import '../../../core/paises.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import 'calendarios_externos_sheet.dart';
+import 'eliminar_cuenta_sheet.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../auth/presentation/elegir_rol_screen.dart';
@@ -831,6 +833,23 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               ],
             ),
           ),
+          // Google Calendar u Outlook en las dos direcciones (ADR 0199): para quien
+          // atiende; conectarlo se hace en la web.
+          if (atiende(sesion))
+            Card(
+              child: ListTile(
+                key: const Key('calendarios-externos'),
+                leading: const Icon(Icons.sync),
+                title: const Text('Sincronizar con Google u Outlook'),
+                subtitle: const Text(
+                  'Lo ocupado en tu calendario bloquea tu agenda.',
+                ),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: _guardando
+                    ? null
+                    : () => mostrarCalendariosExternos(context),
+              ),
+            ),
           if (sesion.tieneVariosRoles)
             Card(
               child: ListTile(
@@ -858,6 +877,14 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             nombreNegocio: sesion.estudioNombre,
           ),
           const SizedBox(height: 8),
+          // Eliminar la cuenta (cualquier rol; lo piden Apple y Google).
+          TextButton.icon(
+            key: const Key('eliminar-cuenta'),
+            style: TextButton.styleFrom(foregroundColor: context.colores.error),
+            icon: const Icon(Icons.person_remove_outlined),
+            label: const Text('Eliminar mi cuenta'),
+            onPressed: _guardando ? null : () => mostrarEliminarCuenta(context),
+          ),
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: context.colores.error),
             icon: const Icon(Icons.logout),

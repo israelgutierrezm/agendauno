@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  La extensión del widget de inicio (ProximoWidget.swift). Su versión es la de la app
+  (FLUTTER_BUILD_NAME / FLUTTER_BUILD_NUMBER, de las mismas configuraciones de Flutter):
+  el App Store rechaza una extensión con otra versión que su app.
+  - AppGroupId: el App Group del sabor ($(APP_GROUP_ID)), el mismo UserDefaults en que
+    la app guarda los datos con home_widget.
+  - AppProducto: el sabor ($(FLAVOR)); con turnouno el widget dice «cita».
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+	<key>AppGroupId</key>
+	<string>$(APP_GROUP_ID)</string>
+	<key>AppProducto</key>
+	<string>$(FLAVOR)</string>
+</dict>
+</plist>

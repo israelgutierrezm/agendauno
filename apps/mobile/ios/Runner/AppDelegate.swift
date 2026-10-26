@@ -2,6 +2,7 @@ import Flutter
 import PassKit
 import QuickLook
 import UIKit
+import UniformTypeIdentifiers
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -28,10 +29,17 @@ import UIKit
 
 /// Lo que la app le pide al iPhone con bytes que bajó con su sesión: agregar el pase de
 /// entrada a Apple Wallet (ADR 0195) y ver un documento (un PDF) con la vista previa
-/// del sistema. Responde false si no se pudo (la app lo dice).
-final class ArchivosNativos: NSObject, QLPreviewControllerDataSource {
+/// del sistema; y elegir un PDF de Archivos para subirlo (sin permisos: el sistema da
+/// acceso solo al que se elige). Responde false (o nil) si no se pudo.
+final class ArchivosNativos: NSObject, QLPreviewControllerDataSource,
+  UIDocumentPickerDelegate
+{
   private var canal: FlutterMethodChannel?
   private var vistaPrevia: URL?
+  /// La respuesta pendiente de «elegir un PDF» (una a la vez).
+  private var pdfPendiente: FlutterResult?
+  /// El tope del servidor para un documento (8 MB).
+  private static let maximoPdf = 8 * 1024 * 1024
 
   func escuchar(_ canal: FlutterMethodChannel) {
     canal.setMethodCallHandler { [weak self] llamada, resultado in
@@ -48,9 +56,59 @@ final class ArchivosNativos: NSObject, QLPreviewControllerDataSource {
     case "abrir":
       let nombre = (llamada.arguments as? [String: Any])?["nombre"] as? String
       abrir(datos?.data, nombre: nombre, resultado)
+    case "elegirPdf":
+      elegirPdf(resultado)
     default:
       resultado(FlutterMethodNotImplemented)
     }
+  }
+
+  /// El selector de Archivos, solo PDF y como copia. Responde `{bytes, nombre}`, nil
+  /// si se canceló o `{demasiado: true}` si pasa del tope.
+  private func elegirPdf(_ resultado: @escaping FlutterResult) {
+    guard pdfPendiente == nil, let arriba = ArchivosNativos.pantallaDeArriba() else {
+      resultado(nil)
+      return
+    }
+    let selector = UIDocumentPickerViewController(
+      forOpeningContentTypes: [UTType.pdf], asCopy: true)
+    selector.allowsMultipleSelection = false
+    selector.delegate = self
+    pdfPendiente = resultado
+    arriba.present(selector, animated: true)
+  }
+
+  func documentPicker(
+    _ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]
+  ) {
+    guard let resultado = pdfPendiente else { return }
+    pdfPendiente = nil
+    guard let url = urls.first else {
+      resultado(nil)
+      return
+    }
+    let tamano = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+    if tamano > ArchivosNativos.maximoPdf {
+      resultado(["demasiado": true])
+      return
+    }
+    guard let datos = try? Data(contentsOf: url) else {
+      resultado(nil)
+      return
+    }
+    if datos.count > ArchivosNativos.maximoPdf {
+      resultado(["demasiado": true])
+      return
+    }
+    resultado([
+      "bytes": FlutterStandardTypedData(bytes: datos),
+      "nombre": url.lastPathComponent,
+    ])
+  }
+
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    pdfPendiente?(nil)
+    pdfPendiente = nil
   }
 
   /// La hoja de Apple Wallet con el pase (`.pkpass` firmado por el servidor).

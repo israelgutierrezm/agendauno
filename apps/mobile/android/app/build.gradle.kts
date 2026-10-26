@@ -45,6 +45,17 @@ val recursosMarca = file("../../configuraciones/marca_blanca/$negocioMarcaBlanca
 val recursosColorMarca = layout.buildDirectory.dir("generated/marca_blanca/res").get().asFile
 val conColorMarca = negocioValido && Regex("^#[0-9a-fA-F]{6}$").matches(colorMarca)
 
+// Un applicationId de Android: segmentos separados por puntos (al menos dos), cada uno
+// empieza con letra y sigue con letras, números o «_» (como lo exige Google Play).
+val formatoIdAndroid = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
+
+// El esquema propio de cada app para volver a ella desde el navegador (el regreso del
+// pago: `<esquema>://pagos?ref=…`): `agendauno`, `turnouno` y, en la marca blanca, su
+// ANDROID_ID en minúsculas con «-» en lugar de «_» (lo mismo calcula la app en
+// AppConfig.esquemaApp). La API solo acepta `^[a-z][a-z0-9.+-]{2,40}$`.
+val esquemaMarcaBlanca = idMarcaBlanca.lowercase().replace('_', '-')
+val formatoEsquema = Regex("^[a-z][a-z0-9.+-]{2,40}$")
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -78,11 +89,13 @@ android {
             // Una app de marca blanca de AgendaUno lleva su propio id y su nombre.
             applicationId = idMarcaBlanca.ifEmpty { "com.agendauno.app" }
             manifestPlaceholders["appNombre"] = nombreMarcaBlanca.ifEmpty { "AgendaUno" }
+            manifestPlaceholders["esquemaApp"] = esquemaMarcaBlanca.ifEmpty { "agendauno" }
         }
         create("turnouno") {
             dimension = "producto"
             applicationId = "com.turnouno.app"
             manifestPlaceholders["appNombre"] = "TurnoUno"
+            manifestPlaceholders["esquemaApp"] = "turnouno"
         }
     }
 
@@ -162,6 +175,19 @@ gradle.taskGraph.whenReady {
         idMarcaBlanca == "com.turnouno.app"
     ) {
         detener("necesita su propio ANDROID_ID en su archivo de configuración (configuraciones/marca_blanca/)")
+    }
+    if (!formatoIdAndroid.matches(idMarcaBlanca)) {
+        detener(
+            "ANDROID_ID=$idMarcaBlanca no es un id de Android: segmentos separados por " +
+                "puntos (al menos dos, p. ej. mx.estudioluna.app), cada uno empieza con " +
+                "letra y sigue con letras, números o «_»",
+        )
+    }
+    if (!formatoEsquema.matches(esquemaMarcaBlanca)) {
+        detener(
+            "ANDROID_ID=$idMarcaBlanca es muy largo para el esquema de la app " +
+                "($esquemaMarcaBlanca: máximo 41 caracteres)",
+        )
     }
     if (nombreMarcaBlanca.isEmpty()) {
         detener("falta APP_NOMBRE: su nombre en el teléfono")

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/application/sesion_controller.dart';
 import 'core/config/app_config.dart';
+import 'core/enlaces/regreso_pago.dart';
 import 'core/errores/reporte_errores.dart';
 import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
@@ -72,14 +73,34 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
   final _navegador = GlobalKey<NavigatorState>();
   // Al volver a primer plano se confirma que la sesión sigue viva (pudo cerrarse
   // en la web u otro teléfono mientras la app estaba en segundo plano).
+  // Y se vuelve a registrar el teléfono para los avisos: pudo activarlos en Ajustes
+  // (o en iPhone, llegar el token de APNs) mientras tanto.
   late final AppLifecycleListener _ciclo = AppLifecycleListener(
-    onResume: () => ref.read(sesionProvider.notifier).revisar(),
+    onResume: () {
+      ref.read(sesionProvider.notifier).revisar();
+      final sesion = ref.read(sesionProvider);
+      if (sesion != null) {
+        ref.read(pushProvider).registrar(sesion);
+      }
+    },
   );
+
+  // El regreso del pago en el navegador (`<esquema>://pagos?ref=…`): se atiende
+  // antes que el Navigator, que no tiene esa ruta.
+  late final EnlacesDeLaApp _enlaces = EnlacesDeLaApp(_alRegresarDePago);
 
   @override
   void initState() {
     super.initState();
     _ciclo;
+    WidgetsBinding.instance.addObserver(_enlaces);
+    // Si la app estaba cerrada y la abrió ese enlace.
+    final alAbrir = EnlacesDeLaApp.alAbrir();
+    if (alAbrir != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _alRegresarDePago(alAbrir),
+      );
+    }
     // Una sesión restaurada se valida con el servidor (token revocado → login).
     ref.read(sesionProvider.notifier).refrescar();
     ReporteErrores.instancia.estudio = () => ref.read(sesionProvider)?.slug;
@@ -93,8 +114,22 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(_enlaces);
     _ciclo.dispose();
     super.dispose();
+  }
+
+  /// Volvió del pago: el cliente ve sus pagos, ya leídos de nuevo (el webhook pudo
+  /// confirmar el pago mientras tanto), y lo que pasó.
+  void _alRegresarDePago(RegresoDePago regreso) {
+    final sesion = ref.read(sesionProvider);
+    if (sesion == null || !sesion.esMiembro) {
+      return;
+    }
+    _navegador.currentState?.popUntil((ruta) => ruta.isFirst);
+    ref.invalidate(cuentaProvider);
+    ref.read(avisoAbiertoProvider.notifier).irA(DestinoPush.pagos);
+    _mostrarAviso(regreso.mensaje, '');
   }
 
   /// Sin sesión (o con el negocio suspendido) no queda ninguna pantalla encima del
@@ -201,6 +236,9 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       locale: AgendaUnoApp.idioma,
       supportedLocales: const [AgendaUnoApp.idioma],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      // Siempre la pantalla de la sesión: un enlace que abre la app (el regreso del
+      // pago) lo atiende [EnlacesDeLaApp], no el Navigator.
+      initialRoute: '/',
       home: inicio,
     );
   }

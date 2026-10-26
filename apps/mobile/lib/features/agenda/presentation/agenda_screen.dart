@@ -11,8 +11,10 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/agenda_controller.dart';
+import '../data/bloqueos.dart';
 import '../data/agenda_models.dart';
 import 'abrir_sesion.dart';
+import 'bloqueos_agenda.dart';
 import 'nueva_cita_sheet.dart';
 
 const _diasCortos = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -327,6 +329,16 @@ class _AgendaCitas extends ConsumerWidget {
     final citas = agenda.sesiones
         .where((s) => s.instructorId == pro.id)
         .toList();
+    final sesion = ref.watch(sesionProvider);
+    // Sus bloqueos de ese día (comida, ausencia) y los cierres de sede.
+    final pared = paredDelNegocio(sesion);
+    final bloqueos = bloqueosDe(
+      agenda.bloqueos,
+      profesionalId: pro.id,
+      dia: dia,
+      pared: pared,
+    );
+    final puedeBloquear = sesion?.puede('agenda.gestionar') ?? false;
     // En qué va cada cita lo dice el servidor.
     final enLocal = citas
         .where(
@@ -412,20 +424,57 @@ class _AgendaCitas extends ConsumerWidget {
             ],
           ),
         ),
+        if (puedeBloquear)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: const Key('bloquear-horario'),
+                onPressed: () => mostrarNuevoBloqueo(
+                  context,
+                  profesional: pro,
+                  dia: dia,
+                  propio: acotado,
+                ),
+                icon: const Icon(Icons.block, size: 18),
+                label: Text(
+                  acotado ? 'Bloquear mi horario' : 'Bloquear horario',
+                ),
+              ),
+            ),
+          ),
         Expanded(
-          child: _LineaTiempo(citas: citas, dia: dia),
+          child: _LineaTiempo(
+            citas: citas,
+            dia: dia,
+            bloqueos: bloqueos,
+            pared: pared,
+          ),
         ),
       ],
     );
   }
 }
 
-/// Día del profesional a escala: horas, citas por estado y la línea de "ahora".
+/// Día del profesional a escala: horas, citas por estado, sus bloqueos (comida,
+/// ausencia, cierre de la sede) y la línea de "ahora".
 class _LineaTiempo extends ConsumerStatefulWidget {
-  const _LineaTiempo({required this.citas, required this.dia});
+  const _LineaTiempo({
+    required this.citas,
+    required this.dia,
+    this.bloqueos = const [],
+    this.pared = _sinZona,
+  });
 
   final List<SesionAgenda> citas;
   final DateTime dia;
+  final List<BloqueoAgenda> bloqueos;
+
+  /// La hora de pared del negocio de un instante (la de los bloqueos).
+  final DateTime Function(DateTime) pared;
+
+  static DateTime _sinZona(DateTime d) => d.toLocal();
 
   @override
   ConsumerState<_LineaTiempo> createState() => _LineaTiempoState();
@@ -474,7 +523,27 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
           : 24 * 60;
       fin = math.max(fin, (termina / 60).ceil() * 60);
     }
+    // Un bloqueo por horas también se ve (uno de todo el día cubre lo que haya).
+    for (final b in widget.bloqueos.where((b) => !b.todoElDia)) {
+      final (desde, hasta) = _minutosDe(b);
+      ini = math.min(ini, desde ~/ 60 * 60);
+      fin = math.max(fin, (hasta / 60).ceil() * 60);
+    }
     return (ini, math.min(fin, 24 * 60));
+  }
+
+  /// De qué minuto a qué minuto de este día va un bloqueo (recortado al día).
+  (int, int) _minutosDe(BloqueoAgenda b) {
+    final dia = DateTime(widget.dia.year, widget.dia.month, widget.dia.day);
+    final desde = widget.pared(b.desde);
+    final hasta = widget.pared(b.hasta);
+    final inicio = desde.isBefore(dia) ? 0 : _minuto(desde);
+    final fin =
+        hasta.isAfter(dia.add(const Duration(days: 1))) ||
+            !_mismoDia(hasta, dia)
+        ? 24 * 60
+        : _minuto(hasta);
+    return (inicio, math.max(inicio, fin));
   }
 
   double _y(int minuto) => (minuto - _rango.$1) / 60 * _pxHora;
@@ -520,7 +589,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
         color: context.colores.superficie,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: widget.citas.isEmpty
+      child: widget.citas.isEmpty && widget.bloqueos.isEmpty
           ? const _Vacio('Sin citas este día.')
           : SingleChildScrollView(
               controller: _scroll,
@@ -550,6 +619,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
                         ),
                       ),
                     ],
+                    for (final b in widget.bloqueos) _bloqueo(context, b),
                     for (final s in widget.citas) _tarjeta(context, s, sesion),
                     if (verAhora) ...[
                       Positioned(
@@ -588,6 +658,71 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
                 ),
               ),
             ),
+    );
+  }
+
+  /// Un bloqueo en la línea de tiempo: gris, con su motivo; al tocarlo, su detalle
+  /// (y quitarlo, con permiso).
+  Widget _bloqueo(BuildContext context, BloqueoAgenda b) {
+    final (rangoIni, rangoFin) = _rango;
+    final (desde, hasta) = b.todoElDia ? (rangoIni, rangoFin) : _minutosDe(b);
+    final top = _y(math.max(desde, rangoIni)) + 1;
+    final alto = math.max(
+      24.0,
+      (math.min(hasta, rangoFin) - math.max(desde, rangoIni)) / 60 * _pxHora -
+          3,
+    );
+    final texto = [
+      b.motivo ?? 'Bloqueado',
+      if (!b.dePersona && b.nombre != null) b.nombre!,
+      horarioBloqueo(b, widget.pared),
+    ].join(' · ');
+    return Positioned(
+      key: ValueKey('bloqueo-${b.id}'),
+      left: 58,
+      right: 12,
+      top: top,
+      height: alto,
+      child: Semantics(
+        button: true,
+        label: 'Bloqueado: $texto',
+        child: Material(
+          color: context.colores.superficie2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: context.colores.borde),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => mostrarBloqueo(context, b),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.block,
+                    size: 14,
+                    color: context.colores.textoSuave,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      texto,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.colores.textoSuave,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

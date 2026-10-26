@@ -4,16 +4,25 @@ name: Apps móviles
 # (.aab) firmado con su llave de subida, como artefacto de este flujo. No lo sube a la
 # tienda: publicar requiere autorización y se hace a mano en Play Console. Solo a mano
 # (Actions → Apps móviles → Run workflow), con el entorno de GitHub de cada app
-# (`android-agendauno`, `android-turnouno`), que guarda sus secretos (docs/CI-CD.md):
+# (`android-agendauno`, `android-turnouno`), que guarda sus secretos (docs/MOBILE.md):
 # ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS,
-# ANDROID_KEY_PASSWORD y, para las notificaciones, FIREBASE_API_KEY, FIREBASE_APP_ID,
-# FIREBASE_SENDER_ID y FIREBASE_PROJECT_ID. Variable opcional: GOOGLE_SERVER_CLIENT_ID.
+# ANDROID_KEY_PASSWORD y los de su app en Firebase: FIREBASE_API_KEY, FIREBASE_APP_ID
+# (o FIREBASE_ANDROID_APP_ID), FIREBASE_SENDER_ID y FIREBASE_PROJECT_ID. Sin Firebase
+# el paquete no se compila: una app publicada sin push no recibiría ningún aviso.
+# Variable opcional: GOOGLE_SERVER_CLIENT_ID.
+#
+# Con `marca_blanca` (el slug de un negocio de AgendaUno) firma el .aab de SU app:
+# su archivo configuraciones/marca_blanca/<negocio>.json (con su ANDROID_ID, su nombre
+# y su Firebase), sus íconos y su propio entorno `marca-blanca-<negocio>` con su llave
+# de subida (los mismos cuatro secretos ANDROID_*). Solo Android y solo AgendaUno.
 #
 # Con plataforma `ios` compila la app de iOS SIN FIRMAR en una Mac de GitHub (ADR
-# 0208): comprueba que el proyecto de Xcode compila con el esquema de esa app y que
-# sale con su id, su nombre, su ícono y solo para iPhone. No usa secretos ni entorno;
-# el .ipa firmado para el App Store se hace en una Mac con la cuenta de Apple
-# (docs/MOBILE.md).
+# 0208), con lo que llevará en el App Store: el entorno `ios-<app>` con la variable
+# APP_STORE_ID (el id numérico de su ficha) y los secretos de su app iOS en Firebase
+# (FIREBASE_API_KEY o FIREBASE_IOS_API_KEY, FIREBASE_IOS_APP_ID, FIREBASE_SENDER_ID,
+# FIREBASE_PROJECT_ID). Comprueba que sale con su id, su nombre, su ícono, solo para
+# iPhone, su esquema de regreso y su manifiesto de privacidad. El .ipa firmado para el
+# App Store se hace en una Mac con la cuenta de Apple (docs/MOBILE.md).
 
 on:
   workflow_dispatch:
@@ -32,49 +41,121 @@ on:
         type: choice
         options: [android, ios]
         default: android
+      marca_blanca:
+        description: Marca blanca (el slug del negocio; vacío para la app oficial). Solo Android y AgendaUno
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
-  android:
-    name: Android · ${{ inputs.app }}
-    if: inputs.plataforma == 'android'
+  # Lo que se pidió, antes de elegir el entorno (y sus secretos) con ello.
+  revisar:
+    name: Revisar lo pedido
     runs-on: ubuntu-24.04
-    environment: android-${{ inputs.app }}
-    defaults:
-      run:
-        working-directory: apps/mobile
     env:
       APP: ${{ inputs.app }}
       NUMERO: ${{ inputs.numero }}
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-      FIREBASE_SENDER_ID: ${{ secrets.FIREBASE_SENDER_ID }}
-      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-      GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+      PLATAFORMA: ${{ inputs.plataforma }}
+      MARCA_BLANCA: ${{ inputs.marca_blanca }}
+    outputs:
+      entorno: ${{ steps.datos.outputs.entorno }}
     steps:
       - uses: actions/checkout@v5
 
-      - name: Revisar datos
+      - id: datos
+        name: Revisar datos
         run: |
           set -euo pipefail
           if ! printf '%s' "$NUMERO" | grep -Eq '^[1-9][0-9]{0,8}$'; then
             echo "::error::El número de compilación debe ser un entero positivo."
             exit 1
           fi
-          for secreto in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            if [ -z "${!secreto}" ]; then
-              echo "::error::Falta el secreto $secreto del entorno android-$APP (docs/CI-CD.md)."
+          if [ -z "$MARCA_BLANCA" ]; then
+            echo "entorno=$PLATAFORMA-$APP" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # La marca blanca: un slug, solo AgendaUno y solo Android (ADR 0111 y 0208).
+          if ! printf '%s' "$MARCA_BLANCA" | grep -Eq '^[a-z0-9-]{1,60}$'; then
+            echo "::error::marca_blanca debe ser el slug del negocio: minúsculas, números y guiones."
+            exit 1
+          fi
+          if [ "$APP" != agendauno ] || [ "$PLATAFORMA" != android ]; then
+            echo "::error::La marca blanca es solo de AgendaUno y solo de Android (docs/MOBILE.md)."
+            exit 1
+          fi
+          archivo="apps/mobile/configuraciones/marca_blanca/$MARCA_BLANCA.json"
+          if [ ! -f "$archivo" ]; then
+            echo "::error::Falta su archivo $archivo (docs/MOBILE.md, «Marca blanca»)."
+            exit 1
+          fi
+          if [ "$(jq -r '.NEGOCIO // ""' "$archivo")" != "$MARCA_BLANCA" ]; then
+            echo "::error::El NEGOCIO de $archivo no es $MARCA_BLANCA."
+            exit 1
+          fi
+          # Su app en Firebase: sin ella, la app publicada no recibiría avisos.
+          for clave in FIREBASE_SENDER_ID FIREBASE_PROJECT_ID; do
+            if [ -z "$(jq -r --arg c "$clave" '.[$c] // ""' "$archivo")" ]; then
+              echo "::error::Falta $clave en $archivo."
               exit 1
             fi
           done
-          if [ -z "$FIREBASE_APP_ID" ]; then
-            echo "::warning::Sin FIREBASE_*: la app se compila sin notificaciones push."
+          if [ -z "$(jq -r '(.FIREBASE_ANDROID_APP_ID // "") + (.FIREBASE_APP_ID // "")' "$archivo")" ]; then
+            echo "::error::Falta FIREBASE_ANDROID_APP_ID en $archivo."
+            exit 1
+          fi
+          if [ -z "$(jq -r '(.FIREBASE_API_KEY // "") + (.FIREBASE_ANDROID_API_KEY // "")' "$archivo")" ]; then
+            echo "::error::Falta FIREBASE_API_KEY en $archivo."
+            exit 1
+          fi
+          echo "entorno=marca-blanca-$MARCA_BLANCA" >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android · ${{ inputs.marca_blanca != '' && inputs.marca_blanca || inputs.app }}
+    needs: revisar
+    if: inputs.plataforma == 'android'
+    runs-on: ubuntu-24.04
+    environment: ${{ needs.revisar.outputs.entorno }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      APP: ${{ inputs.app }}
+      NUMERO: ${{ inputs.numero }}
+      MARCA_BLANCA: ${{ inputs.marca_blanca }}
+      ENTORNO: ${{ needs.revisar.outputs.entorno }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID || secrets.FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_SENDER_ID: ${{ secrets.FIREBASE_SENDER_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Revisar secretos
+        run: |
+          set -euo pipefail
+          for secreto in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!secreto}" ]; then
+              echo "::error::Falta el secreto $secreto del entorno $ENTORNO (docs/MOBILE.md)."
+              exit 1
+            fi
+          done
+          # La app oficial lleva su Firebase en el entorno; la marca blanca, en su archivo
+          # (revisado arriba). Sin Firebase no se compila un paquete para la tienda.
+          if [ -z "$MARCA_BLANCA" ]; then
+            for secreto in FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_SENDER_ID FIREBASE_PROJECT_ID; do
+              if [ -z "${!secreto}" ]; then
+                echo "::error::Falta el secreto $secreto del entorno $ENTORNO: sin Firebase la app saldría sin notificaciones push (docs/MOBILE.md)."
+                exit 1
+              fi
+            done
           fi
 
       - uses: actions/setup-java@v4
@@ -106,18 +187,26 @@ jobs:
       - name: Compilar (.aab)
         run: |
           set -euo pipefail
-          flutter build appbundle --release --flavor "$APP" --build-number "$NUMERO" \
-            --dart-define=APP_VERSION="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)" \
-            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
-            --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID" \
-            --dart-define=FIREBASE_SENDER_ID="$FIREBASE_SENDER_ID" \
-            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
-            --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+          version="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
+          if [ -n "$MARCA_BLANCA" ]; then
+            # Todo lo suyo sale de su archivo (Gradle revisa que esté completo).
+            flutter build appbundle --release --flavor agendauno --build-number "$NUMERO" \
+              --dart-define-from-file="configuraciones/marca_blanca/$MARCA_BLANCA.json" \
+              --dart-define=APP_VERSION="$version"
+          else
+            flutter build appbundle --release --flavor "$APP" --build-number "$NUMERO" \
+              --dart-define=APP_VERSION="$version" \
+              --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
+              --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID" \
+              --dart-define=FIREBASE_SENDER_ID="$FIREBASE_SENDER_ID" \
+              --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
+              --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.app }}-${{ inputs.numero }}-aab
-          path: apps/mobile/build/app/outputs/bundle/${{ inputs.app }}Release/*.aab
+          name: ${{ inputs.marca_blanca != '' && format('marca-blanca-{0}', inputs.marca_blanca) || inputs.app }}-${{ inputs.numero }}-aab
+          path: apps/mobile/build/app/outputs/bundle/${{ inputs.marca_blanca != '' && 'agendauno' || inputs.app }}Release/*.aab
           retention-days: 30
 
       - name: Limpiar llave
@@ -126,24 +215,39 @@ jobs:
 
   ios:
     name: iOS · ${{ inputs.app }} (sin firmar)
+    needs: revisar
     if: inputs.plataforma == 'ios'
     runs-on: macos-15
+    environment: ios-${{ inputs.app }}
     defaults:
       run:
         working-directory: apps/mobile
     env:
       APP: ${{ inputs.app }}
       NUMERO: ${{ inputs.numero }}
+      APP_STORE_ID: ${{ vars.APP_STORE_ID }}
+      FIREBASE_API_KEY: ${{ secrets.FIREBASE_IOS_API_KEY || secrets.FIREBASE_API_KEY }}
+      FIREBASE_IOS_APP_ID: ${{ secrets.FIREBASE_IOS_APP_ID }}
+      FIREBASE_SENDER_ID: ${{ secrets.FIREBASE_SENDER_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v5
 
+      # Su ficha en el App Store (la pantalla «Actualiza la app» la abre) y su app iOS
+      # en Firebase: sin ellas no es la app que se publica.
       - name: Revisar datos
         run: |
           set -euo pipefail
-          if ! printf '%s' "$NUMERO" | grep -Eq '^[1-9][0-9]{0,8}$'; then
-            echo "::error::El número de compilación debe ser un entero positivo."
+          if ! printf '%s' "$APP_STORE_ID" | grep -Eq '^[0-9]{6,12}$'; then
+            echo "::error::Falta la variable APP_STORE_ID (el id numérico de su ficha en App Store Connect) del entorno ios-$APP (docs/MOBILE.md)."
             exit 1
           fi
+          for secreto in FIREBASE_API_KEY FIREBASE_IOS_APP_ID FIREBASE_SENDER_ID FIREBASE_PROJECT_ID; do
+            if [ -z "${!secreto}" ]; then
+              echo "::error::Falta el secreto $secreto del entorno ios-$APP: sin Firebase la app saldría sin notificaciones push (docs/MOBILE.md)."
+              exit 1
+            fi
+          done
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -160,17 +264,23 @@ jobs:
         run: |
           set -euo pipefail
           flutter build ios --release --no-codesign --flavor "$APP" --build-number "$NUMERO" \
-            --dart-define=APP_VERSION="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
+            --dart-define=APP_VERSION="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)" \
+            --dart-define=APP_STORE_ID="$APP_STORE_ID" \
+            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
+            --dart-define=FIREBASE_IOS_APP_ID="$FIREBASE_IOS_APP_ID" \
+            --dart-define=FIREBASE_SENDER_ID="$FIREBASE_SENDER_ID" \
+            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
 
       # Lo que distingue a cada app en el App Store, leído de lo que se compiló.
       - name: Revisar lo compilado
         run: |
           set -euo pipefail
-          plist=build/ios/iphoneos/Runner.app/Info.plist
+          app=build/ios/iphoneos/Runner.app
+          plist="$app/Info.plist"
           leer() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist"; }
           case "$APP" in
-            agendauno) id=com.agendauno.app; nombre=AgendaUno; icono=AppIcon ;;
-            turnouno) id=com.turnouno.app; nombre=TurnoUno; icono=AppIcon-TurnoUno ;;
+            agendauno) id=com.agendauno.app; nombre=AgendaUno; icono=AppIcon; esquema=agendauno ;;
+            turnouno) id=com.turnouno.app; nombre=TurnoUno; icono=AppIcon-TurnoUno; esquema=turnouno ;;
           esac
           test "$(leer CFBundleIdentifier)" = "$id" || { echo "::error::El id no es $id."; exit 1; }
           test "$(leer CFBundleDisplayName)" = "$nombre" || { echo "::error::El nombre no es $nombre."; exit 1; }
@@ -182,6 +292,19 @@ jobs:
             echo "::error::La app también se declara para iPad."
             exit 1
           fi
-          test -f build/ios/iphoneos/Runner.app/PrivacyInfo.xcprivacy \
+          # El regreso del pago (<esquema>://pagos?ref=…) abre esta app.
+          test "$(leer CFBundleURLTypes:0:CFBundleURLSchemes:0)" = "$esquema" \
+            || { echo "::error::El esquema de regreso no es $esquema."; exit 1; }
+          test -f "$app/PrivacyInfo.xcprivacy" \
             || { echo "::error::Falta PrivacyInfo.xcprivacy en la app."; exit 1; }
-          echo "iOS $APP: $id, $nombre, $icono, solo iPhone, con manifiesto de privacidad."
+          # El widget de inicio (ADR 0208): su extensión, con su id y su App Group.
+          widget="$app/PlugIns/ProximoWidget.appex"
+          test -d "$widget" || { echo "::error::Falta el widget ProximoWidget.appex en la app."; exit 1; }
+          leerw() { /usr/libexec/PlistBuddy -c "Print :$1" "$widget/Info.plist"; }
+          test "$(leerw CFBundleIdentifier)" = "$id.ProximoWidget" \
+            || { echo "::error::El id del widget no es $id.ProximoWidget."; exit 1; }
+          test "$(leerw AppGroupId)" = "group.$id" \
+            || { echo "::error::El App Group del widget no es group.$id."; exit 1; }
+          test "$(leerw AppProducto)" = "$APP" \
+            || { echo "::error::El widget no es de $APP."; exit 1; }
+          echo "iOS $APP: $id, $nombre, $icono, solo iPhone, $esquema://, widget y manifiesto de privacidad."

@@ -32,6 +32,57 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
   bool _appleWallet = false;
   bool _abriendoWallet = false;
 
+  /// Renueva el pase de la cartera (como la web): el anterior deja de servir.
+  Future<void> _renovarWallet() async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null || _abriendoWallet) {
+      return;
+    }
+    final seguir = await showDialog<bool>(
+      context: context,
+      builder: (contexto) => AlertDialog(
+        title: const Text('Renovar el pase de la cartera'),
+        content: const Text(
+          'El pase que ya tienes en la cartera dejará de servir; vuelve a '
+          'agregarlo después.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexto).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(contexto).pop(true),
+            child: const Text('Renovarlo'),
+          ),
+        ],
+      ),
+    );
+    if (seguir != true || !mounted) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _abriendoWallet = true);
+    try {
+      await repo.renovarPaseWallet();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Listo: el pase anterior ya no sirve. Vuelve a agregarlo a tu cartera.',
+          ),
+        ),
+      );
+    } on DioException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No se pudo renovar tu pase.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _abriendoWallet = false);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -211,9 +262,15 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
                 ),
               const SizedBox(height: 4),
               Text(
-                'El pase de la cartera no cambia cada minuto como este QR.',
+                'El pase de la cartera no cambia cada minuto como este QR. Si '
+                'pierdes tu teléfono, renuévalo.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.colores.textoSuave),
+              ),
+              TextButton(
+                key: const Key('pase-renovar-wallet'),
+                onPressed: _abriendoWallet ? null : _renovarWallet,
+                child: const Text('Renovar el pase de la cartera'),
               ),
             ],
           ],

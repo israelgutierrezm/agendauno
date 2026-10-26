@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El canal propio de las notificaciones push (ADR 0025): lo crea MainActivity al
+     abrir la app y FCM lo usa con la app en segundo plano (default_notification_channel_id
+     en el manifiesto). La persona lo ve con este nombre en Ajustes. -->
+<resources>
+    <string name="canal_avisos_id" translatable="false">avisos</string>
+    <string name="canal_avisos_nombre">Avisos del negocio</string>
+    <string name="canal_avisos_descripcion">Tus reservas, pagos y mensajes del negocio.</string>
+</resources>

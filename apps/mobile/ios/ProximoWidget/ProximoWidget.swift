@@ -4,10 +4,10 @@
 // que guardó muestra la primera que aún no termina, y la línea de tiempo cambia sola a
 // la siguiente cuando una termina. Al tocarlo, abre la app.
 //
-// Este archivo NO pertenece todavía a ningún target: es el código de la Widget
-// Extension que se crea en Xcode siguiendo ios/WIDGET.md. Las claves son las de
-// `ClavesWidget` (lib/features/widget_inicio/data/datos_widget.dart) y las mismas que
-// lee WidgetProximo.kt en Android.
+// Es el target `ProximoWidget` (Widget Extension) del proyecto de Xcode, que Runner
+// copia dentro de la app (ios/WIDGET.md). Las claves son las de `ClavesWidget`
+// (lib/features/widget_inicio/data/datos_widget.dart) y las mismas que lee
+// WidgetProximo.kt en Android.
 
 import SwiftUI
 import WidgetKit

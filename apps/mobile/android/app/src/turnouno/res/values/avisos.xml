@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TurnoUno: de citas (main/res/values/avisos.xml tiene el id y el nombre). -->
+<resources>
+    <string name="canal_avisos_descripcion">Tus citas, pagos y mensajes del negocio.</string>
+</resources>

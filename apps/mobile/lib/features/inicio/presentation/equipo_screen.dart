@@ -18,6 +18,9 @@ import '../../cuenta/presentation/tarjeta_principal.dart';
 import '../../notificaciones/application/aviso_abierto.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../../perfil/presentation/perfil_screen.dart';
+import '../../ventas/data/ventas_repository.dart';
+import '../../ventas/presentation/por_cobrar_screen.dart';
+import '../../ventas/presentation/vender_screen.dart';
 import '../data/inicio_repository.dart';
 import '../data/resumen_hoy.dart';
 import 'resumen_mes_card.dart';
@@ -258,7 +261,18 @@ class _InicioNegocio extends ConsumerWidget {
               ],
               if (hoy != null &&
                   (hoy.cobros != null || hoy.renovaciones != null))
-                _Pendientes(hoy: hoy, esCitas: esCitas),
+                _Pendientes(
+                  hoy: hoy,
+                  esCitas: esCitas,
+                  // Cobrar lo pendiente en caja, con el permiso de la web.
+                  onCobrar: puedeCobrarOrdenes(sesion)
+                      ? () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const PorCobrarScreen(),
+                          ),
+                        )
+                      : null,
+                ),
               // Los números del mes, para quien los ve (ADR 0081).
               ...switch (ref.watch(resumenMesProvider)) {
                 AsyncData(:final value?) => [
@@ -315,6 +329,23 @@ class _InicioNegocio extends ConsumerWidget {
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => const EscanerPaseScreen(),
+                      ),
+                    ),
+                  ),
+                // La venta rápida de un plan en el mostrador (como la web), con
+                // el permiso de vender.
+                if (puedeVenderPlanes(sesion))
+                  TarjetaAcceso(
+                    key: const Key('vender'),
+                    icono: Icons.sell_outlined,
+                    titulo: 'Vender',
+                    valor: esCitas
+                        ? 'Un bono, cobrado en caja'
+                        : 'Un plan, cobrado en caja',
+                    tono: TonosAcceso.pagos,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const VenderScreen(),
                       ),
                     ),
                   ),
@@ -514,14 +545,18 @@ class _Libres extends StatelessWidget {
   );
 }
 
-/// Lo pendiente de cobro y de renovación (se atiende desde la web).
+/// Lo pendiente de cobro y de renovación. Lo por cobrar se abre para cobrarlo en
+/// caja ([onCobrar], con el permiso); las renovaciones se atienden en la web.
 class _Pendientes extends StatelessWidget {
-  const _Pendientes({required this.hoy, this.esCitas = false});
+  const _Pendientes({required this.hoy, this.esCitas = false, this.onCobrar});
 
   /// En citas se venden bonos, no membresías (ADR 0130).
   final bool esCitas;
 
   final ResumenHoy hoy;
+
+  /// Abre «Por cobrar»; null sin permiso de cobrar.
+  final VoidCallback? onCobrar;
 
   @override
   Widget build(BuildContext context) {
@@ -548,8 +583,20 @@ class _Pendientes extends StatelessWidget {
               linea('Todo al día: nada por cobrar ni renovaciones por atender.')
             else ...[
               if (c != null && c.ordenesPendientes > 0)
-                linea(
-                  '${c.ordenesPendientes == 1 ? '1 orden' : '${c.ordenesPendientes} órdenes'} por cobrar · ${Formato.dinero(c.porCobrarMinor, c.moneda)}',
+                Row(
+                  children: [
+                    Expanded(
+                      child: linea(
+                        '${c.ordenesPendientes == 1 ? '1 orden' : '${c.ordenesPendientes} órdenes'} por cobrar · ${Formato.dinero(c.porCobrarMinor, c.moneda)}',
+                      ),
+                    ),
+                    if (onCobrar != null)
+                      TextButton(
+                        key: const Key('abrir-por-cobrar'),
+                        onPressed: onCobrar,
+                        child: const Text('Cobrar'),
+                      ),
+                  ],
                 ),
               if (c != null && c.enMora > 0)
                 linea(

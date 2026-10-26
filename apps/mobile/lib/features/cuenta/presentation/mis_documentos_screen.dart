@@ -13,18 +13,29 @@ import 'cuenta_screen.dart' show hacerConAviso;
 import 'cuenta_widgets.dart';
 
 /// "Mis documentos": lo que pide el negocio y cómo va cada uno. El alumno sube una
-/// foto del documento; queda en revisión hasta que el equipo lo valida. Lo que ya
+/// foto del documento o un PDF; queda en revisión hasta que el equipo lo valida. Lo que ya
 /// subió se puede ver: una foto dentro de la app y un PDF con el visor del teléfono
 /// (el archivo es privado: se baja con su sesión).
 class MisDocumentosScreen extends ConsumerStatefulWidget {
-  const MisDocumentosScreen({super.key});
+  const MisDocumentosScreen({
+    super.key,
+    this.elegirPdf = ArchivosNativos.elegirPdf,
+  });
+
+  /// El selector de PDF del teléfono (se cambia en las pruebas).
+  final Future<PdfElegido?> Function() elegirPdf;
 
   @override
   ConsumerState<MisDocumentosScreen> createState() =>
       _MisDocumentosScreenState();
 }
 
+/// De dónde sale lo que se sube.
+enum _Origen { camara, galeria, pdf }
+
 class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
+  Future<PdfElegido?> elegirPdf() => widget.elegirPdf();
+
   List<RequisitoDocumento>? _requisitos;
   List<DocumentoMio> _otros = const [];
   String? _error;
@@ -103,7 +114,7 @@ class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
   }
 
   Future<void> _subir(RequisitoDocumento r) async {
-    final origen = await showModalBottomSheet<ImageSource>(
+    final origen = await showModalBottomSheet<_Origen>(
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -113,12 +124,19 @@ class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
               title: const Text('Tomar foto'),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+              onTap: () => Navigator.of(context).pop(_Origen.camara),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
               title: const Text('Elegir de la galería'),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+              onTap: () => Navigator.of(context).pop(_Origen.galeria),
+            ),
+            ListTile(
+              key: const Key('subir-pdf'),
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Elegir un PDF'),
+              subtitle: const Text('De tus archivos, hasta 8 MB'),
+              onTap: () => Navigator.of(context).pop(_Origen.pdf),
             ),
           ],
         ),
@@ -127,15 +145,38 @@ class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
     if (origen == null || !mounted) {
       return;
     }
-    final foto = await ImagePicker().pickImage(
-      source: origen,
-      maxWidth: 2000,
-      imageQuality: 85,
-    );
-    if (foto == null || !mounted) {
-      return;
+    final messenger = ScaffoldMessenger.of(context);
+    final List<int> bytes;
+    final String nombre;
+    if (origen == _Origen.pdf) {
+      final pdf = await elegirPdf();
+      if (pdf == null || !mounted) {
+        return;
+      }
+      if (pdf.demasiado) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Ese PDF pesa más de 8 MB: elige uno más ligero.'),
+          ),
+        );
+        return;
+      }
+      bytes = pdf.bytes!;
+      nombre = pdf.nombreConExtension;
+    } else {
+      final foto = await ImagePicker().pickImage(
+        source: origen == _Origen.camara
+            ? ImageSource.camera
+            : ImageSource.gallery,
+        maxWidth: 2000,
+        imageQuality: 85,
+      );
+      if (foto == null || !mounted) {
+        return;
+      }
+      bytes = await foto.readAsBytes();
+      nombre = foto.name;
     }
-    final bytes = await foto.readAsBytes();
     final repo = ref.read(cuentaRepositoryProvider);
     if (repo == null || !mounted) {
       return;
@@ -144,7 +185,7 @@ class _MisDocumentosScreenState extends ConsumerState<MisDocumentosScreen> {
     setState(() => _subiendo = r.tipoId);
     await hacerConAviso(
       context,
-      () => repo.subirDocumento(r.tipoId, bytes, foto.name),
+      () => repo.subirDocumento(r.tipoId, bytes, nombre),
       exito: 'Documento enviado. Queda en revisión.',
     );
     await _cargar();

@@ -73,6 +73,7 @@ class BloqueClase {
     this.lugares = 0,
     this.dePago = false,
     this.precioMinor,
+    this.enLinea = false,
   });
 
   /// Null: sin cupo.
@@ -89,6 +90,14 @@ class BloqueClase {
 
   /// Precio de la clase suelta, solo si es de pago.
   final int? precioMinor;
+
+  /// Clase en línea (con enlace de videollamada, ADR 0184). Un API que no lo manda:
+  /// presencial.
+  final bool enLinea;
+
+  /// Clase en línea que se paga suelta: contenido digital, que la app no vende
+  /// (reglas 3.1.1 y 3.1.3 de Apple). Se reserva con un plan que ya la incluya.
+  bool get pagoDigital => enLinea && dePago;
 
   /// Sin lugares: se ofrece la lista de espera.
   bool get llena => libres == 0;
@@ -109,6 +118,7 @@ class BloqueClase {
         lugares: (bloque['lugares'] as num? ?? 0).toInt(),
         dePago: bloque['de_pago'] == true,
         precioMinor: (bloque['precio_minor'] as num?)?.toInt(),
+        enLinea: bloque['en_linea'] == true || respaldo['en_linea'] == true,
       );
     }
     final capacidad = (respaldo['capacidad'] as num?)?.toInt();
@@ -120,6 +130,7 @@ class BloqueClase {
           ? null
           : (capacidad - ocupados).clamp(0, capacidad),
       enEspera: (respaldo['en_espera'] as num? ?? 0).toInt(),
+      enLinea: respaldo['en_linea'] == true,
     );
   }
 }

@@ -30,12 +30,32 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- El regreso del pago en el navegador: la página de la web ofrece «Volver
+                 a la app» con <esquema>://pagos?ref=…&pago=…; la app abre Pagos y se
+                 actualiza (lib/core/enlaces/regreso_pago.dart). El esquema es el de
+                 cada app (agendauno, turnouno o el de la marca blanca, build.gradle.kts). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="${esquemaApp}" android:host="pagos"/>
+            </intent-filter>
+            <!-- Flutter pasa el enlace a la app como una ruta (la app lo atiende antes
+                 que el Navigator). -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
         </activity>
         <!-- Ícono pequeño de las notificaciones push (silueta blanca del isotipo):
              con la app en segundo plano, FCM lo usa en la barra de estado. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notificacion" />
+        <!-- Su canal propio (res/values/avisos.xml; lo crea MainActivity): con la app
+             en segundo plano FCM publica ahí, no en el canal genérico. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/canal_avisos_id" />
         <!-- Abrir con el visor del teléfono un documento que la app bajó con su sesión
              (un PDF): solo la carpeta compartidos/ de la caché y solo lectura. -->
         <provider
