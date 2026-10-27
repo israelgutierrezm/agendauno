@@ -285,7 +285,9 @@ function descargarQr(): void {
         role="switch"
         :aria-checked="activa"
         :aria-label="$t('captacion.formularios.activa')"
-        :aria-describedby="puedeEncender ? undefined : 'captacion-activa-motivo'"
+        :aria-describedby="
+          puedeEncender ? undefined : 'captacion-activa-motivo'
+        "
         :title="
           puedeEncender
             ? undefined

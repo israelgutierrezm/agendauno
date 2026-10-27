@@ -26,6 +26,9 @@ export default {
     "Devengado: lo ya impartido, con la tarifa vigente ese día. Por venir: lo que falta del periodo, solo como proyección.",
   periodoDe: "Periodo: {desde} – {hasta}",
   exportar: "Exportar CSV",
+  // «Exportar» deshabilitado dice por qué (ADR 0229).
+  exportarSinEsquema:
+    "Nadie del equipo tiene esquema de pago: define uno para exportar la nómina.",
   colMiembro: "Integrante",
   colEsquema: "Esquema",
   colCantidad: "Cantidad",

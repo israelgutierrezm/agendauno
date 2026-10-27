@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { esInstructor } from "@/lib/roles";
-import { computed, nextTick, onMounted, ref, toRef, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  toRef,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
@@ -49,6 +57,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { intentoUnico } from "@/lib/intento";
 import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
+import { centrarEnTira } from "@/lib/pantalla";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { fechaEnUrl, useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { colorEstado, estadoEnLista } from "@/lib/paseLista";
@@ -434,21 +443,29 @@ const diaSelInfo = computed(
   () => dias.value.find((d) => d.iso === diaSel.value) ?? dias.value[0],
 );
 
-// La tira de días del teléfono deja a la vista el día elegido (hoy puede ser domingo).
+// La tira de días del teléfono deja a la vista el día elegido (hoy puede ser domingo):
+// al entrar, al volver de la vista de mes (la tira estaba oculta), al cambiar de día o
+// de semana y al cambiar el tamaño de la ventana (girar el teléfono). Solo se anima al
+// elegir otro día o semana, y nunca con «reducir movimiento».
 const tiraDias = ref<HTMLElement | null>(null);
-watch(
-  [diaSel, () => dias.value[0]?.iso, tiraDias],
-  () => {
-    const tira = tiraDias.value;
-    const boton = tira?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (tira && boton) {
-      tira.scrollLeft =
-        boton.offsetLeft -
-        tira.offsetLeft -
-        (tira.clientWidth - boton.offsetWidth) / 2;
-    }
-  },
-  { flush: "post" },
+function centrarDiaActivo(suave = false): void {
+  const tira = tiraDias.value;
+  centrarEnTira(
+    tira,
+    tira?.querySelector<HTMLElement>('[aria-pressed="true"]') ?? null,
+    suave,
+  );
+}
+watch([tiraDias, vista], () => centrarDiaActivo(), { flush: "post" });
+watch([diaSel, () => dias.value[0]?.iso], () => centrarDiaActivo(true), {
+  flush: "post",
+});
+function centrarAlRedimensionar(): void {
+  centrarDiaActivo();
+}
+onMounted(() => window.addEventListener("resize", centrarAlRedimensionar));
+onBeforeUnmount(() =>
+  window.removeEventListener("resize", centrarAlRedimensionar),
 );
 
 /**
@@ -2719,7 +2736,11 @@ onMounted(async () => {
         >
           {{ diaTexto }}
         </p>
-        <div ref="tiraDias" class="flex gap-1.5 overflow-x-auto pb-2">
+        <div
+          ref="tiraDias"
+          class="flex gap-1.5 overflow-x-auto pb-2"
+          data-prueba="tira-dias"
+        >
           <button
             v-for="d in dias"
             :key="d.iso"
@@ -3892,7 +3913,12 @@ onMounted(async () => {
         </AvisoTono>
         <!-- Cómo se carga: primero se elige, y según eso cambia el formulario. -->
         <div class="sm:col-span-2">
-          <div class="tu-segmentado" role="group">
+          <!-- En el teléfono las tres formas van apiladas: no caben a lo ancho. -->
+          <div
+            class="tu-segmentado tu-segmentado-apilado"
+            role="group"
+            data-prueba="modos-nueva-clase"
+          >
             <button
               v-for="op in MODOS"
               :key="op"

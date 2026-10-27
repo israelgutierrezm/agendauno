@@ -723,6 +723,21 @@
     color: var(--primario-fuerte);
     box-shadow: 0 1px 3px rgb(16 24 40 / 8%);
   }
+  /* Opciones de texto largo (p. ej. cómo se cargan los horarios en «Nueva clase»): en
+     un teléfono angosto van una debajo de otra, a todo el ancho, en vez de esconder
+     las que no caben en un desplazamiento a lo ancho. En pantallas más anchas, igual
+     que cualquier segmentado. */
+  @media (max-width: 639.98px) {
+    .tu-segmentado.tu-segmentado-apilado {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      overflow-x: visible;
+    }
+    .tu-segmentado.tu-segmentado-apilado > button {
+      white-space: normal;
+    }
+  }
 
   /* Detalle de una cita, una clase o una persona: un mismo patrón. Franja de datos
      con su ícono, píldoras de estado (el color va en --tono) y secciones con título. */

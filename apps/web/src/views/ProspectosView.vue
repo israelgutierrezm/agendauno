@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -839,8 +840,12 @@ const descartarAlta = useDescartarCambios({
   }),
   guardando: accionando,
 });
+// Lo que impide agregarlo se dice dentro del formulario (no en un aviso flotante que
+// desaparece) y lo escrito se conserva para corregirlo y reintentar (ADR 0229).
+const errorAlta = ref("");
 function abrirAlta(): void {
   Object.assign(alta, { nombre: "", email: "", telefono: "" });
+  errorAlta.value = "";
   descartarAlta.fijar();
   alta.abierto = true;
 }
@@ -852,9 +857,10 @@ async function crear(): Promise<void> {
     alta.nombre.trim() === "" ||
     (alta.email.trim() === "" && alta.telefono.trim() === "")
   ) {
-    toast.error(t("captacion.prospectos.alta.requiereContacto"));
+    errorAlta.value = t("captacion.prospectos.alta.requiereContacto");
     return;
   }
+  errorAlta.value = "";
   accionando.value = true;
   try {
     const { data } = await api.post<{ data: Prospecto }>(
@@ -874,7 +880,12 @@ async function crear(): Promise<void> {
     await cargar();
     await abrir(data.data);
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    // Ya agregado (el alta se cerró), lo que falle después va en el aviso flotante.
+    if (alta.abierto) {
+      errorAlta.value = mensajeDeError(e);
+    } else {
+      toast.error(mensajeDeError(e));
+    }
   } finally {
     accionando.value = false;
   }
@@ -1590,6 +1601,14 @@ async function crear(): Promise<void> {
       @cerrar="cerrarAlta"
     >
       <form id="form-prospecto" class="grid gap-4" @submit.prevent="crear">
+        <AvisoTono
+          v-if="errorAlta"
+          tono="peligro"
+          role="alert"
+          data-prueba="error-alta-prospecto"
+        >
+          {{ errorAlta }}
+        </AvisoTono>
         <label class="block">
           <span class="tu-label">{{
             $t("captacion.prospectos.alta.nombre")

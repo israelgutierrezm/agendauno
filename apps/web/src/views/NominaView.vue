@@ -706,10 +706,17 @@ onMounted(async () => {
               hasta: fechaCorta(periodoCalculado.hasta),
             })
           }}</span>
+          <!-- Deshabilitado, dice por qué (ADR 0229). -->
           <button
             type="button"
             class="tu-btn tu-btn-secundario"
             :disabled="conEsquema === 0"
+            :title="
+              conEsquema === 0
+                ? $t('nominaVisual.exportarSinEsquema')
+                : undefined
+            "
+            data-prueba="exportar-nomina"
             @click="exportar"
           >
             <IconoNav nombre="abajo" :tam="16" />

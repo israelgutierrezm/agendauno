@@ -1,6 +1,7 @@
 # ADR 0203 — Contrato de interfaz del panel
 
-Estado: Aceptado (2026-10-23).
+Estado: Aceptado (2026-10-23). Ampliado por el ADR 0229 (cuándo usar cada pieza:
+navegación, acción principal, errores y estados deshabilitados).
 
 ## Contexto
 

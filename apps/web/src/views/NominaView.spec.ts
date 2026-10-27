@@ -103,6 +103,29 @@ describe("nómina", () => {
     expect(texto).not.toContain("Ana Alumna");
   });
 
+  it("sin nadie con esquema, «Exportar CSV» deshabilitado dice por qué", async () => {
+    const con = montar();
+    await flushPromises();
+    const habilitado = con.get('[data-prueba="exportar-nomina"]');
+    expect(habilitado.attributes("disabled")).toBeUndefined();
+    expect(habilitado.attributes("title")).toBeUndefined();
+    con.unmount();
+
+    mocks.get.mockImplementation(async (url: string) =>
+      url.endsWith("/usuarios")
+        ? { data: { data: USUARIOS } }
+        : { data: { data: [] } },
+    );
+    const w = montar();
+    await flushPromises();
+    const exportar = w.get('[data-prueba="exportar-nomina"]');
+    expect(exportar.attributes("disabled")).toBeDefined();
+    expect(exportar.attributes("title")).toBe(
+      "Nadie del equipo tiene esquema de pago: define uno para exportar la nómina.",
+    );
+    w.unmount();
+  });
+
   it("«Editar esquema» llena el formulario y guardarlo recalcula", async () => {
     const w = montar();
     await flushPromises();

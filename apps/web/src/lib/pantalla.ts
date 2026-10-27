@@ -34,3 +34,37 @@ export function llevarALaVista(elemento: HTMLElement | null): void {
   if (arriba >= barra && arriba <= barra + window.innerHeight * 0.2) return;
   window.scrollTo({ top: Math.max(0, window.scrollY + arriba - barra - 16) });
 }
+
+/**
+ * Deja `elemento` al centro de su tira con desplazamiento a lo ancho (p. ej. el día
+ * elegido en la tira de días de la agenda del teléfono). Es lo que haría
+ * `scrollIntoView({ inline: "center", block: "nearest" })`, pero solo mueve la tira:
+ * aquel también desplaza la página hasta la tira si ya se bajó a la lista (al girar el
+ * teléfono, la página saltaría). Una tira oculta (sin ancho) no se toca: se centra
+ * cuando aparece. `suave` anima el movimiento, salvo con «reducir movimiento».
+ */
+export function centrarEnTira(
+  tira: HTMLElement | null,
+  elemento: HTMLElement | null,
+  suave = false,
+): void {
+  if (tira === null || elemento === null || tira.clientWidth === 0) return;
+  const caja = tira.getBoundingClientRect();
+  const pieza = elemento.getBoundingClientRect();
+  const destino =
+    tira.scrollLeft +
+    pieza.left -
+    (caja.left + tira.clientLeft) -
+    (tira.clientWidth - pieza.width) / 2;
+  const left = Math.round(
+    Math.max(0, Math.min(destino, tira.scrollWidth - tira.clientWidth)),
+  );
+  const quieto =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (typeof tira.scrollTo === "function") {
+    tira.scrollTo({ left, behavior: suave && !quieto ? "smooth" : "auto" });
+  } else {
+    tira.scrollLeft = left;
+  }
+}

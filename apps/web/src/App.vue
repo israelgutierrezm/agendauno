@@ -22,7 +22,9 @@ import CuentaLateral from "@/components/CuentaLateral.vue";
 import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
+import { useFocoPanel } from "@/lib/focoPanel";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
+import { useAnchoMinimo } from "@/lib/pantalla";
 import { productoActual } from "@/lib/producto";
 import { ubicacion } from "@/lib/menu";
 import { useUbicacionActual } from "@/lib/ubicacionActual";
@@ -155,6 +157,26 @@ const rolPorElegir = computed(
 // La contracción solo aplica en escritorio; con el cajón abierto se ve completo.
 const compactoEfectivo = computed(() => compacto.value && !menuLateral.value);
 
+// En el teléfono el menú lateral es un cajón. Cerrado queda fuera de la pantalla y
+// `inert`: ni Tab ni un lector de pantalla llegan a sus enlaces. Abierto, como los
+// paneles: el foco entra en él, Escape lo cierra y, al cerrarse, el foco vuelve al
+// botón del menú. En escritorio el lateral siempre se ve y nunca es `inert`.
+const escritorio = useAnchoMinimo(1024);
+const cajon = ref<HTMLElement | null>(null);
+const cajonAbierto = computed(() => menuLateral.value && !escritorio.value);
+const cajonInerte = computed(() => !menuLateral.value && !escritorio.value);
+useFocoPanel(
+  () => cajonAbierto.value,
+  cajon,
+  () => {
+    menuLateral.value = false;
+  },
+);
+// Si la ventana crece a escritorio con el cajón abierto, se da por cerrado.
+watch(escritorio, (si) => {
+  if (si) menuLateral.value = false;
+});
+
 function alternarCompacto(): void {
   compacto.value = !compacto.value;
   try {
@@ -196,7 +218,8 @@ onMounted(() => {
     <!-- Barra lateral (oscura) -->
     <aside
       v-show="!agendaAmpliada"
-      class="tu-sin-imprimir fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200"
+      ref="cajon"
+      class="tu-sin-imprimir fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200 outline-none"
       :class="[
         compacto ? 'lg:w-16' : 'lg:w-64',
         menuLateral ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
@@ -205,6 +228,9 @@ onMounted(() => {
         background: 'var(--barra)',
         color: 'var(--barra-texto)',
       }"
+      :inert="cajonInerte || undefined"
+      tabindex="-1"
+      data-prueba="menu-lateral"
     >
       <!-- Marca -->
       <RouterLink
@@ -315,6 +341,7 @@ onMounted(() => {
             type="button"
             class="tu-icono-btn tu-barra-menu relative"
             :aria-label="$t('nav.menu')"
+            :aria-expanded="menuLateral"
             data-prueba="boton-menu"
             @click="menuLateral = true"
           >

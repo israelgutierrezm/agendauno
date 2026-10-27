@@ -337,3 +337,40 @@ describe("prospectos: responsable, contacto e historia", () => {
     );
   });
 });
+
+describe("prospectos: agregar uno a mano", () => {
+  it("lo que impide agregarlo se dice dentro del formulario y lo escrito se queda", async () => {
+    const w = montar();
+    await flushPromises();
+    w.findComponent(BarraListado).vm.$emit("nuevo");
+    await flushPromises();
+    const form = w.get("#form-prospecto");
+    const [nombre, , telefono] = form.findAll("input");
+
+    // Sin correo ni teléfono: el aviso va en el formulario, no en uno flotante.
+    await nombre!.setValue("Lucía Méndez");
+    await form.trigger("submit");
+    expect(w.get('[data-prueba="error-alta-prospecto"]').text()).toBe(
+      "Escribe su correo o su teléfono.",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
+
+    // El servidor lo rechaza: el motivo, ahí mismo; lo capturado sigue para reintentar.
+    api.post.mockRejectedValueOnce("Ya hay un prospecto con ese teléfono.");
+    await telefono!.setValue("5512345678");
+    await form.trigger("submit");
+    await flushPromises();
+    expect(w.get('[data-prueba="error-alta-prospecto"]').text()).toBe(
+      "Ya hay un prospecto con ese teléfono.",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+    expect((nombre!.element as HTMLInputElement).value).toBe("Lucía Méndez");
+    expect((telefono!.element as HTMLInputElement).value).toBe("5512345678");
+
+    // Al reintentar con éxito, el alta se cierra.
+    await form.trigger("submit");
+    await flushPromises();
+    expect(w.find("#form-prospecto").exists()).toBe(false);
+  });
+});
