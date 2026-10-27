@@ -37,4 +37,12 @@ export default {
     programada: "Programada",
     cancelada: "Cancelada",
   },
+  // En el pase de lista, para recepción: lo mismo que en Integraciones, sin configurar.
+  recepcion: {
+    titulo: "Pendientes en Fitpass Admin",
+    ayuda:
+      "Los horarios por capturar en Fitpass Admin y quién falta marcar allá.",
+    ver: "Ver pendientes",
+    ocultar: "Ocultar pendientes",
+  },
 };

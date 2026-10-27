@@ -44,6 +44,9 @@ async function montar(hash: string) {
           template: '<div><input data-prueba="borrador-giro" /></div>',
         },
         TerminologiaNegocio: { template: "<div>Terminología</div>" },
+        KioscosNegocio: {
+          template: '<div data-prueba="kioscos">Tabletas</div>',
+        },
       },
     },
   });
@@ -89,5 +92,23 @@ describe("configuración acotada por opción", () => {
     expect(lectura.w.find("#terminologia").exists()).toBe(false);
     expect(lectura.w.find("#pagina-publica").exists()).toBe(false);
     lectura.w.unmount();
+  });
+
+  it("el kiosco de llegada está en Configuración del negocio para quien la administra", async () => {
+    const { w } = await montar("#kiosco");
+    expect(w.get("h1").text()).toBe("Kiosco de llegada");
+    expect(w.find('[data-prueba="kioscos"]').exists()).toBe(true);
+    // Solo esa sección: no se monta en las demás (consulta sus tabletas).
+    expect(w.get("#datos").isVisible()).toBe(false);
+    w.unmount();
+
+    const otra = await montar("#terminologia");
+    expect(otra.w.find('[data-prueba="kioscos"]').exists()).toBe(false);
+    otra.w.unmount();
+
+    mocks.puede.mockReturnValue(false);
+    const sinPermiso = await montar("#kiosco");
+    expect(sinPermiso.w.find('[data-prueba="kioscos"]').exists()).toBe(false);
+    sinPermiso.w.unmount();
   });
 });

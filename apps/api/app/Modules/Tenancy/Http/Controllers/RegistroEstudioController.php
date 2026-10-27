@@ -58,7 +58,7 @@ class RegistroEstudioController
     public function store(RegistrarEstudioRequest $request, AtribucionPlataforma $atribucion): JsonResponse
     {
         // Anti-bots: reCAPTCHA v3 (se omite si no hay llaves configuradas).
-        if (! $this->recaptcha->aprobado($request->string('recaptcha_token')->value(), $request->ip())) {
+        if (! $this->recaptcha->aprobado($request->string('recaptcha_token')->value(), $request->ip(), 'registro')) {
             throw ValidationException::withMessages([
                 'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
             ]);

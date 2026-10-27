@@ -294,7 +294,7 @@ class AuthTenantController
             'destino' => ['required', 'string', 'max:300', 'regex:#^/(?![/\\\\])\S*$#'],
         ]);
         $estudio = $this->estudioDe($request);
-        $codigo = $this->auth->crearEnlaceWeb((string) $estudio->slug, $usuario, (string) $validado['destino']);
+        $codigo = $this->auth->crearEnlaceWeb((string) $estudio->slug, $usuario, (string) $validado['destino'], AutenticacionTenant::idDeToken($request->bearerToken()));
 
         return response()->json(['data' => [
             'url' => MarcaProducto::urlWeb($estudio).'/entrar?'.http_build_query(['estudio' => $estudio->slug, 'enlace' => $codigo]),

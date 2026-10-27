@@ -1,3 +1,5 @@
+import { computed, type ComputedRef } from "vue";
+
 import { api } from "@/lib/api";
 import { useSucursales } from "@/lib/sucursalOperativa";
 
@@ -13,13 +15,19 @@ export interface OrdenNueva {
  * orden por cobrar. Cada intento lleva su clave: repetir la MISMA venta (sin red, doble
  * clic) devuelve la venta que ya se hizo, no cobra otra.
  *
- * Se cobra en la sucursal de la barra (la fija): su caja lo registra (ADR 0175).
+ * Se cobra en la sucursal de la barra (la fija): su caja lo registra (ADR 0175). Con
+ * varias sucursales y «Todas» en la barra no se sabe en qué caja entra: `sinSucursal`
+ * lo dice para pedir elegirla antes de cobrar (Ventas y la venta rápida).
  */
 export function crearVenta(): {
   vender: (base: string, orden: OrdenNueva, metodo: string) => Promise<string>;
+  sinSucursal: ComputedRef<boolean>;
 } {
   let intento: { venta: string; clave: string } | null = null;
   const sucursales = useSucursales();
+  const sinSucursal = computed(
+    () => sucursales.varias.value && sucursales.fija.value === null,
+  );
 
   async function vender(
     base: string,
@@ -46,5 +54,35 @@ export function crearVenta(): {
     return data.data.id;
   }
 
-  return { vender };
+  return { vender, sinSucursal };
+}
+
+/** Un derecho del alumno como lo da `GET /miembros/{id}/derechos` (unidades: 1000 = 1). */
+export interface DerechoDeVenta {
+  id: string;
+  ilimitado: boolean;
+  saldo: number | null;
+  disponible: number | null;
+}
+
+/**
+ * El derecho que dejó una venta, comparando lo que tenía antes con lo de después: el
+ * nuevo o, si la venta se sumó a uno que ya tenía (clases extra), el que cambió. Sin
+ * ninguno, null (el aviso no inventa un saldo).
+ */
+export function derechoVendido(
+  antes: DerechoDeVenta[],
+  despues: DerechoDeVenta[],
+): DerechoDeVenta | null {
+  const previos = new Map(antes.map((d) => [d.id, d]));
+  return (
+    despues.find((d) => !previos.has(d.id)) ??
+    despues.find((d) => {
+      const previo = previos.get(d.id);
+      return (
+        previo !== undefined && (previo.disponible ?? 0) !== (d.disponible ?? 0)
+      );
+    }) ??
+    null
+  );
 }

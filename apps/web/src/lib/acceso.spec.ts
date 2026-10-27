@@ -95,4 +95,14 @@ describe("política de acceso", () => {
       delete POLITICAS["portal-de-prueba"];
     }
   });
+
+  it("la bitácora es de todo el negocio: no se ofrece a quien solo ve sus sucursales", () => {
+    const admin = sesion("admin", "clases", ["auditoria.ver"]);
+    expect(puedeEntrar("bitacora", admin)).toBe(true);
+    const acotado = {
+      ...admin,
+      usuario: { ...admin.usuario, todo_el_negocio: false },
+    } as unknown as Sesion;
+    expect(puedeEntrar("bitacora", acotado)).toBe(false);
+  });
 });

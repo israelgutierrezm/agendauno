@@ -111,7 +111,7 @@ interface Pago {
   anulable?: boolean;
   // Aparte de su estado (ADR 0166): una incidencia abierta y cómo va el recibo.
   por_conciliar?: boolean;
-  comprobante?: "enviado" | "fallido" | "pendiente" | null;
+  comprobante?: "enviado" | "fallido" | "incierto" | "pendiente" | null;
   // El banco del cliente lo disputó (ADR 0168).
   contracargo?: "abierto" | "ganado" | "perdido" | null;
   // Su venta y su factura, o si ya se puede facturar (ADR 0179).
@@ -318,6 +318,41 @@ const errorReembolso = ref<string | null>(null);
 const erroresReembolso = ref<Record<string, string>>({});
 const PASARELAS_EN_LINEA = ["stripe", "openpay", "mercadopago"];
 const avisoReembolso = ref<string | null>(null);
+// «Reconsultar este pago» (ADR 0227): devoluciones hechas en el panel de la pasarela.
+const reconsultando = ref<string | null>(null);
+function reconsultable(p: Pago): boolean {
+  return (
+    puedeReembolsar.value &&
+    PASARELAS_EN_LINEA.includes(p.proveedor ?? "") &&
+    (p.estado === "aprobado" || p.estado === "parcialmente_reembolsado")
+  );
+}
+async function reconsultar(p: Pago): Promise<void> {
+  if (reconsultando.value !== null) {
+    return;
+  }
+  reconsultando.value = p.id;
+  avisoReembolso.value = null;
+  try {
+    const { data } = await api.post<{ data: { registradas: number } }>(
+      `${base.value}/pagos/${p.id}/reconsultar`,
+    );
+    avisoReembolso.value =
+      data.data.registradas > 0
+        ? t("reembolsosPago.reconsultaConDevoluciones", {
+            n: data.data.registradas,
+          })
+        : t("reembolsosPago.reconsultaSinCambios");
+    if (data.data.registradas > 0) {
+      porConciliar.value?.cargar();
+      await cargar();
+    }
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    reconsultando.value = null;
+  }
+}
 const porConciliar = ref<InstanceType<typeof PorConciliar> | null>(null);
 // El corte de caja expone su descarga para el encabezado de la vista.
 const corteCaja = ref<InstanceType<typeof CorteDeCaja> | null>(null);
@@ -1448,7 +1483,9 @@ watch(vista, cargar, { immediate: true });
                             color:
                               p.comprobante === 'fallido'
                                 ? 'var(--error)'
-                                : 'var(--texto-suave)',
+                                : p.comprobante === 'incierto'
+                                  ? 'var(--aviso)'
+                                  : 'var(--texto-suave)',
                           }"
                           data-prueba="pago-comprobante"
                           >{{
@@ -1490,6 +1527,18 @@ watch(vista, cargar, { immediate: true });
                           "
                         >
                           {{ $t("cobranza.corregir") }}
+                        </button>
+                        <!-- Preguntar a la pasarela por devoluciones hechas en su panel. -->
+                        <button
+                          v-if="reconsultable(p)"
+                          class="tu-btn tu-btn-secundario tu-btn-chico"
+                          type="button"
+                          :disabled="reconsultando !== null"
+                          :aria-busy="reconsultando === p.id"
+                          data-prueba="pago-reconsultar"
+                          @click="reconsultar(p)"
+                        >
+                          {{ $t("reembolsosPago.reconsultar") }}
                         </button>
                         <!-- Devolver dinero: destructiva (el diálogo pide monto y motivo). -->
                         <button

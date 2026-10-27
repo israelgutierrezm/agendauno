@@ -62,6 +62,8 @@ interface Difusion {
   // Agotaron sus intentos (ya no se reintentan).
   fallidos?: number;
   descartados?: number;
+  // Pudieron haber salido (ADR 0227): se revisan en la bandeja de salida.
+  sin_confirmar?: number;
 }
 // A cuántos llega por ese canal y quién queda fuera (ADR 0166), antes de enviar.
 interface Alcance {
@@ -96,7 +98,7 @@ interface Mensaje {
   canal: Canal;
   destinatario: string | null;
   asunto: string;
-  estado: "encolado" | "enviado" | "fallido" | "descartado";
+  estado: "encolado" | "enviado" | "fallido" | "incierto" | "descartado";
   intentos: number;
   creado_en?: string | null;
   enviado_en: string | null;
@@ -345,6 +347,8 @@ const TONO_MENSAJE: Record<Mensaje["estado"], string> = {
   encolado: "var(--aviso)",
   enviado: "var(--exito)",
   fallido: "var(--error)",
+  // Pudo haber salido (ADR 0227): no se reintenta solo; se revisa y se reenvía a mano.
+  incierto: "var(--aviso)",
   descartado: "var(--texto-suave)",
 };
 
@@ -811,6 +815,7 @@ const ESTADOS_SALIDA = [
   "encolado",
   "enviado",
   "fallido",
+  "incierto",
   "descartado",
 ] as const;
 interface MetaSalida {
@@ -876,6 +881,25 @@ async function cargarSalida(): Promise<void> {
     }
   }
 }
+// Reenviar uno sin confirmar o que no salió (ADR 0227): vuelve a la cola.
+const reenviando = ref<string | null>(null);
+async function reenviarMensaje(m: Mensaje): Promise<void> {
+  if (reenviando.value !== null) {
+    return;
+  }
+  reenviando.value = m.id;
+  try {
+    await api.post(`${base.value}/mensajes/${m.id}/reenviar`);
+    m.estado = "encolado";
+    m.ultimo_error = null;
+    toast.exito(t("comunicacionesAuto.reenviado"));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    reenviando.value = null;
+  }
+}
+
 async function irPaginaSalida(n = 1): Promise<void> {
   paginaSalida.value = n;
   try {
@@ -1335,6 +1359,7 @@ onMounted(cargar);
                     v-if="
                       (d.enviados ?? 0) +
                         (d.fallidos ?? 0) +
+                        (d.sin_confirmar ?? 0) +
                         (d.descartados ?? 0) >
                       0
                     "
@@ -1349,6 +1374,11 @@ onMounted(cargar);
                         (d.fallidos ?? 0) > 0
                           ? $t("comunicaciones.resultado.fallidos", {
                               n: d.fallidos ?? 0,
+                            })
+                          : null,
+                        (d.sin_confirmar ?? 0) > 0
+                          ? $t("comunicaciones.resultado.sinConfirmar", {
+                              n: d.sin_confirmar ?? 0,
                             })
                           : null,
                         (d.descartados ?? 0) > 0
@@ -1644,21 +1674,42 @@ onMounted(cargar);
               {{ fecha(m.enviado_en ?? m.creado_en ?? null) }}
             </p>
             <p
-              v-if="m.estado === 'fallido' && m.ultimo_error"
+              v-if="
+                (m.estado === 'fallido' || m.estado === 'incierto') &&
+                m.ultimo_error
+              "
               class="mt-0.5 text-xs truncate"
-              style="color: var(--error)"
+              :style="{
+                color:
+                  m.estado === 'fallido'
+                    ? 'var(--error)'
+                    : 'var(--texto-suave)',
+              }"
               :title="m.ultimo_error"
               data-prueba="error-mensaje"
             >
               {{ m.ultimo_error }}
             </p>
           </div>
-          <span
-            class="tu-estado shrink-0"
-            :style="{ '--tono': TONO_MENSAJE[m.estado] }"
-            data-prueba="estado-mensaje"
-            >{{ estadoDeMensaje(m) }}</span
-          >
+          <span class="flex shrink-0 items-center gap-2">
+            <!-- Sin confirmar: quien revisa decide si se manda otra vez. -->
+            <button
+              v-if="puedeControlar && m.estado === 'incierto'"
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
+              :disabled="reenviando !== null"
+              data-prueba="reenviar-mensaje"
+              @click="reenviarMensaje(m)"
+            >
+              {{ $t("comunicacionesAuto.reenviar") }}
+            </button>
+            <span
+              class="tu-estado"
+              :style="{ '--tono': TONO_MENSAJE[m.estado] }"
+              data-prueba="estado-mensaje"
+              >{{ estadoDeMensaje(m) }}</span
+            >
+          </span>
         </li>
       </ul>
       <PaginacionListado

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\Push\ClienteFcm;
+use App\Modules\Tenancy\Comunicaciones\Push\ClienteWebPush;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\DispositivoPushTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\SuscripcionPushWebTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
@@ -17,14 +19,16 @@ use Throwable;
 /**
  * Entrega de un mensaje por push: a cada teléfono donde su destinatario (el usuario
  * del equipo al que va, o si no el de la persona) tiene la app con sesión en este
- * negocio. Los tokens que FCM ya no reconoce se olvidan. Si ningún
- * teléfono lo recibió por un error pasajero, se lanza para que el relay reintente.
+ * negocio y a cada navegador donde activó los avisos (ADR 0225). Los tokens y las
+ * suscripciones que ya no existen se olvidan. Si nadie lo recibió por un error
+ * pasajero, se lanza para que el relay reintente.
  */
 class EntregarPushTenant
 {
     public function __construct(
         private readonly ClienteFcm $fcm,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly ClienteWebPush $web,
     ) {}
 
     /**
@@ -32,7 +36,7 @@ class EntregarPushTenant
      */
     public function puedeRecibir(?PersonaTenant $persona): bool
     {
-        return $this->fcm->configurado() && $this->dispositivos(self::usuarioDe($persona))->isNotEmpty();
+        return $this->tieneDestino(self::usuarioDe($persona));
     }
 
     /**
@@ -40,15 +44,23 @@ class EntregarPushTenant
      */
     public function puedeRecibirUsuario(Usuario $usuario): bool
     {
-        return $this->fcm->configurado() && $this->dispositivos((int) $usuario->getKey())->isNotEmpty();
+        return $this->tieneDestino((int) $usuario->getKey());
+    }
+
+    /** ¿Tiene la app con sesión (con FCM) o un navegador con los avisos (con VAPID)? */
+    private function tieneDestino(?int $usuarioId): bool
+    {
+        return ($this->fcm->configurado() && $this->dispositivos($usuarioId)->isNotEmpty())
+            || ($this->web->configurado() && $this->navegadores($usuarioId)->isNotEmpty());
     }
 
     public function entregar(MensajeTenant $mensaje): void
     {
         $usuario = $mensaje->usuario_id !== null ? (int) $mensaje->usuario_id : self::usuarioDe($mensaje->persona);
-        $dispositivos = $this->dispositivos($usuario);
-        if ($dispositivos->isEmpty()) {
-            throw new RuntimeException('El destinatario ya no tiene la app con sesión en ningún teléfono.');
+        $dispositivos = $this->fcm->configurado() ? $this->dispositivos($usuario) : new Collection;
+        $navegadores = $this->web->configurado() ? $this->navegadores($usuario) : new Collection;
+        if ($dispositivos->isEmpty() && $navegadores->isEmpty()) {
+            throw new RuntimeException('El destinatario ya no tiene la app con sesión ni los avisos en un navegador.');
         }
 
         $datos = [
@@ -65,6 +77,17 @@ class EntregarPushTenant
                     $entregados++;
                 } else {
                     $dispositivo->delete();
+                }
+            } catch (Throwable $e) {
+                $pasajero = $e;
+            }
+        }
+        foreach ($navegadores as $navegador) {
+            try {
+                if ($this->web->enviar($navegador, $mensaje->asunto, $mensaje->cuerpo, $datos)) {
+                    $entregados++;
+                } else {
+                    $navegador->delete();
                 }
             } catch (Throwable $e) {
                 $pasajero = $e;
@@ -91,6 +114,18 @@ class EntregarPushTenant
         }
 
         return (int) $persona->usuario_id;
+    }
+
+    /**
+     * @return Collection<int, SuscripcionPushWebTenant>
+     */
+    private function navegadores(?int $usuarioId): Collection
+    {
+        if ($usuarioId === null) {
+            return new Collection;
+        }
+
+        return SuscripcionPushWebTenant::query()->where('usuario_id', $usuarioId)->orderBy('id')->get();
     }
 
     /**

@@ -10,7 +10,7 @@ export default {
   lugar: "lugar {n}",
   sinActivar: "Esta tableta no está activada",
   sinActivarAyuda:
-    "Actívala desde el panel del negocio: Integraciones → Kiosco de llegada, y abre aquí el enlace de activación.",
+    "Actívala desde el panel del negocio: Configuración → Negocio → Kiosco de llegada, y abre aquí el enlace de activación.",
   panel: {
     titulo: "Kiosco de llegada",
     ayuda:

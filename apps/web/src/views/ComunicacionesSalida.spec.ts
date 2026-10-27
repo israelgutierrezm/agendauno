@@ -104,4 +104,28 @@ describe("bandeja de salida por páginas", () => {
       },
     });
   });
+
+  it("uno sin confirmar dice por qué y se reenvía a mano (ADR 0227)", async () => {
+    mensaje.estado = "incierto";
+    mensaje.ultimo_error = "El envío se cortó y no se sabe si salió";
+    api.post.mockResolvedValue({ data: { data: { estado: "encolado" } } });
+    try {
+      const w = await abrirSalida();
+      expect(w.get('[data-prueba="estado-mensaje"]').text()).toBe(
+        "Sin confirmar",
+      );
+      expect(w.text()).toContain("no se sabe si salió");
+
+      await w.get('[data-prueba="reenviar-mensaje"]').trigger("click");
+      await flushPromises();
+      expect(api.post).toHaveBeenCalledWith(
+        "/api/v1/app/demo/mensajes/m1/reenviar",
+      );
+      expect(w.get('[data-prueba="estado-mensaje"]').text()).toBe("En cola");
+      expect(w.find('[data-prueba="reenviar-mensaje"]').exists()).toBe(false);
+    } finally {
+      mensaje.estado = "fallido";
+      mensaje.ultimo_error = "Buzón lleno";
+    }
+  });
 });

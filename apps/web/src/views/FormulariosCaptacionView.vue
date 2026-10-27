@@ -269,12 +269,28 @@ function descargarQr(): void {
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("captacion.formularios.activaAyuda") }}
         </p>
+        <!-- Deshabilitado, dice por qué (ADR 0229). -->
+        <p
+          v-if="!puedeEncender"
+          id="captacion-activa-motivo"
+          class="mt-1 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="captacion-activa-motivo"
+        >
+          {{ $t("captacion.formularios.activaSinPermiso") }}
+        </p>
       </div>
       <button
         type="button"
         role="switch"
         :aria-checked="activa"
         :aria-label="$t('captacion.formularios.activa')"
+        :aria-describedby="puedeEncender ? undefined : 'captacion-activa-motivo'"
+        :title="
+          puedeEncender
+            ? undefined
+            : $t('captacion.formularios.activaSinPermiso')
+        "
         :disabled="!puedeEncender"
         class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors"
         :style="{

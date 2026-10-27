@@ -51,3 +51,4 @@ COPY infra/produccion/nginx-comun.conf /etc/nginx/snippets/agendauno-comun.conf
 COPY infra/produccion/nginx-cabeceras.conf /etc/nginx/snippets/agendauno-cabeceras.conf
 COPY infra/produccion/nginx-landing-proxy.conf /etc/nginx/snippets/agendauno-landing-proxy.conf
 COPY infra/produccion/nginx-api-interna.conf /etc/nginx/snippets/agendauno-api-interna.conf
+COPY infra/produccion/nginx-negocio.conf /etc/nginx/snippets/agendauno-negocio.conf

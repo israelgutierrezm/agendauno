@@ -198,6 +198,9 @@ async function pagar(
 
 // Las condiciones que aceptó, por plan (permanencia; B04).
 const aceptadas = ref<Record<string, boolean>>({});
+// Cupón (ADR 0220): viaja con la compra; si no vale, el error sale en su plan.
+const conCupon = ref(false);
+const cupon = ref("");
 async function comprar(id: string): Promise<void> {
   const p = cuenta.productos.value.find((x) => x.id === id);
   if (!p || (p.condiciones && !aceptadas.value[id])) {
@@ -206,8 +209,12 @@ async function comprar(id: string): Promise<void> {
   comprando.value = id;
   mensaje.value = null;
   errorCompra.value = null;
-  if (await cuenta.comprar(p, !!p.condiciones)) {
+  if (
+    await cuenta.comprar(p, !!p.condiciones, conCupon.value ? cupon.value : "")
+  ) {
     mensaje.value = "comprado";
+    cupon.value = "";
+    conCupon.value = false;
   } else {
     // El de la compra, en su tarjeta; el aviso de arriba queda para lo que no cargó.
     errorCompra.value = { id, mensaje: cuenta.error.value ?? "" };
@@ -491,6 +498,34 @@ onMounted(() => void cuenta.asegurar());
         <AvisoTono v-if="mensaje === 'comprado'" tono="exito" class="mt-2">
           {{ $t(tc("miCuenta.comprar.creada")) }}
         </AvisoTono>
+        <!-- Cupón: vale para el plan que elija; se revisa al comprar (el descuento depende del plan). -->
+        <div class="mt-2" data-prueba="cupon-compra">
+          <button
+            v-if="!conCupon"
+            type="button"
+            class="tu-enlace text-sm"
+            data-prueba="abrir-cupon-compra"
+            @click="conCupon = true"
+          >
+            {{ $t("cupon.tienes") }}
+          </button>
+          <template v-else>
+            <label class="tu-label" for="mp-cupon">{{
+              $t("cupon.codigo")
+            }}</label>
+            <input
+              id="mp-cupon"
+              v-model="cupon"
+              class="tu-input max-w-56"
+              maxlength="64"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              :disabled="comprando !== null"
+            />
+            <p class="tu-hint">{{ $t("cupon.alComprar") }}</p>
+          </template>
+        </div>
         <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <li
             v-for="p in comprables"

@@ -243,7 +243,7 @@ async function revisarCupon(
   codigo: string,
 ): Promise<{ descuento_minor: number }> {
   const { data } = await api.get<{ data: { descuento_minor: number } }>(
-    `${base.value}/citas/cupon`,
+    `${base.value}/mi/citas/cupon`,
     { params: { codigo, oferta_id: servicioId.value } },
   );
   return data.data;

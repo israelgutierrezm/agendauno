@@ -30,9 +30,8 @@ const sesion = vi.hoisted(() => ({
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
-vi.mock("@/stores/toast", () => ({
-  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
-}));
+const toast = vi.hoisted(() => ({ exito: vi.fn(), error: vi.fn() }));
+vi.mock("@/stores/toast", () => ({ useToastStore: () => toast }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
 }));
@@ -343,6 +342,121 @@ describe("vender un plan", () => {
     await flushPromises();
     expect(w.find('[data-prueba="error-carga-ventas"]').exists()).toBe(false);
     expect(w.findAll('[data-prueba="plan"]').length).toBe(2);
+  });
+});
+
+describe("el aviso tras vender", () => {
+  const der = (id: string, disponible: number, saldo = disponible) => ({
+    id,
+    ilimitado: false,
+    saldo,
+    disponible,
+  });
+  async function venderA(
+    antes: unknown[],
+    despues: unknown[],
+    esCitas = false,
+  ): Promise<void> {
+    const conCitas = sesion as typeof sesion & { esCitas?: boolean };
+    conCitas.esCitas = esCitas;
+    const base = mocks.get.getMockImplementation()!;
+    let consultas = 0;
+    mocks.get.mockImplementation((url: string, config?: unknown) =>
+      url.endsWith("/miembros/m1/derechos")
+        ? Promise.resolve({
+            data: { data: consultas++ === 0 ? antes : despues },
+          })
+        : base(url, config),
+    );
+    try {
+      const w = mount(VentasView, { global: { plugins: [i18n] } });
+      await flushPromises();
+      await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+      const buscador = w.findComponent(BuscarPersona);
+      buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+      buscador.vm.$emit("update:modelValue", "m1");
+      await flushPromises();
+      await w.get("form").trigger("submit");
+      await flushPromises();
+    } finally {
+      delete conCitas.esCitas;
+    }
+  }
+
+  it("dice lo disponible del plan recién vendido, con decimales (no el primero ni el saldo total)", async () => {
+    await venderA(
+      [der("viejo", 3000, 5000)],
+      // El nuevo no es el primero de la lista; el viejo tiene más saldo que disponible.
+      [der("viejo", 3000, 5000), der("nuevo", 2500)],
+    );
+    expect(toast.exito).toHaveBeenCalledWith(
+      "Vendido. Con este plan, Ana López tiene 2.5 créditos disponibles.",
+    );
+  });
+
+  it("en citas, las sesiones del bono; una sola, en singular", async () => {
+    await venderA([], [der("bono", 1000)], true);
+    expect(toast.exito).toHaveBeenCalledWith(
+      "Vendido. Ana López tiene 1 sesión disponible en este bono.",
+    );
+  });
+
+  it("sin saber qué plan dejó la venta, solo confirma la venta", async () => {
+    await venderA([der("a", 1000)], [der("a", 1000)]);
+    expect(toast.exito).toHaveBeenCalledWith(
+      "Venta registrada para Ana López.",
+    );
+  });
+});
+
+describe("corregir el cobro de una venta reciente", () => {
+  const conPago = (pago: Record<string, unknown> | null) => {
+    const base = mocks.get.getMockImplementation()!;
+    mocks.get.mockImplementation((url: string, config?: unknown) =>
+      url.endsWith("/ordenes")
+        ? Promise.resolve({
+            data: {
+              data: [
+                {
+                  id: "o2",
+                  comprador: "Bea",
+                  estado: "pagada",
+                  total_minor: 150000,
+                  moneda: "MXN",
+                  metodo_pago: "efectivo",
+                  pagada_en: "2030-01-09T15:00:00Z",
+                  lineas: [{ producto: "Mensualidad", cantidad: 1 }],
+                  pago,
+                },
+              ],
+            },
+          })
+        : base(url, config),
+    );
+  };
+
+  it("quien gestiona órdenes corrige la forma de pago con el componente de Cobros", async () => {
+    conPago({
+      id: "pg1",
+      metodo: "efectivo",
+      en_caja: true,
+      corregible: true,
+      anulable: false,
+    });
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    await w.get('[data-prueba="corregir-venta-plan"]').trigger("click");
+    expect(w.find('[data-prueba="corregir-pago"]').exists()).toBe(true);
+  });
+
+  it("sin cobro corregible no hay columna ni botón", async () => {
+    conPago(null);
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    expect(w.find('[data-prueba="corregir-venta-plan"]').exists()).toBe(false);
+    expect(w.findAll("thead th")).toHaveLength(6);
   });
 });
 

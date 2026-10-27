@@ -77,45 +77,63 @@ class ConciliarReembolsosTenant
      * que falten ({@see ReembolsarPagoTenant::desdeLaPasarela()}, idempotente con el
      * aviso). Devuelve cuántas se registraron.
      */
-    public function devolucionesEnLaPasarela(): int
+    public function devolucionesEnLaPasarela(?Carbon $desde = null, ?Carbon $hasta = null): int
     {
         $registradas = 0;
         $ahora = Carbon::now();
+        // Con fechas (ADR 0227: conciliación ampliada a pagos más viejos), todos los de ese
+        // rango sin el tope de cada pasada; sin ellas, los de estos días.
+        $porFechas = $desde !== null;
 
         PagoTenant::query()
             ->whereIn('proveedor', ProveedorPasarela::enLinea())
             ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
             ->whereNotNull('referencia_externa')
-            ->where('created_at', '>=', $ahora->copy()->subDays(self::DIAS_DEVOLUCIONES_EXTERNAS))
-            ->where(fn ($q) => $q->whereNull('revisado_en')->orWhere('revisado_en', '<=', $ahora->copy()->subHours(self::HORAS_ENTRE_REVISIONES)))
-            ->orderByRaw('revisado_en is not null')
-            ->orderBy('revisado_en')
+            ->where('created_at', '>=', $desde ?? $ahora->copy()->subDays(self::DIAS_DEVOLUCIONES_EXTERNAS))
+            ->when($hasta !== null, fn ($q) => $q->where('created_at', '<=', $hasta))
+            ->when(! $porFechas, fn ($q) => $q
+                ->where(fn ($q2) => $q2->whereNull('revisado_en')->orWhere('revisado_en', '<=', $ahora->copy()->subHours(self::HORAS_ENTRE_REVISIONES)))
+                ->orderByRaw('revisado_en is not null')
+                ->orderBy('revisado_en')
+                ->limit(self::COBROS_POR_PASADA))
             ->orderBy('id')
-            ->limit(self::COBROS_POR_PASADA)
             ->get()
-            ->each(function (PagoTenant $pago) use (&$registradas, $ahora): void {
+            ->each(function (PagoTenant $pago) use (&$registradas): void {
                 try {
-                    $pasarela = $this->registro->resolver($pago->proveedor);
-                    if (! $pasarela instanceof PasarelaConDevoluciones) {
-                        return;
-                    }
-                    $devoluciones = $pasarela->devoluciones($pago, $this->registro->llaves($pago->proveedor));
+                    $registradas += $this->revisarPago($pago);
                 } catch (Throwable $e) {
                     // Sin llaves o sin respuesta: se vuelve a preguntar en la próxima revisión.
                     Log::warning('No se pudieron consultar las devoluciones del cobro.', ['pago' => $pago->ulid, 'error' => $e->getMessage()]);
-                    $pago->update(['revisado_en' => $ahora]);
-
-                    return;
-                }
-                $pago->update(['revisado_en' => $ahora]);
-                foreach ($devoluciones as $devolucion) {
-                    $antes = ReembolsoTenant::query()->where('referencia_externa', $devolucion['id'])->exists();
-                    $this->reembolsos->desdeLaPasarela($pago->refresh(), $devolucion['id'], $devolucion['monto_minor'], $devolucion['moneda'], $devolucion['llave']);
-                    if (! $antes && ReembolsoTenant::query()->where('referencia_externa', $devolucion['id'])->exists()) {
-                        $registradas++;
-                    }
                 }
             });
+
+        return $registradas;
+    }
+
+    /**
+     * Pregunta a la pasarela las devoluciones de un cobro y registra las que falten
+     * (idempotente con el aviso). Es también «Reconsultar este pago» (ADR 0227): un error
+     * de la pasarela se lanza para decirlo. Devuelve cuántas registró.
+     */
+    public function revisarPago(PagoTenant $pago): int
+    {
+        $pasarela = $this->registro->resolver($pago->proveedor);
+        if (! $pasarela instanceof PasarelaConDevoluciones) {
+            return 0;
+        }
+        try {
+            $devoluciones = $pasarela->devoluciones($pago, $this->registro->llaves($pago->proveedor));
+        } finally {
+            $pago->update(['revisado_en' => Carbon::now()]);
+        }
+        $registradas = 0;
+        foreach ($devoluciones as $devolucion) {
+            $antes = ReembolsoTenant::query()->where('referencia_externa', $devolucion['id'])->exists();
+            $this->reembolsos->desdeLaPasarela($pago->refresh(), $devolucion['id'], $devolucion['monto_minor'], $devolucion['moneda'], $devolucion['llave']);
+            if (! $antes && ReembolsoTenant::query()->where('referencia_externa', $devolucion['id'])->exists()) {
+                $registradas++;
+            }
+        }
 
         return $registradas;
     }

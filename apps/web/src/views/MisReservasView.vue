@@ -18,6 +18,7 @@ import CalendarioVistas, {
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import MisInvitados from "@/components/MisInvitados.vue";
 import HistorialReservas, {
   type ItemHistorial,
 } from "@/components/HistorialReservas.vue";
@@ -1016,6 +1017,12 @@ onMounted(() => void cuenta.asegurar());
             : $t("portal.reservas.sincronizar")
         }}</RouterLink>
       </div>
+      <!-- Sus invitados a las próximas clases, con Cancelar (ADR 0182). -->
+      <MisInvitados
+        v-if="!sesion.esCitas"
+        :base="cuenta.base.value"
+        class="mt-4"
+      />
     </div>
 
     <!-- HISTORIAL -->

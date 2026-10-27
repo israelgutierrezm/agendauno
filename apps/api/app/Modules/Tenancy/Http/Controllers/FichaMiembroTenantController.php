@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\PagoDeOrdenTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
@@ -123,7 +124,7 @@ class FichaMiembroTenantController
         ]);
         $pagina = OrdenTenant::query()
             ->where('persona_id', $persona->getKey())
-            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor'])
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'pagos'])
             ->orderByDesc('id')
             ->paginate((int) ($filtros['per_page'] ?? 25), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
@@ -280,7 +281,7 @@ class FichaMiembroTenantController
     {
         $ordenes = OrdenTenant::query()
             ->where('persona_id', $persona->getKey())
-            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor'])
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'pagos'])
             ->orderByDesc('id')
             ->limit(self::HISTORIAL)
             ->get();
@@ -298,7 +299,7 @@ class FichaMiembroTenantController
         return OrdenTenant::query()
             ->where('persona_id', $persona->getKey())
             ->where('estado', EstadoOrden::Pendiente->value)
-            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor'])
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'pagos'])
             ->orderBy('id')
             ->get()
             ->map(fn (OrdenTenant $orden): array => $this->presentarOrden($orden))
@@ -324,6 +325,8 @@ class FichaMiembroTenantController
             'cuotas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): ?array => $l->comoCuota())->filter()->values()->all(),
             'metodo_pago' => $orden->metodo_pago,
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
+            // Para corregir la forma de pago o anularlo desde la ficha (ADR 0223).
+            'pago' => app(PagoDeOrdenTenant::class)->presentar($orden),
             // Qué se pagó: sus productos o, si es una cita, el servicio, con quién y cuándo.
             'concepto' => $productos->isNotEmpty() ? $productos->implode(', ') : $sesion?->oferta?->nombre,
             'sesion' => $sesion instanceof SesionTenant ? [

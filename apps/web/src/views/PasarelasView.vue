@@ -135,7 +135,7 @@ function estado(p: Pasarela): { tono: string; texto: string } {
 }
 
 // Con otra moneda que no sea el peso mexicano, las de cobro en línea no aplican; la
-// ventanilla (depósito con comprobante) sí.
+// ventanilla (depósito o transferencia que el negocio registra en caja) sí.
 const enLineaDisponible = ref(true);
 function configurable(p: Pasarela): boolean {
   return enLineaDisponible.value || p.proveedor === "ventanilla";

@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
 
 /*
 | El envío de mensajes corre en la cola (ADR 0205): el programador solo encola una
@@ -33,6 +36,30 @@ afterEach(function (): void {
 function enNegocioDeEnvio(Closure $hacer): mixed
 {
     return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', 'estudio-envio')->firstOrFail(), $hacer);
+}
+
+/** El correo sale por un transporte que falla con ese error, como un SMTP real. */
+function correoQueFallaCon(string $error): void
+{
+    Mail::extend('falla', fn (): AbstractTransport => new class($error) extends AbstractTransport
+    {
+        public function __construct(private readonly string $error)
+        {
+            parent::__construct();
+        }
+
+        protected function doSend(SentMessage $message): void
+        {
+            throw new TransportException($this->error);
+        }
+
+        public function __toString(): string
+        {
+            return 'falla';
+        }
+    });
+    config(['mail.default' => 'falla', 'mail.mailers.falla' => ['transport' => 'falla']]);
+    Mail::forgetMailers();
 }
 
 /** Un aviso de operación y un mensaje de campaña, los dos por correo. */
@@ -108,7 +135,7 @@ it('la verificación de producción avisa de un envío atascado', function (): v
         ->expectsOutputToContain('AVISO Campañas saliendo a tiempo — 300 pendiente(s)');
 });
 
-it('como máximo una vez: lo que una pasada cortada dejó «enviando» no se vuelve a mandar y al rato queda fallido', function (): void {
+it('como máximo una vez: lo que una pasada cortada dejó «enviando» no se vuelve a mandar y al rato queda sin confirmar', function (): void {
     $e = estudioConSesion('estudio-envio', 'a@correo.mx');
     Mail::fake();
     enNegocioDeEnvio(function (): void {
@@ -135,13 +162,60 @@ it('como máximo una vez: lo que una pasada cortada dejó «enviando» no se vue
     $estados = enNegocioDeEnvio(fn (): array => MensajeTenant::query()->orderBy('id')->get()
         ->mapWithKeys(fn (MensajeTenant $m): array => [$m->destinatario => [$m->estado->value, $m->intentos]])->all());
     expect($estados)->toBe([
-        'cortado@correo.mx' => ['fallido', EnviarMensajesTenant::MAX_INTENTOS],
+        'cortado@correo.mx' => ['incierto', 1],
         'en-curso@correo.mx' => ['enviando', 1],
         'nuevo@correo.mx' => ['enviado', 1],
     ]);
     // En la bandeja de salida el que se está entregando se ve «en cola».
     $salida = $this->getJson("/api/v1/app/{$e['slug']}/mensajes?page=1", conBearer($e['bearer']))->assertOk();
-    expect($salida->json('meta.conteos'))->toMatchArray(['encolado' => 1, 'enviado' => 1, 'fallido' => 1])
+    expect($salida->json('meta.conteos'))->toMatchArray(['encolado' => 1, 'enviado' => 1, 'incierto' => 1, 'fallido' => 0])
         ->and($salida->json('meta.conteos'))->not->toHaveKey('enviando')
         ->and(collect($salida->json('data'))->firstWhere('destinatario', 'en-curso@correo.mx')['estado'])->toBe('encolado');
+});
+
+it('si el proveedor pudo haberlo recibido queda sin confirmar y no se repite; si no se pudo conectar, se reintenta (ADR 0227)', function (): void {
+    $e = estudioConSesion('estudio-envio', 'a@correo.mx');
+    enNegocioDeEnvio(function (): void {
+        MensajeTenant::query()->create([
+            'canal' => 'email', 'destinatario' => 'lento@correo.mx', 'asunto' => 'Tu pago', 'cuerpo' => 'Recibido', 'estado' => 'encolado',
+        ]);
+    });
+
+    // Se agotó el tiempo con el mensaje ya mandado: pudo haber salido.
+    correoQueFallaCon('Connection to "smtp.correo.mx:587" timed out.');
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+    $mensaje = enNegocioDeEnvio(fn (): MensajeTenant => MensajeTenant::query()->firstOrFail());
+    expect($mensaje->estado->value)->toBe('incierto')
+        ->and($mensaje->ultimo_error)->toContain('timed out');
+
+    // La siguiente pasada no lo toca.
+    Mail::fake();
+    $this->travel(EnviarMensajesTenant::MINUTOS_ENVIO_CORTADO + 5)->minutes();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+    Mail::assertNothingSent();
+
+    // Quien revisa decide reenviarlo: vuelve a la cola y sale.
+    $this->postJson("/api/v1/app/{$e['slug']}/mensajes/{$mensaje->ulid}/reenviar", [], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'encolado');
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+    Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $m): bool => $m->hasTo('lento@correo.mx'));
+    // Uno enviado ya no se reenvía.
+    $this->postJson("/api/v1/app/{$e['slug']}/mensajes/{$mensaje->ulid}/reenviar", [], conBearer($e['bearer']))
+        ->assertStatus(422);
+});
+
+it('si no se pudo conectar con el proveedor, el mensaje no salió y se reintenta', function (): void {
+    estudioConSesion('estudio-envio', 'a@correo.mx');
+    enNegocioDeEnvio(function (): void {
+        MensajeTenant::query()->create([
+            'canal' => 'email', 'destinatario' => 'caido@correo.mx', 'asunto' => 'Tu clase', 'cuerpo' => 'Mañana', 'estado' => 'encolado',
+        ]);
+    });
+
+    correoQueFallaCon('Connection could not be established with host "smtp.correo.mx:587".');
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+    $mensaje = enNegocioDeEnvio(fn (): MensajeTenant => MensajeTenant::query()->firstOrFail());
+    expect($mensaje->estado->value)->toBe('fallido')
+        ->and($mensaje->intentos)->toBe(1)
+        ->and(EnviarMensajesTenant::pudoHaberSalido(new RuntimeException('Rechazado')))->toBeFalse();
 });

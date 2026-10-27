@@ -978,6 +978,49 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
+  it("comprar con cupón: el código viaja con la compra (el servidor lo valida al crearla)", async () => {
+    api.post.mockResolvedValue({ data: { data: {} } });
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/mi/productos")
+            ? [
+                {
+                  id: "p8",
+                  nombre: "Paquete 8 clases",
+                  tipo: "paquete",
+                  precio_minor: 100000,
+                  moneda: "MXN",
+                  ilimitado: false,
+                  creditos_incluidos: 8000,
+                  disponible: true,
+                },
+              ]
+            : (datos[url.replace("/api/v1/app/demo", "")] ?? []),
+        },
+      }),
+    );
+    const w = montar(MisPagosView);
+    await flushPromises();
+    await w.get('[data-prueba="abrir-cupon-compra"]').trigger("click");
+    await w.get("#mp-cupon").setValue(" VERANO ");
+    await w
+      .get('[data-prueba="comprable"]')
+      .findAll("button")
+      .at(-1)!
+      .trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/mi/ordenes", {
+      items: [{ producto_id: "p8", cantidad: 1 }],
+      codigo_promo: "VERANO",
+      idempotency_key: expect.stringMatching(/^[a-f0-9]{32}$/),
+    });
+    // Comprado: el campo se cierra (la siguiente compra va sin cupón).
+    expect(w.find("#mp-cupon").exists()).toBe(false);
+    w.unmount();
+  });
+
   it("si la compra falla, el porqué va en la tarjeta del plan y no ofrece «Reintentar»", async () => {
     api.post.mockRejectedValue("Este plan ya no está a la venta.");
     api.get.mockImplementation((url: string) =>

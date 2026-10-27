@@ -6,4 +6,7 @@ export default {
   aplicado: "Cupón {codigo}: −{monto}",
   quitar: "Quitar",
   descuento: "Cupón",
+  // Al comprar un plan desde la cuenta del alumno: se valida al crear la compra.
+  alComprar:
+    "Se aplica al comprar: verás el total con el descuento en «Por pagar», antes de pagar.",
 };

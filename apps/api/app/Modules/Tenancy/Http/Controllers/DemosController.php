@@ -126,7 +126,7 @@ class DemosController
         if (in_array($dominio, (array) config('agendauno.ventas.dominios_desechables', []), true)) {
             throw ValidationException::withMessages(['correo' => ['Usa un correo que revises: ahí te llega la confirmación y el enlace para cancelarla.']]);
         }
-        if (! $this->recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
+        if (! $this->recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip(), 'demo')) {
             throw ValidationException::withMessages(['recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.']]);
         }
         $aviso = $this->legales->vigente(DocumentoLegal::AVISO);

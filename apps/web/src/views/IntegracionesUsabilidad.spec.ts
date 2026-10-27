@@ -42,6 +42,50 @@ beforeEach(() => {
   );
 });
 
+describe("integraciones: llaves de API", () => {
+  it("dice qué dirección del negocio consultar con cada permiso", async () => {
+    api.get.mockImplementation((ruta: string) =>
+      Promise.resolve({
+        data: {
+          data: [],
+          ...(ruta.endsWith("llaves-api")
+            ? {
+                scopes: [
+                  "miembros.ver",
+                  "agenda.ver",
+                  "reservas.ver",
+                  "derechos.ver",
+                  "ordenes.ver",
+                ],
+              }
+            : { eventos_disponibles: [] }),
+        },
+      }),
+    );
+    const w = await montar();
+    const direcciones = w.get('[data-prueba="direcciones-api"]');
+    const base = `${window.location.origin}/api/v1/app/demo/integracion`;
+    expect(direcciones.findAll("code").map((c) => c.text())).toEqual([
+      `GET ${base}/miembros`,
+      `GET ${base}/sesiones`,
+      `GET ${base}/reservas`,
+      `GET ${base}/derechos`,
+      `GET ${base}/ordenes`,
+    ]);
+    expect(direcciones.text()).toContain("X-API-Key");
+    expect(direcciones.get('[data-alcance="agenda.ver"]').text()).toContain(
+      "Agenda",
+    );
+    w.unmount();
+  });
+
+  it("el kiosco de llegada ya no es una pestaña de Integraciones", async () => {
+    const w = await montar();
+    expect(w.text()).not.toContain("Kiosco de llegada");
+    w.unmount();
+  });
+});
+
 describe("integraciones: formularios a demanda", () => {
   it("no muestra el formulario hasta solicitar una llave y cancelar no crea accesos", async () => {
     const w = await montar();

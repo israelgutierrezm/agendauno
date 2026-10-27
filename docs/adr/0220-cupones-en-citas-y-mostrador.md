@@ -35,5 +35,6 @@ dueño lo pidió para la V1.
 ## Consecuencias
 
 - Migración del negocio `000201`: `ventas_pos.descuento_minor` y `promocion_id`.
-- La app móvil no ofrece cupones todavía al agendar; se puede agregar con el mismo
-  campo `cupon`.
+- La app móvil ofrece el mismo campo al agendar desde la cuenta del cliente
+  (`GET /mi/citas/cupon` y `cupon` en `POST /mi/citas`); la app del equipo (agendar o
+  cobrar una cita) todavía no.

@@ -269,6 +269,9 @@ export default {
     activa: "Recibir prospectos",
     activaAyuda:
       "Apagado, nadie puede dejar sus datos y «Pedir acceso» en tu página muestra tu WhatsApp o teléfono.",
+    // El interruptor deshabilitado dice por qué (ADR 0229).
+    activaSinPermiso:
+      "Encenderlo o apagarlo es de quien administra el negocio: tu rol no puede cambiarlo.",
     nuevo: "Nuevo formulario",
     predeterminado: "En tu página («Pedir acceso»)",
     inactivo: "Apagado",

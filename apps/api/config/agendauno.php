@@ -64,7 +64,7 @@ return [
         'archivo_traefik' => env('DOMINIOS_PROPIOS_TRAEFIK', ''),
         'certresolver' => env('DOMINIOS_PROPIOS_CERTRESOLVER', 'letsencrypt'),
         'entrada_traefik' => env('TRAEFIK_ENTRADA', 'websecure'),
-        'servicio_traefik' => env('DOMINIOS_PROPIOS_SERVICIO', 'agendauno-web@docker'),
+        'servicio_traefik' => env('DOMINIOS_PROPIOS_SERVICIO', 'agendauno-web-propios@docker'),
     ],
 
     /*
@@ -200,6 +200,17 @@ return [
     | (env) y un código por correo (ADR 0126). Sin token, el apartado queda
     | deshabilitado (todas sus rutas responden 401).
     */
+    /*
+    | Push en la web (ADR 0225): las llaves VAPID de la plataforma (base64url; se generan
+    | con `agendauno:generar-vapid`) y el contacto para los servicios de push. Sin ellas,
+    | los avisos push solo llegan a la app.
+    */
+    'push_web' => [
+        'publica' => env('PUSH_WEB_PUBLICA', ''),
+        'privada' => env('PUSH_WEB_PRIVADA', ''),
+        'sujeto' => env('PUSH_WEB_SUJETO', 'mailto:soporte@agendauno.mx'),
+    ],
+
     'plataforma' => [
         'token' => env('PLATFORM_ADMIN_TOKEN'),
         // ¿El token solo abre la API (scripts, pruebas)? En producción, no.

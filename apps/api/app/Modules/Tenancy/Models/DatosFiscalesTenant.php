@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $sello_cer
  * @property string|null $sello_key
  * @property string|null $sello_password
+ * @property string|null $rfc_del_sello el RFC que FacturAPI dice que trae el sello (ADR 0228)
  */
 class DatosFiscalesTenant extends Model
 {
@@ -33,7 +34,7 @@ class DatosFiscalesTenant extends Model
     protected $fillable = [
         'razon_social', 'rfc', 'regimen_fiscal', 'codigo_postal',
         'facturapi_organizacion_id', 'facturapi_llave', 'facturapi_lista', 'facturapi_pendientes', 'facturapi_error',
-        'sello_cer', 'sello_key', 'sello_password',
+        'sello_cer', 'sello_key', 'sello_password', 'rfc_del_sello',
     ];
 
     /**
@@ -59,5 +60,14 @@ class DatosFiscalesTenant extends Model
     public function sellosCargados(): bool
     {
         return $this->sello_cer !== null && $this->sello_key !== null && $this->sello_password !== null;
+    }
+
+    /**
+     * ¿El sello que tiene FacturAPI es de otro RFC que el capturado (ADR 0228)? Con él no
+     * se timbra: el CFDI saldría a nombre de otro emisor.
+     */
+    public function selloDeOtroRfc(): bool
+    {
+        return ($this->rfc_del_sello ?? '') !== '' && mb_strtoupper((string) $this->rfc_del_sello) !== mb_strtoupper((string) $this->rfc);
     }
 }

@@ -67,6 +67,9 @@ class UsuarioTenantPresenter
             'sucursales' => self::sucursales($usuario),
             // Personal sin sucursal en un negocio con varias: no ve nada (ADR 0098).
             'sin_sucursal' => app(ResolverAccesoTenant::class)->sinSucursal($usuario),
+            // ¿Ve todo el negocio? Lo que es de todo el negocio (bitácora, conciliación de
+            // plataformas) no se le ofrece a quien solo ve sus sucursales (ADR 0227).
+            'todo_el_negocio' => app(ResolverAccesoTenant::class)->sucursalesPermitidas($usuario) === null,
         ];
     }
 

@@ -15,10 +15,13 @@ vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("qrcode", () => ({
   default: { toDataURL: vi.fn(async () => "data:image/png;base64,QR") },
 }));
+// Sin `estudio.gestionar` se ven los formularios pero no se enciende la captación.
+const sinAdministrar = vi.hoisted(() => ({ si: false }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
-    puede: () => true,
+    puede: (permiso: string) =>
+      !(sinAdministrar.si && permiso === "estudio.gestionar"),
   }),
 }));
 vi.mock("@/stores/toast", () => ({
@@ -67,6 +70,7 @@ function responder(lista: object[], activa = true): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sinAdministrar.si = false;
 });
 
 describe("formularios de captación", () => {
@@ -112,6 +116,31 @@ describe("formularios de captación", () => {
 
     expect(w.get('[data-prueba="captacion-apagada"]').text()).toContain(
       "La captación está apagada",
+    );
+  });
+
+  it("si su rol no puede encender la captación, el interruptor deshabilitado dice por qué", async () => {
+    responder([formulario("f1", "Pedir acceso")]);
+    const conPermiso = montar();
+    await flushPromises();
+    expect(
+      conPermiso.get('[data-prueba="captacion-activa"]').attributes(),
+    ).not.toHaveProperty("title");
+    expect(
+      conPermiso.find('[data-prueba="captacion-activa-motivo"]').exists(),
+    ).toBe(false);
+    conPermiso.unmount();
+
+    sinAdministrar.si = true;
+    const w = montar();
+    await flushPromises();
+    const interruptor = w.get('[data-prueba="captacion-activa"]');
+    const motivo = w.get('[data-prueba="captacion-activa-motivo"]');
+    expect(interruptor.attributes("disabled")).toBeDefined();
+    expect(motivo.text()).toContain("tu rol no puede cambiarlo");
+    expect(interruptor.attributes("title")).toBe(motivo.text());
+    expect(interruptor.attributes("aria-describedby")).toBe(
+      motivo.attributes("id"),
     );
   });
 });

@@ -130,6 +130,14 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         "horario",
         "ubicación",
       ]),
+      // Las tabletas de llegada (ADR 0183): las activa quien administra el negocio.
+      o(
+        "kiosco",
+        "configuracion",
+        "kiosco.panel.titulo",
+        ["kiosco", "tableta", "llegada", "check-in", "recepción", "qr"],
+        { hash: "#kiosco" },
+      ),
       o("region", "region", "configNegocio.opciones.region", [
         "país",
         "lada",

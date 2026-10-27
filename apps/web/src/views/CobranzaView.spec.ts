@@ -177,6 +177,39 @@ describe("cobros: movimientos", () => {
     expect(llaves[0]).not.toBe(llaves[1]);
     expect(w.find('[role="dialog"]').exists()).toBe(false);
   });
+  it("un cobro en línea se reconsulta con su pasarela; uno en caja no (ADR 0227)", async () => {
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/pagos")
+          ? {
+              data: [
+                { ...pago("1", "Ana López", "aprobado"), proveedor: "stripe" },
+                pago("2", "Bea Ruiz", "aprobado"),
+              ],
+              meta: resumen([{ moneda: "MXN", total_minor: 20000 }]),
+            }
+          : { data: [] },
+      }),
+    );
+    mocks.post.mockResolvedValueOnce({
+      data: { data: { registradas: 1, estado: "parcialmente_reembolsado" } },
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    const botones = w.findAll('[data-prueba="pago-reconsultar"]');
+    expect(botones).toHaveLength(1);
+    await botones[0]!.trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/pagos/1/reconsultar",
+    );
+    expect(w.text()).toContain(
+      "Se registró una devolución hecha en la pasarela.",
+    );
+  });
   it("el reembolso que no pasa se explica dentro del diálogo, junto a su campo", async () => {
     mocks.post.mockRejectedValueOnce({
       campos: { monto_minor: "El monto excede lo reembolsable." },

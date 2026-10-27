@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use App\Modules\Tenancy\Models\VerificacionWhatsApp;
@@ -103,4 +105,28 @@ it('el superadmin ajusta cuánto se guarda cada registro', function (): void {
     // Menos del mínimo no se acepta.
     $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['limpieza.dias_envios_whatsapp' => 1]], conPlataforma())
         ->assertUnprocessable();
+});
+
+it('con plazos largos borra los eventos ya publicados y los mensajes que ya salieron (ADR 0224)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    $crear = function (string $sufijo): void {
+        EventoOutboxTenant::query()->create([
+            'tipo' => 'orden.pagada', 'agregado_tipo' => 'orden', 'agregado_id' => "o-{$sufijo}", 'payload' => [],
+            'ocurrido_en' => now(), 'publicado_en' => now(),
+        ]);
+        MensajeTenant::query()->create(['canal' => 'email', 'destinatario' => "{$sufijo}@correo.mx", 'asunto' => 'Hola', 'cuerpo' => 'Hola', 'estado' => 'enviado']);
+        MensajeTenant::query()->create(['canal' => 'email', 'destinatario' => "{$sufijo}-cola@correo.mx", 'asunto' => 'Hola', 'cuerpo' => 'Hola', 'estado' => 'encolado']);
+    };
+    $this->travel(-400)->days();
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => $crear('viejo'));
+    alRelojDePrueba();
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => $crear('nuevo'));
+
+    $this->artisan('agendauno:limpiar-registros')
+        ->expectsOutputToContain('Eventos publicados: 1. Mensajes enviados: 1.')
+        ->assertSuccessful();
+    // Lo que aún está por salir se queda, aunque sea viejo.
+    expect(app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => MensajeTenant::query()->orderBy('id')->pluck('destinatario')->all()))
+        ->toBe(['viejo-cola@correo.mx', 'nuevo@correo.mx', 'nuevo-cola@correo.mx']);
 });

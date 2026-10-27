@@ -467,6 +467,33 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
 - `POST /pagos/{pago}/reembolsos` de un pago mixto pide `metodo` (la forma por la que
   sale), sin pasar de lo que entró por ella.
 
+## Enlace web, reconsultar pagos y mensajes sin confirmar (ADR 0227)
+
+- El código de `POST /yo/enlace-web` (se canjea en `POST /enlace-web/canjear`) sirve una
+  sola vez aunque lleguen dos canjes a la vez, y deja de servir si se cierra la sesión de
+  la app que lo pidió.
+- `POST /pagos/{pago}/reconsultar` (permiso `pagos.reembolsar`, 10 por minuto): pregunta
+  a la pasarela las devoluciones del cobro y registra las que falten. Responde
+  `{registradas, estado}`; 422 si no es un cobro en línea o la pasarela no respondió.
+- `agendauno:conciliar-reembolsos --desde=AAAA-MM-DD [--hasta=AAAA-MM-DD]` revisa las
+  devoluciones de todos los cobros en línea de esas fechas.
+- Los mensajes tienen el estado `incierto` («sin confirmar»: pudo haber salido); no se
+  reintenta solo. `POST /mensajes/{m}/reenviar` (permiso `comunicaciones.gestionar`)
+  devuelve a la cola uno `incierto` o `fallido` (422 si no). Las campañas suman
+  `sin_confirmar` y el `comprobante` de un pago puede ser `incierto`.
+- La sesión (`GET /yo`) trae `todo_el_negocio`: false si el usuario solo ve algunas
+  sucursales (no se le ofrecen la bitácora ni la conciliación de plataformas).
+
+## Push en la web (ADR 0225)
+
+- `GET /mi/push-web?endpoint=`: `{disponible, llave_publica, activa}` (la llave VAPID
+  pública para `pushManager.subscribe`; `activa` si ese navegador ya está).
+- `POST /mi/push-web` (`endpoint`, `keys.p256dh`, `keys.auth`; 10 por minuto): da de
+  alta el navegador del usuario. Solo `https` de los servicios de push de los
+  navegadores; otra dirección responde 422. Hasta 10 navegadores por usuario.
+- `DELETE /mi/push-web` (`endpoint`): lo quita (solo el suyo).
+- Los avisos del canal `push` llegan a la app y a los navegadores suscritos.
+
 ## Agenda de clases completa (ADR 0223)
 
 - `POST /plantillas-horario/{p}/generar`: sin `hasta`, hasta el horizonte del negocio
@@ -510,8 +537,9 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
     bono ni en un servicio pagado por adelantado.
   - Al cobrar la cita, descuenta el servicio pendiente.
   - En el mostrador se reparte en las líneas; la venta trae `descuento_minor`.
-- Revisar antes, sin usarlo: `GET /citas/cupon?codigo=&oferta_id=` (público, 20 por
-  minuto), `POST /promociones/validar` (`ordenes.gestionar`) y `POST /pos/cupon`
+- Revisar antes, sin usarlo: `GET /citas/cupon?codigo=&oferta_id=` (público, con la
+  página del negocio abierta, 20 por minuto), `GET /mi/citas/cupon` (igual, desde la
+  cuenta del cliente aunque no haya página pública), `POST /promociones/validar` (`ordenes.gestionar`) y `POST /pos/cupon`
   (`pos.vender`) con `{codigo, subtotal_minor}`. Responden `codigo`, `descuento_minor`
   y `total_minor`.
 - El uso del cupón se cuenta al pagarse.
@@ -973,7 +1001,8 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
     moneda) y `por_cobrar`.
 - `GET /mensajes?q&estado&canal&desde&hasta&page&per_page` (25 por omisión):
   - `q` busca en el asunto, el destinatario o la persona;
-  - `meta.conteos` cuenta lo encontrado por estado, sin el filtro de estado;
+  - `meta.conteos` cuenta lo encontrado por estado, sin el filtro de estado (incluye
+    `incierto`, ADR 0227);
   - cada mensaje suma `creado_en`.
 - `GET /accesos?q&resultado&desde&hasta&page&per_page` (50 por omisión):
   - `q` busca a la persona; `resultado` es `permitido` o `denegado`;
@@ -1350,6 +1379,14 @@ Ya no tienen un tope de 200. Van por páginas y con `meta` (`total`, `page`, `pe
   `POST /plataforma/estudios/{e}/extender-prueba` no acepta más) y, en cada cargo,
   `cobro_automatico` (`intentos`, `error`, `proximo_intento_en`) si la tarjeta lo rechazó
   (ADR 0222).
+- `POST /plataforma/estudios` (alta asistida, perfiles `total` y `soporte`; ADR 0226):
+  `nombre`, `slug?`, `perfil_negocio`, `pais`, `ciudad?`, `zona_horaria?` y el contacto
+  del dueño (`contacto_nombre`, `contacto_primer_apellido`, `contacto_email`,
+  `contacto_whatsapp_pais`, `contacto_telefono`, segundos nombre y apellido opcionales).
+  Responde 201 con el resumen; el dueño recibe su activación.
+- `PUT /plataforma/estudios/{e}/contacto` (los mismos campos de contacto): el correo solo
+  cambia si el dueño no ha activado su cuenta (si no, 422); la ficha trae
+  `contacto.campos`.
 - `POST /plataforma/estudios/{e}/aprovisionar`: vuelve a intentar en la cola la base de un
   negocio en `provisioning` (202); con su base creada, 422 (ADR 0222). En producción el
   registro responde `provisioning` y la activación sale al terminar la cola.

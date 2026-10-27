@@ -21,6 +21,8 @@ services:
       traefik.enable: "true"
       traefik.docker.network: ${TRAEFIK_RED:-traefik}
       traefik.http.services.agendauno-web.loadbalancer.server.port: "80"
+      # Los dominios propios de los negocios entran por el 81 (su IP real, ADR 0224).
+      traefik.http.services.agendauno-web-propios.loadbalancer.server.port: "81"
 
       # AgendaUno: el dominio, www y el subdominio de cada negocio, con un certificado
       # comodín (DOMINIO y *.DOMINIO).

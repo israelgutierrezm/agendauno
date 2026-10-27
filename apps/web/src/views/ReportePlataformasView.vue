@@ -779,8 +779,8 @@ onMounted(() => {
         </div>
       </div>
     </PanelLateral>
-    <!-- Conciliación de pagos (ADR 0185) -->
-    <ConciliacionPlataformas />
+    <!-- Conciliación de pagos (ADR 0185): es de todo el negocio (ADR 0227). -->
+    <ConciliacionPlataformas v-if="sesion.usuario?.todo_el_negocio !== false" />
   </section>
 </template>
 

@@ -5,6 +5,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import CampoCupon from "@/components/CampoCupon.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -166,9 +167,32 @@ const reglas = computed(() =>
       })
     : [],
 );
-// Lo que se cobra: el plan y, si le toca, su inscripción (lo que suma el servidor).
+// Cupón (ADR 0220): se revisa contra el precio del plan (como en Ventas) y la orden lo
+// lleva; el servidor lo vuelve a validar al vender. Otro plan, otra revisión.
+const codigoCupon = ref("");
+const descuentoCupon = ref(0);
+watch(productoSel, () => {
+  codigoCupon.value = "";
+  descuentoCupon.value = 0;
+});
+async function revisarCupon(
+  codigo: string,
+): Promise<{ descuento_minor: number }> {
+  const { data } = await api.post<{ data: { descuento_minor: number } }>(
+    `${base.value}/promociones/validar`,
+    { codigo, subtotal_minor: elegido.value?.precio_minor ?? 0 },
+  );
+  return data.data;
+}
+// Lo que se cobra: el plan (menos el cupón) y, si le toca, su inscripción (lo que suma
+// el servidor).
 const totalVenta = computed(
-  () => (elegido.value?.precio_minor ?? 0) + inscripcion.value,
+  () =>
+    Math.max(
+      0,
+      (elegido.value?.precio_minor ?? 0) -
+        (codigoCupon.value !== "" ? descuentoCupon.value : 0),
+    ) + inscripcion.value,
 );
 const metodo = ref("efectivo");
 const procesando = ref(false);
@@ -177,6 +201,9 @@ const avisoVenta = ref<string | null>(null);
 // Con los números del país del negocio («$ 1.250,50» en Colombia).
 function dinero(minor: number, moneda: string): string {
   return dineroDelPais(minor, moneda, sesionStore.pais);
+}
+function dineroDelPlan(minor: number): string {
+  return dinero(minor, elegido.value?.moneda ?? sesionStore.moneda);
 }
 
 async function abrirVenta(): Promise<void> {
@@ -194,10 +221,13 @@ async function abrirVenta(): Promise<void> {
   }
 }
 
-// Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
+// Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra). Con
+// varias sucursales y «Todas» en la barra, se pide elegir en qué caja entra (ADR 0175),
+// como en Ventas.
 const cobro = crearVenta();
+const sinSucursalParaCobrar = cobro.sinSucursal;
 async function vender(): Promise<void> {
-  if (productoSel.value === "") {
+  if (productoSel.value === "" || sinSucursalParaCobrar.value) {
     return;
   }
   // Vender cobra en el momento: se confirma qué, cuánto (con la inscripción, si le
@@ -228,6 +258,10 @@ async function vender(): Promise<void> {
       {
         comprador_id: props.personaId,
         items: [{ producto_id: productoSel.value, cantidad: 1 }],
+        // Solo el cupón ya revisado: lo que se confirmó es lo que se cobra.
+        ...(codigoCupon.value !== ""
+          ? { codigo_promo: codigoCupon.value }
+          : {}),
         ...(pideCondiciones.value ? { acepta_condiciones: true } : {}),
       },
       metodo.value,
@@ -235,6 +269,8 @@ async function vender(): Promise<void> {
     avisoVenta.value = t("recepcion.miembro.vendido");
     vendiendo.value = false;
     productoSel.value = "";
+    codigoCupon.value = "";
+    descuentoCupon.value = 0;
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -643,6 +679,26 @@ function cancelarVenta(): void {
               {{ $t("ventas.vender.aceptaCondiciones") }}
             </label>
           </div>
+          <!-- Cupón: revisado contra el precio del plan; la orden lo lleva. -->
+          <CampoCupon
+            v-if="elegido"
+            v-model="codigoCupon"
+            :revisar="revisarCupon"
+            :dinero="dineroDelPlan"
+            :deshabilitado="procesando"
+            @aplicado="descuentoCupon = $event"
+          />
+          <p
+            v-if="elegido && codigoCupon !== '' && descuentoCupon > 0"
+            class="text-sm font-medium"
+            data-prueba="total-con-cupon"
+          >
+            {{
+              $t("ventas.vender.promoTotal", {
+                monto: dinero(totalVenta, elegido.moneda),
+              })
+            }}
+          </p>
           <select v-model="metodo" class="tu-input">
             <option value="efectivo">
               {{ $t("recepcion.miembro.efectivo") }}
@@ -654,12 +710,22 @@ function cancelarVenta(): void {
               {{ $t("recepcion.miembro.transferencia") }}
             </option>
           </select>
+          <p
+            v-if="sinSucursalParaCobrar"
+            class="text-sm"
+            role="status"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="elige-sucursal"
+          >
+            {{ $t("sucursalOperativa.eligeParaCobrar") }}
+          </p>
           <div class="flex gap-2">
             <button
               type="button"
               class="tu-btn tu-btn-primario flex-1"
               :disabled="
                 procesando ||
+                sinSucursalParaCobrar ||
                 productoSel === '' ||
                 consultandoCuotas ||
                 errorCuotas ||

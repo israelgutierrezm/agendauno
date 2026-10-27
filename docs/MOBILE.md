@@ -13,7 +13,7 @@ pantalla del rol activo:
 | Rol activo | Pantalla | Qué hace |
 |---|---|---|
 | Alumno o cliente (`miembro`) | `CuentaScreen` | Inicio, reservar clases o agendar citas, reprogramar y cancelar, comprar planes, pagos y pago automático, pase QR, expediente y documentos, privacidad |
-| Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista, su agenda y sus bloqueos |
+| Quien imparte (`instructor`) | `InstructorScreen` | Sus clases y citas, pase de lista, su agenda y sus bloqueos; en citas, con la función de comisiones del plan, «Mis comisiones» (lo ganado, sus propinas y lo por venir del periodo, `GET /mis-comisiones`, ADR 0219) |
 | Equipo (dueño, admin, recepción, roles propios) | `EquipoScreen` | Inicio del día, la agenda (con bloqueos), crear y reprogramar citas, el pase de lista completo, escanear el pase QR, cobrar lo pendiente y vender un plan, la caja y la bandeja de mensajes, según sus permisos |
 
 Cualquier rol puede **eliminar su cuenta** desde Perfil (ver «Eliminar la cuenta»).
@@ -66,6 +66,11 @@ para una clase y la administración (catálogo, reportes, configuración).
   corte del bono dice «Agendadas», no «Reservadas».
 - Al agendar una cita que se paga para apartarla (o con anticipo), el aviso trae
   «Pagar ahora» si el negocio cobra en línea.
+- Al agendar, «¿Tienes un cupón?» (ADR 0220, `CampoCupon`): revisa el código
+  (`GET /mi/citas/cupon`), dice cuánto descuenta y lo manda en `cupon`; solo en lo que se
+  paga (no con su bono, ni lo ya pagado por adelantado, ni sin precio) y se limpia al
+  cambiar de servicio. Lo ya pagado por adelantado (ADR 0218) dice «Ya lo pagaste» y
+  no pide anticipo.
 - En el Expediente sube fotos o un PDF (el selector del sistema, sin permisos; hasta
   8 MB como el servidor; canal `agendauno/archivos`, método `elegirPdf`).
 - El pase de la cartera se renueva («Si pierdes tu teléfono, renuévalo»;

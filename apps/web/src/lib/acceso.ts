@@ -33,6 +33,8 @@ export interface Politica {
   soloInstructor?: boolean;
   // Basta con la sesión (perfil propio, elegir rol).
   personal?: boolean;
+  // Es de todo el negocio: no la ve quien solo ve sus sucursales (el servidor la niega).
+  todoElNegocio?: boolean;
   // Se puede entrar si se puede entrar a CUALQUIERA de estas rutas (portadas que
   // solo reúnen opciones, como la de Configuración).
   algunaDe?: string[];
@@ -125,7 +127,7 @@ export const POLITICAS: Record<string, Politica> = {
   },
   usuarios: { permiso: "usuarios.gestionar" },
   roles: { permiso: "roles.gestionar", funcion: "roles_propios" },
-  bitacora: { permiso: "auditoria.ver" },
+  bitacora: { permiso: "auditoria.ver", todoElNegocio: true },
   privacidad: { permiso: "miembros.gestionar" },
   // Portada: solo reúne opciones; se ve si alguna se puede abrir.
   ajustes: {
@@ -252,6 +254,12 @@ export function puedeEntrar(
     return false;
   }
   if (politica.soloInstructor === true && !esInstructor(sesion.usuario)) {
+    return false;
+  }
+  if (
+    politica.todoElNegocio === true &&
+    sesion.usuario?.todo_el_negocio === false
+  ) {
     return false;
   }
   if (

@@ -6,6 +6,7 @@ import { RouterLink, useRouter } from "vue-router";
 import AgregarAClase from "@/components/AgregarAClase.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
+import FitpassOperacion from "@/components/FitpassOperacion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { asistenciaAbierta } from "@/lib/agenda";
 import { useRecargarAlVolver } from "@/lib/alVolver";
@@ -272,6 +273,12 @@ const fitpassActivo = ref(false);
 const capturandoFitpass = ref(false);
 const textoFitpass = ref("");
 const erroresFitpass = ref<string[]>([]);
+// Lo pendiente en Fitpass Admin (horarios por capturar y asistencias por marcar), a la
+// mano de recepción: antes solo estaba en Integraciones (ADR 0202).
+const verFitpassAdmin = computed(
+  () => sesion.puede("checkins.registrar") || sesion.puede("agenda.ver"),
+);
+const viendoFitpass = ref(false);
 /**
  * Un renglón por reserva: «ID, nombre, correo» (también separados por tabulador o
  * punto y coma, como al copiar la tabla de Fitpass Admin).
@@ -416,6 +423,21 @@ async function marcarInvitado(
   } finally {
     ocupado.value = false;
   }
+}
+// Antes de la clase se cancela la invitación: el lugar queda libre y el pase vuelve.
+async function cancelarInvitado(i: InvitadoLista): Promise<void> {
+  if (
+    !(await confirmar(
+      t("paseLista.invitados.cancelarConfirmar", { nombre: i.nombre }),
+      { peligro: true, aceptar: t("paseLista.invitados.cancelar") },
+    ))
+  ) {
+    return;
+  }
+  await accion(async () => {
+    await api.delete(`${base.value}/invitados/${i.id}`);
+    invitados.value = invitados.value.filter((x) => x.id !== i.id);
+  });
 }
 
 async function cargar(silencioso = false): Promise<void> {
@@ -942,6 +964,16 @@ watch(
                 {{ $t("paseLista.acciones.noVino") }}
               </button>
             </template>
+            <button
+              v-if="puedeGestionar && i.estado === 'reservado' && !yaEmpezo"
+              type="button"
+              class="tu-btn tu-btn-secundario"
+              :disabled="ocupado"
+              data-prueba="cancelar-invitado"
+              @click="cancelarInvitado(i)"
+            >
+              {{ $t("paseLista.invitados.cancelar") }}
+            </button>
           </li>
         </ul>
       </section>
@@ -1047,6 +1079,34 @@ watch(
             </template>
           </li>
         </ul>
+      </section>
+
+      <!-- Fitpass sin API: lo que falta capturar o marcar en Fitpass Admin -->
+      <section
+        v-if="fitpassActivo && verFitpassAdmin"
+        class="pl-espera tu-card"
+        data-prueba="fitpass-admin"
+      >
+        <header>
+          <div>
+            <h2>{{ $t("fitpass.recepcion.titulo") }}</h2>
+            <p>{{ $t("fitpass.recepcion.ayuda") }}</p>
+          </div>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            :aria-expanded="viendoFitpass"
+            data-prueba="ver-fitpass-admin"
+            @click="viendoFitpass = !viendoFitpass"
+          >
+            {{
+              viendoFitpass
+                ? $t("fitpass.recepcion.ocultar")
+                : $t("fitpass.recepcion.ver")
+            }}
+          </button>
+        </header>
+        <FitpassOperacion v-if="viendoFitpass" operacion />
       </section>
 
       <!-- Apartados para recoger (ADR 0194): se cobran en el mostrador -->

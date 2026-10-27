@@ -5,6 +5,7 @@ import { useRoute } from "vue-router";
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import GiroNegocio from "@/components/GiroNegocio.vue";
+import KioscosNegocio from "@/components/KioscosNegocio.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { DatosTerminologia, TerminosNegocio } from "@/lib/terminologia";
@@ -17,6 +18,8 @@ const secciones: Record<string, string> = {
   datos: "configNegocio.opciones.datos",
   "tipo-negocio": "modalidadNegocio.giro.titulo",
   terminologia: "configNegocio.opciones.terminologia",
+  // Las tabletas de llegada (ADR 0183), en clases y en citas.
+  kiosco: "kiosco.panel.titulo",
 };
 const seccion = computed(() => {
   const pedida = route.hash.slice(1);
@@ -140,6 +143,18 @@ onMounted(cargar);
           :guardar="guardarTerminologia"
           @guardado="terminologiaGuardada"
         />
+      </div>
+      <!-- Kiosco de llegada: lo activa quien administra el negocio (ADR 0183). Se
+           monta solo a la vista: consulta sus tabletas y sedes. -->
+      <div
+        v-if="puedeGestionar && visible('kiosco')"
+        id="kiosco"
+        class="mt-6 scroll-mt-24"
+      >
+        <h2 v-if="seccion !== 'kiosco'" class="tu-titulo-seccion mb-3">
+          {{ $t("kiosco.panel.titulo") }}
+        </h2>
+        <KioscosNegocio />
       </div>
     </template>
   </section>

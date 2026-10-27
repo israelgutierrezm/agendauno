@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Application\PlantillasWhatsAppNegocio;
 use App\Modules\Tenancy\Application\ResolverSegmentoTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\ColaDeMensajes;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Models\DifusionTenant;
@@ -140,6 +141,8 @@ class DifusionesTenantController
         $difusion = $this->difusion($request);
         abort_unless($difusion->estado === DifusionTenant::PAUSADA, 422, 'Esta difusión no está en pausa.');
         $difusion->update(['estado' => DifusionTenant::ENVIANDO, 'pausada_en' => null]);
+        // Lo que esperaba vuelve a la cola: el envío de cada minuto ya no la salta.
+        app(ColaDeMensajes::class)->hayNuevo(ColaDeMensajes::CAMPANAS);
 
         return response()->json(['data' => $this->presentar($difusion->refresh())]);
     }
@@ -216,6 +219,8 @@ class DifusionesTenantController
             'fallidos' => $difusion->mensajes()->where('estado', EstadoMensaje::Fallido->value)
                 ->where('intentos', '>=', EnviarMensajesTenant::MAX_INTENTOS)->count(),
             'descartados' => $difusion->mensajes()->where('estado', EstadoMensaje::Descartado->value)->count(),
+            // Pudieron haber salido (ADR 0227): se revisan en la bandeja de salida.
+            'sin_confirmar' => $difusion->mensajes()->where('estado', EstadoMensaje::Incierto->value)->count(),
         ];
     }
 }

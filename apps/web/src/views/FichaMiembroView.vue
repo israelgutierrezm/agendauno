@@ -6,7 +6,9 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import CorregirCobro from "@/components/CorregirCobro.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
+import DarCortesia from "@/components/DarCortesia.vue";
 import DarDeBajaMembresia from "@/components/DarDeBajaMembresia.vue";
 import FamiliaMiembro from "@/components/FamiliaMiembro.vue";
 import NivelesMiembro from "@/components/NivelesMiembro.vue";
@@ -125,6 +127,15 @@ interface Orden {
   concepto?: string | null;
   // Sus cuotas (B04), para exentarlas por separado.
   cuotas?: CuotaPorCobrar[];
+  // El cobro en caja de una compra pagada, para corregir su forma de pago o anularlo
+  // (ADR 0086/0087); la misma forma que el de una cita en la agenda.
+  pago?: {
+    id: string;
+    metodo: string | null;
+    en_caja?: boolean;
+    corregible: boolean;
+    anulable: boolean;
+  } | null;
   sesion?: {
     profesional: string | null;
     inicia_en: string;
@@ -184,6 +195,16 @@ const verComprasMostrador = computed(
     sesion.estudio?.plan?.sin.includes("inventario") !== true,
 );
 const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
+// Quitar créditos a mano (ajuste con motivo) y dar un plan de cortesía (ADR 0181),
+// cada uno con su permiso; la cortesía, si el plan del negocio trae paquetes.
+const puedeQuitar = computed(() => sesion.puede("creditos.gestionar"));
+const puedeCortesia = computed(
+  () =>
+    sesion.puede("membresias.cortesia") &&
+    sesion.puede("productos.ver") &&
+    sesion.estudio?.plan?.sin.includes("paquetes") !== true,
+);
+const dandoCortesia = ref(false);
 
 // Negocio de citas: el cliente paga cada servicio; sin bono ni membresía no le
 // falta nada. Lo que importa es su próxima cita, su última visita, lo que suele
@@ -354,6 +375,96 @@ async function recargar(d: Derecho): Promise<void> {
   } finally {
     guardandoRecarga.value = false;
   }
+}
+
+// Quitar créditos a mano (lo que no debía tener): de lo disponible de ese plan, con
+// motivo, y queda en sus movimientos como ajuste. No devuelve dinero.
+const quitando = ref<string | null>(null);
+const quita = ref({ creditos: 1, motivo: "" });
+const guardandoQuita = ref(false);
+function abrirQuita(d: Derecho): void {
+  quita.value = { creditos: 1, motivo: "" };
+  quitando.value = quitando.value === d.id ? null : d.id;
+}
+function disponibleDe(d: Derecho): number {
+  return Math.max(0, d.disponible_unidades ?? 0) / 1000;
+}
+const unidadesQuita = computed(() =>
+  Math.round((Number(quita.value.creditos) || 0) * 1000),
+);
+function puedeQuitarDe(d: Derecho): boolean {
+  return (
+    puedeQuitar.value &&
+    !d.ilimitado &&
+    esVigente(d) &&
+    (d.disponible_unidades ?? 0) > 0
+  );
+}
+async function quitarCreditos(d: Derecho): Promise<void> {
+  const unidades = unidadesQuita.value;
+  const motivo = quita.value.motivo.trim();
+  if (
+    unidades <= 0 ||
+    unidades > (d.disponible_unidades ?? 0) ||
+    motivo === ""
+  ) {
+    return;
+  }
+  const n = unidades / 1000;
+  if (
+    !(await confirmar(
+      tm(
+        "confirmaciones.quitarCreditos",
+        {
+          n: creditos(unidades),
+          plan: d.producto ?? "—",
+          quedan: creditos((d.disponible_unidades ?? 0) - unidades),
+        },
+        n === 1 ? 1 : 2,
+      ),
+      { aceptar: tm("creditosFicha.quitar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  guardandoQuita.value = true;
+  try {
+    await api.post(`${base.value}/derechos/${d.id}/consumos`, {
+      unidades,
+      descripcion: motivo,
+    });
+    toast.exito(tm("creditosFicha.quitados"));
+    quitando.value = null;
+    movimientosDe.value = null;
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    guardandoQuita.value = false;
+  }
+}
+
+// Plan de cortesía dado: se dice qué quedó y se recarga la ficha.
+async function cortesiaHecha(aviso: string): Promise<void> {
+  toast.exito(aviso);
+  await cargar();
+}
+
+// Corregir la forma de pago (o anular) un cobro en caja desde su historial de compras.
+const corrigiendoOrden = ref<string | null>(null);
+function corregibleOrden(o: Orden): boolean {
+  const p = o.pago;
+  return (
+    !!p &&
+    p.en_caja !== false &&
+    ((p.corregible && sesion.puede("ordenes.gestionar")) ||
+      (p.anulable && sesion.puede("pagos.reembolsar")))
+  );
+}
+async function cobroCorregido(): Promise<void> {
+  corrigiendoOrden.value = null;
+  todasOrdenes.value = null;
+  await cargar();
 }
 
 // Dar de baja una membresía (B04): con la simulación a la vista.
@@ -716,7 +827,7 @@ const regreso = useRegreso({
               </p>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button
               v-if="puedeVender"
               type="button"
@@ -724,6 +835,15 @@ const regreso = useRegreso({
               @click="vendiendo = true"
             >
               {{ $t("ficha.vender") }}
+            </button>
+            <button
+              v-if="puedeCortesia"
+              type="button"
+              class="tu-btn tu-btn-secundario"
+              data-prueba="abrir-cortesia"
+              @click="dandoCortesia = true"
+            >
+              {{ $t("operacion.ficha.cortesia.boton") }}
             </button>
             <button
               v-if="puedeGestionar"
@@ -1033,6 +1153,16 @@ const regreso = useRegreso({
                             >
                               {{ tm("creditosFicha.agregar") }}
                             </button>
+                            <button
+                              v-if="puedeQuitarDe(d)"
+                              type="button"
+                              class="tu-btn tu-btn-secundario tu-btn-chico"
+                              :aria-expanded="quitando === d.id"
+                              data-prueba="abrir-quitar-creditos"
+                              @click="abrirQuita(d)"
+                            >
+                              {{ tm("creditosFicha.quitar") }}
+                            </button>
                           </template>
                           <template v-if="puedeRecargar && d.acuerdo_id">
                             <button
@@ -1201,6 +1331,85 @@ const regreso = useRegreso({
                               :aria-busy="guardandoRecarga || undefined"
                             >
                               {{ $t("creditosFicha.confirmar") }}
+                            </button>
+                          </div>
+                        </form>
+                        <!-- Quitar créditos: de lo disponible, con motivo -->
+                        <form
+                          v-if="quitando === d.id"
+                          class="w-full space-y-3 rounded-xl border p-4"
+                          :style="{
+                            borderColor: 'var(--borde)',
+                            background: 'var(--fondo)',
+                          }"
+                          data-prueba="quitar-creditos"
+                          @submit.prevent="quitarCreditos(d)"
+                        >
+                          <p
+                            class="text-xs"
+                            :style="{ color: 'var(--texto-suave)' }"
+                          >
+                            {{ tm("creditosFicha.quitarAyuda") }}
+                          </p>
+                          <div class="flex flex-wrap items-end gap-3">
+                            <div>
+                              <label class="tu-label" :for="`qc-${d.id}`">{{
+                                tm("creditosFicha.creditos")
+                              }}</label>
+                              <input
+                                :id="`qc-${d.id}`"
+                                v-model.number="quita.creditos"
+                                class="tu-input w-24"
+                                type="number"
+                                min="0.5"
+                                step="0.5"
+                                :max="disponibleDe(d)"
+                                required
+                              />
+                              <span class="tu-hint">{{
+                                $t("creditosFicha.disponibles", {
+                                  n: creditos(d.disponible_unidades ?? 0),
+                                })
+                              }}</span>
+                            </div>
+                            <div class="min-w-[12rem] flex-1">
+                              <label class="tu-label" :for="`qm-${d.id}`">{{
+                                $t("creditosFicha.motivo")
+                              }}</label>
+                              <input
+                                :id="`qm-${d.id}`"
+                                v-model="quita.motivo"
+                                class="tu-input"
+                                maxlength="255"
+                                :placeholder="
+                                  tm('creditosFicha.quitarMotivoPh')
+                                "
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div class="flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              class="tu-btn tu-btn-secundario"
+                              :disabled="guardandoQuita"
+                              @click="quitando = null"
+                            >
+                              {{ $t("comun.cancelar") }}
+                            </button>
+                            <button
+                              type="submit"
+                              class="tu-btn tu-btn-peligro"
+                              :disabled="
+                                guardandoQuita ||
+                                unidadesQuita <= 0 ||
+                                unidadesQuita > (d.disponible_unidades ?? 0) ||
+                                quita.motivo.trim() === ''
+                              "
+                              :aria-busy="guardandoQuita || undefined"
+                              data-prueba="confirmar-quitar-creditos"
+                            >
+                              {{ tm("creditosFicha.quitar") }}
                             </button>
                           </div>
                         </form>
@@ -1459,7 +1668,28 @@ const regreso = useRegreso({
                         "
                         >{{ $t(`ficha.ordenes.estados.${o.estado}`) }}</span
                       >
+                      <button
+                        v-if="corregibleOrden(o)"
+                        type="button"
+                        class="tu-btn tu-btn-secundario tu-btn-chico"
+                        :aria-expanded="corrigiendoOrden === o.id"
+                        data-prueba="corregir-compra"
+                        @click="
+                          corrigiendoOrden =
+                            corrigiendoOrden === o.id ? null : o.id
+                        "
+                      >
+                        {{ $t("corregirCobro.corregir") }}
+                      </button>
                     </div>
+                    <!-- Cobro en caja con error: corregir la forma o anularlo -->
+                    <CorregirCobro
+                      v-if="corrigiendoOrden === o.id && o.pago"
+                      class="w-full"
+                      :base="base"
+                      :pago="o.pago"
+                      @cambiado="cobroCorregido"
+                    />
                   </li>
                 </ul>
                 <button
@@ -1696,6 +1926,14 @@ const regreso = useRegreso({
       :nombre="ficha.persona.nombre_completo"
       venta
       @cerrar="onCerrarVenta"
+    />
+    <DarCortesia
+      v-if="puedeCortesia && dandoCortesia && ficha"
+      v-model:abierto="dandoCortesia"
+      :base="base"
+      :persona-id="personaId"
+      :nombre="ficha.persona.nombre_completo"
+      @hecho="cortesiaHecha"
     />
   </section>
 </template>

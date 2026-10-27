@@ -9,10 +9,13 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: () => "Error",
 }));
+// Los permisos de quien la ve: cada parte se pide solo con el suyo.
+const permisos = vi.hoisted(() => new Set<string>());
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     zonaHoraria: "America/Mexico_City",
+    puede: (p: string) => permisos.has("*") || permisos.has(p),
   }),
 }));
 vi.mock("@/stores/toast", () => ({
@@ -29,6 +32,8 @@ const CLASE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  permisos.clear();
+  permisos.add("*");
   api.get.mockImplementation((ruta: string) =>
     Promise.resolve({
       data: {
@@ -100,5 +105,38 @@ describe("Fitpass en Integraciones", () => {
       {},
     );
     expect(w.findAll('[data-prueba="por-marcar-fitpass"]')).toHaveLength(0);
+  });
+
+  it("en el pase de lista, recepción ve horarios y lo que falta marcar, sin configurar clases", async () => {
+    permisos.clear();
+    permisos.add("agenda.ver");
+    permisos.add("checkins.registrar");
+    const w = mount(FitpassOperacion, {
+      props: { operacion: true },
+      global: { plugins: [i18n] },
+    });
+    await flushPromises();
+
+    const rutas = api.get.mock.calls.map(([ruta]) => ruta as string);
+    expect(rutas).toEqual([
+      "/api/v1/app/demo/integraciones/fitpass/horarios",
+      "/api/v1/app/demo/integraciones/fitpass/por-marcar",
+    ]);
+    expect(w.text()).not.toContain("Clases que ofreces en Fitpass");
+    expect(w.text()).toContain("Horarios para capturar");
+    expect(w.findAll('[data-prueba="por-marcar-fitpass"]')).toHaveLength(1);
+  });
+
+  it("sin permiso de check-in no pide ni muestra lo que falta marcar", async () => {
+    permisos.clear();
+    permisos.add("agenda.ver");
+    const w = mount(FitpassOperacion, {
+      props: { operacion: true },
+      global: { plugins: [i18n] },
+    });
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(w.text()).not.toContain("Por marcar en Fitpass Admin");
   });
 });

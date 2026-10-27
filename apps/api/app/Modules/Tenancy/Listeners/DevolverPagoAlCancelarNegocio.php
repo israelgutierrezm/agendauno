@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 /**
  * Si el negocio lo decide (`cancelacion.devolver_pago_si_cancela_negocio`, ADR 0046),
@@ -28,10 +29,23 @@ use App\Modules\Tenancy\Reservas\QuienCancela;
  *   at-least-once). Si ya se devolvió o la pasarela no puede, no hace nada más: queda
  *   para el negocio en Pagos.
  *
- * Se registra sobre {@see EventoDeDominioTenant} en AppServiceProvider.
+ * Se registra sobre {@see EventoDeDominioTenant} en AppServiceProvider. Corre en la
+ * cola con el negocio del evento: devolver llama a la pasarela.
  */
-class DevolverPagoAlCancelarNegocio
+class DevolverPagoAlCancelarNegocio implements ShouldQueue
 {
+    /** En la cola (ADR 0224): un proveedor lento no detiene el outbox de todos. */
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [60, 600];
+
+    /** Solo se encola lo que le toca: los demás eventos no hacen un trabajo. */
+    public function shouldQueue(EventoDeDominioTenant $evento): bool
+    {
+        return in_array($evento->tipo, ['reserva.cancelada', 'reserva.sesion_cancelada'], true) && $evento->agregadoId !== null;
+    }
+
     public function __construct(
         private readonly ParametrosTenant $parametros,
         private readonly ReembolsarPagoTenant $reembolsar,

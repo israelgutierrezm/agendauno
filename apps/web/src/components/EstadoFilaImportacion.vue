@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+import { conTerminosActuales } from "@/lib/terminologia";
+
 /**
  * Estado de una fila de una carga por CSV, con punto y texto: lista, ya estaba (no se
  * repite), en conflicto (el dato es de alguien más o viene repetido) o con errores. Los
- * motivos van debajo, para corregirlos en el archivo.
+ * motivos van debajo, para corregirlos en el archivo; los da la API con «alumno»
+ * fijo, así que se dicen con los términos del negocio (como sus demás mensajes).
  */
 const props = defineProps<{ estado?: string; errores: string[] }>();
 
@@ -56,6 +59,6 @@ const estado = computed<Estado>(() =>
           : 'var(--error)',
     }"
   >
-    <li v-for="(er, i) in errores" :key="i">{{ er }}</li>
+    <li v-for="(er, i) in errores" :key="i">{{ conTerminosActuales(er) }}</li>
   </ul>
 </template>

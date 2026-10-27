@@ -94,6 +94,7 @@ use App\Modules\Tenancy\Http\Controllers\MiHistorialTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiInteresTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
+use App\Modules\Tenancy\Http\Controllers\MiPushWebTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisComprasMostradorTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
@@ -119,6 +120,7 @@ use App\Modules\Tenancy\Http\Controllers\PlanRentaController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasWhatsAppNegocioController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaAltaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaErroresController;
@@ -331,6 +333,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/wellhub/solicitudes/{solicitud}/asignar', [SolicitudesWellhubPlataformaController::class, 'asignar'])->name('wellhub.solicitudes.asignar');
         Route::post('/wellhub/solicitudes/{solicitud}/descartar', [SolicitudesWellhubPlataformaController::class, 'descartar'])->name('wellhub.solicitudes.descartar');
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
+        // Alta asistida de un negocio y corregir el contacto de su dueño (ADR 0226).
+        Route::post('/estudios', [PlataformaAltaController::class, 'crear'])->name('estudios.store');
+        Route::put('/estudios/{estudio}/contacto', [PlataformaAltaController::class, 'contacto'])->name('estudios.contacto');
         Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
         Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
@@ -579,6 +584,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->middleware('modalidad:citas')->name('mi.citas.disponibilidad');
             Route::get('/mi/citas/dias', [MiTenantController::class, 'diasCita'])->middleware('modalidad:citas')->name('mi.citas.dias');
             Route::post('/mi/citas', [MiTenantController::class, 'agendarCita'])->middleware('modalidad:citas')->name('mi.citas.store');
+            // Revisar un cupón desde la cuenta, aunque el negocio no tenga página pública (ADR 0220).
+            Route::get('/mi/citas/cupon', [PublicoCitasController::class, 'cupon'])->middleware(['throttle:20,1,cupon-citas', 'modalidad:citas'])->name('mi.citas.cupon');
             Route::post('/mi/reservas/{reserva}/cancelar', [MiTenantController::class, 'cancelar'])->name('mi.reservas.cancelar');
             // Cambiar el horario desde su cuenta (ADR 0044).
             Route::get('/mi/reservas/{reserva}/reprogramar', [MiReprogramarTenantController::class, 'opciones'])->name('mi.reservas.reprogramar.opciones');
@@ -601,6 +608,10 @@ Route::prefix('v1')->group(function (): void {
             // Notificaciones push: la app registra el teléfono al iniciar sesión y lo quita al salir.
             Route::post('/mi/dispositivos', [MiDispositivosTenantController::class, 'registrar'])->name('mi.dispositivos.store');
             Route::delete('/mi/dispositivos', [MiDispositivosTenantController::class, 'quitar'])->name('mi.dispositivos.destroy');
+            // Avisos en este navegador (push en la web, ADR 0225).
+            Route::get('/mi/push-web', [MiPushWebTenantController::class, 'mostrar'])->name('mi.push-web.show');
+            Route::post('/mi/push-web', [MiPushWebTenantController::class, 'registrar'])->middleware('throttle:10,1,push-web')->name('mi.push-web.store');
+            Route::delete('/mi/push-web', [MiPushWebTenantController::class, 'quitar'])->name('mi.push-web.destroy');
             // Privacidad (ARCO): descargar mis datos, oponerme a promociones, pedir la baja.
             // Descargar y pedir la baja se confirman con la contraseña (en el cuerpo).
             Route::get('/mi/privacidad', [MiPrivacidadTenantController::class, 'mostrar'])->name('mi.privacidad');
@@ -1268,6 +1279,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/pagos/{pago}/anular', [PagosTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pagos.anular');
             Route::get('/pagos/{pago}/reembolsos', [ReembolsosTenantController::class, 'index'])->middleware('puede:pagos.reembolsar')->name('pagos.reembolsos.index');
             Route::post('/pagos/{pago}/reembolsos', [ReembolsosTenantController::class, 'store'])->middleware('puede:pagos.reembolsar')->name('pagos.reembolsos.store');
+            // Preguntar a la pasarela por devoluciones hechas en su panel (ADR 0227).
+            Route::post('/pagos/{pago}/reconsultar', [ReembolsosTenantController::class, 'reconsultar'])->middleware(['puede:pagos.reembolsar', 'throttle:10,1,reconsultar-pago'])->name('pagos.reconsultar');
 
             // Pasarelas de pago del estudio: el propietario conecta sus llaves
             // (cifradas, nunca expuestas). El cobro en linea real corre cuando el
@@ -1324,6 +1337,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/bandeja/plantillas', [BandejaTenantController::class, 'plantillas'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.plantillas');
             Route::post('/bandeja/conversaciones/{conversacion}/plantilla', [BandejaTenantController::class, 'enviarPlantilla'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:30,1,bandeja-plantillas'])->name('bandeja.plantilla');
             Route::post('/bandeja/conversaciones/{conversacion}/archivos', [BandejaTenantController::class, 'enviarArchivo'])->middleware(['puede:mensajes.atender', 'plan:mensajes', 'throttle:30,1,bandeja-archivos'])->name('bandeja.archivos');
+            // Reenviar un mensaje sin confirmar o que no salió (ADR 0227).
+            Route::post('/mensajes/{mensaje}/reenviar', [MensajesTenantController::class, 'reenviar'])->middleware(['puede:comunicaciones.gestionar', 'throttle:20,1,reenviar-mensaje'])->name('mensajes.reenviar');
             Route::get('/bandeja/mensajes/{mensaje}/archivo', [BandejaTenantController::class, 'archivo'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.archivo');
             Route::put('/bandeja/conversaciones/{conversacion}', [BandejaTenantController::class, 'actualizar'])->middleware(['puede:mensajes.atender', 'plan:mensajes'])->name('bandeja.actualizar');
             Route::get('/bandeja/canales', [CanalesMensajeriaTenantController::class, 'index'])->middleware(['puede:integraciones.configurar', 'plan:mensajes'])->name('bandeja.canales');

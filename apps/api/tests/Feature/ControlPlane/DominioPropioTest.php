@@ -177,7 +177,7 @@ it('si deja de apuntar deja de servirse; Traefik recibe solo los que se sirven',
     expect(file_get_contents($archivo))
         ->toContain('rule: "Host(`reservas.fluo.mx`)"')
         ->toContain('certResolver: "letsencrypt-http"')
-        ->toContain('service: "agendauno-web@docker"');
+        ->toContain('service: "agendauno-web-propios@docker"');
 
     // El dueño movió su DNS: ya no apunta. A las 6 horas se revisa de nuevo.
     dnsDeDominiosPropios(['_agendauno.reservas.fluo.mx' => [$txt]], ['reservas.fluo.mx' => 'otro-servidor.com']);

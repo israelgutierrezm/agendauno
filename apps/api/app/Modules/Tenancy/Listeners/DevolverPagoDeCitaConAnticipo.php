@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 /**
  * Lo pagado en línea de una cita con anticipo (ADR 0161, 0181) cuando no se atiende:
@@ -31,8 +32,20 @@ use App\Modules\Tenancy\Reservas\QuienCancela;
  *
  * Se registra sobre {@see EventoDeDominioTenant} en AppServiceProvider.
  */
-class DevolverPagoDeCitaConAnticipo
+class DevolverPagoDeCitaConAnticipo implements ShouldQueue
 {
+    /** En la cola (ADR 0224): un proveedor lento no detiene el outbox de todos. */
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [60, 600];
+
+    /** Solo se encola lo que le toca: los demás eventos no hacen un trabajo. */
+    public function shouldQueue(EventoDeDominioTenant $evento): bool
+    {
+        return in_array($evento->tipo, ['asistencia.marcada', 'reserva.cancelada'], true);
+    }
+
     public function __construct(
         private readonly ReembolsarPagoTenant $reembolsar,
         private readonly AnticipoDeCitaTenant $anticipos,

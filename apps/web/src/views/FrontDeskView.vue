@@ -515,9 +515,14 @@ onMounted(async () => {
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('recepcion.titulo')">
       <template #acciones>
-        <RouterLink class="tu-btn tu-btn-secundario" :to="{ name: 'agenda' }">{{
-          $t("recepcion.abrirAgenda")
-        }}</RouterLink>
+        <!-- Ir a otra vista del área es navegación secundaria: un enlace, no un
+             botón (las vistas del área ya van bajo el encabezado, ADR 0229). -->
+        <RouterLink
+          class="tu-enlace text-sm"
+          :to="{ name: 'agenda' }"
+          data-prueba="recepcion-abrir-agenda"
+          >{{ $t("recepcion.abrirAgenda") }}</RouterLink
+        >
       </template>
     </EncabezadoSeccion>
     <!-- Clases: cuándo se trajo lo que se ve (en citas lo dice su propia lista). -->

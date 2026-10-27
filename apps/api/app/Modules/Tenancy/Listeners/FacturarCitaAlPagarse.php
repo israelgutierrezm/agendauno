@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Listeners;
 use App\Modules\Tenancy\Application\FacturarCitasEnAutomatico;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Throwable;
 
 /**
@@ -14,10 +15,23 @@ use Throwable;
  * ({@see FacturarCitasEnAutomatico}). Si el timbrado falla, la orden queda para el
  * reintento (`agendauno:facturar-citas`); el aviso no se repite.
  *
- * Se registra sobre {@see EventoDeDominioTenant} en AppServiceProvider.
+ * Se registra sobre {@see EventoDeDominioTenant} en AppServiceProvider. Corre en la
+ * cola con el negocio del evento: timbrar llama a FacturAPI.
  */
-class FacturarCitaAlPagarse
+class FacturarCitaAlPagarse implements ShouldQueue
 {
+    /** En la cola (ADR 0224): un proveedor lento no detiene el outbox de todos. */
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [60, 600];
+
+    /** Solo se encola lo que le toca: los demás eventos no hacen un trabajo. */
+    public function shouldQueue(EventoDeDominioTenant $evento): bool
+    {
+        return $evento->tipo === 'orden.pagada' && $evento->agregadoId !== null;
+    }
+
     public function __construct(private readonly FacturarCitasEnAutomatico $facturar) {}
 
     public function handle(EventoDeDominioTenant $evento): void

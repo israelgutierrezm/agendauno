@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\PagoDeOrdenTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
@@ -325,7 +326,7 @@ class OrdenesTenantController
      */
     private function presentar(OrdenTenant $orden): array
     {
-        $orden->loadMissing(['persona', 'lineas.producto', 'lineas.beneficiario']);
+        $orden->loadMissing(['persona', 'lineas.producto', 'lineas.beneficiario', 'pagos']);
 
         return [
             'id' => $orden->ulid,
@@ -338,6 +339,8 @@ class OrdenesTenantController
             'metodo_pago' => $orden->metodo_pago,
             'referencia_pago' => $orden->referencia_pago,
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
+            // Para corregir la forma de pago o anularlo desde Ventas (ADR 0223).
+            'pago' => app(PagoDeOrdenTenant::class)->presentar($orden),
             'lineas' => $orden->lineas->map(fn (LineaOrdenTenant $linea): array => [
                 'id' => $linea->ulid,
                 'producto' => $linea->nombre(),

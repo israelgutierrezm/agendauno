@@ -25,7 +25,7 @@ class VerificadorGoogleTokeninfo implements VerificadorGoogle
             return null;
         }
 
-        $respuesta = Http::asJson()->acceptJson()->get('https://oauth2.googleapis.com/tokeninfo', [
+        $respuesta = Http::asJson()->acceptJson()->timeout(10)->get('https://oauth2.googleapis.com/tokeninfo', [
             'id_token' => $credential,
         ]);
 

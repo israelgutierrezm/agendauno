@@ -19,12 +19,14 @@ import '../../notificaciones/application/aviso_abierto.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/mis_clases_controller.dart';
+import 'mis_comisiones_screen.dart';
 
 enum PestanaInstructor { inicio, clases, agenda }
 
 /// Portal de quien imparte (sin rol de dueño ni recepción): su Inicio con su
 /// próxima clase o cita y accesos directos, "Mis clases" en lista, día, semana o
-/// mes, y la agenda del día de siempre.
+/// mes, y la agenda del día de siempre. En citas, con la función de comisiones del
+/// plan, también «Mis comisiones» (ADR 0219).
 class InstructorScreen extends ConsumerStatefulWidget {
   const InstructorScreen({super.key});
 
@@ -345,6 +347,21 @@ class _Inicio extends ConsumerWidget {
                       : 'Tu día con horarios y pase de lista',
                   onTap: () => onIr(PestanaInstructor.agenda),
                 ),
+                // Lo que lleva ganado quien atiende citas (ADR 0219), como en la web.
+                if ((sesion?.esCitas ?? false) &&
+                    sesion!.tieneFuncion('comisiones'))
+                  TarjetaAcceso(
+                    key: const Key('acceso-mis-comisiones'),
+                    icono: Icons.payments_outlined,
+                    titulo: 'Mis comisiones',
+                    tono: TonosAcceso.creditos,
+                    valor: 'Lo ganado y tus propinas del mes',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const MisComisionesScreen(),
+                      ),
+                    ),
+                  ),
                 TarjetaAcceso(
                   icono: Icons.person_outline,
                   titulo: 'Mi perfil',

@@ -119,6 +119,16 @@ class PlataformaEstudiosController
                 'whatsapp_verificado' => $modelo->contacto_whatsapp_verificado_en !== null,
                 // ¿Ya activó su cuenta? Si no, se le reenvía la activación (ADR 0216).
                 'cuenta_activa' => self::cuentaDelDuenoActiva($modelo),
+                // Por partes, para corregirlo desde la ficha (ADR 0226).
+                'campos' => [
+                    'contacto_nombre' => $modelo->contacto_nombre,
+                    'contacto_segundo_nombre' => $modelo->contacto_segundo_nombre,
+                    'contacto_primer_apellido' => $modelo->contacto_primer_apellido,
+                    'contacto_segundo_apellido' => $modelo->contacto_segundo_apellido,
+                    'contacto_email' => $modelo->contacto_email,
+                    'contacto_whatsapp_pais' => $modelo->contacto_whatsapp_pais,
+                    'contacto_telefono' => $modelo->contacto_telefono,
+                ],
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
             // Lo más que se extiende su prueba de una vez (parámetro de la plataforma).

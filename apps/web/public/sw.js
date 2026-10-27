@@ -86,3 +86,44 @@ self.addEventListener("fetch", (evento) => {
     );
   }
 });
+
+/*
+| Avisos en este navegador (push en la web, ADR 0225): el servidor manda el aviso cifrado
+| y el navegador ya lo trae descifrado (`titulo`, `cuerpo`). Tocarlo abre (o enfoca) la
+| aplicación de este negocio.
+*/
+self.addEventListener("push", (evento) => {
+  let aviso = {};
+  try {
+    aviso = evento.data ? evento.data.json() : {};
+  } catch {
+    aviso = { cuerpo: evento.data ? evento.data.text() : "" };
+  }
+  evento.waitUntil(
+    self.registration.showNotification(aviso.titulo || "Aviso", {
+      body: aviso.cuerpo || "",
+      icon: "/apple-touch-icon.png",
+      badge: "/favicon-64x64.png",
+      tag: aviso.datos && aviso.datos.mensaje ? aviso.datos.mensaje : undefined,
+      data: { url: "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+  const destino = new URL(
+    (evento.notification.data && evento.notification.data.url) || "/",
+    self.location.origin,
+  ).href;
+  evento.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((ventanas) => {
+        const abierta = ventanas.find((v) =>
+          v.url.startsWith(self.location.origin),
+        );
+        return abierta ? abierta.focus() : self.clients.openWindow(destino);
+      }),
+  );
+});

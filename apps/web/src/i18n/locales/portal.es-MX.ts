@@ -149,6 +149,16 @@ export default {
     listo:
       "Apartamos un lugar para {nombre}. Si no puede venir, cancélalo antes de la clase y recuperas tu pase.",
     ayuda: "Ocupa un lugar en la clase y usa uno de los pases de tu plan.",
+    // Mis invitados (Reservas › Próximas): sus pases y a quién invitó.
+    titulo: "Mis invitados",
+    tuPlan: "Tu plan",
+    quedan:
+      "{plan}: te queda {n} de {total} pases este mes. | {plan}: te quedan {n} de {total} pases este mes.",
+    sinProximos: "No tienes invitados en tus próximas clases.",
+    cancelar: "Cancelar invitación",
+    cancelarConfirmar:
+      "¿Cancelar la invitación de {nombre} a {clase}? Su lugar queda libre y recuperas tu pase.",
+    cancelada: "Cancelamos la invitación de {nombre}. Recuperaste tu pase.",
   },
   antesDeReservar: {
     calculando: "Revisando tu plan…",

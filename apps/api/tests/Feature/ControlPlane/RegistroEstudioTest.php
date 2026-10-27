@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -243,4 +244,18 @@ it('con reCAPTCHA configurado acepta un puntaje alto', function (): void {
     test()->postJson('/api/v1/registro', datosRegistroCaptcha('alto', 'alto@correo.mx'))
         ->assertCreated();
     expect(Estudio::query()->where('slug', 'alto')->exists())->toBeTrue();
+});
+
+it('reCAPTCHA solo vale desde un dominio de la plataforma y para su acción (ADR 0224)', function (): void {
+    Config::set('agendauno.recaptcha.secret', 'test-secret');
+    Config::set('agendauno.recaptcha.min_score', 0.5);
+    $dominio = strtolower(ProductoComercial::AgendaUno->dominio());
+    Http::fake(['*' => Http::sequence()
+        ->push(['success' => true, 'score' => 0.9, 'hostname' => 'sitio-de-otro.com', 'action' => 'registro'])
+        ->push(['success' => true, 'score' => 0.9, 'hostname' => $dominio, 'action' => 'demo'])
+        ->push(['success' => true, 'score' => 0.9, 'hostname' => $dominio, 'action' => 'registro'])]);
+
+    test()->postJson('/api/v1/registro', datosRegistroCaptcha('otro-host', 'otro@correo.mx'))->assertStatus(422);
+    test()->postJson('/api/v1/registro', datosRegistroCaptcha('otra-accion', 'accion@correo.mx'))->assertStatus(422);
+    test()->postJson('/api/v1/registro', datosRegistroCaptcha('desde-la-plataforma', 'plataforma@correo.mx'))->assertCreated();
 });

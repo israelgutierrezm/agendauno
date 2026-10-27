@@ -203,3 +203,13 @@ it('quien no ve las finanzas no le pregunta, y el negocio tiene un tope de pregu
     $this->postJson("/api/v1/app/{$e['slug']}/asistente", ['mensajes' => [['rol' => 'usuario', 'texto' => 'Hola otra vez']]], conBearer($e['bearer']))
         ->assertStatus(429);
 });
+
+it('si el modelo se niega, lo dice con claridad (ADR 0224)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    asistenteEncendido();
+    Http::fake(['api.anthropic.com/*' => Http::response(['stop_reason' => 'refusal', 'content' => []])]);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/asistente", ['mensajes' => [['rol' => 'usuario', 'texto' => 'Algo fuera de lugar']]], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.respuesta', 'No puedo ayudarte con eso. Pregúntame por los datos y la operación de tu negocio.');
+});

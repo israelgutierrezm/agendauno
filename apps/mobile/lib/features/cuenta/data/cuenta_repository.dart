@@ -857,10 +857,30 @@ class CuentaRepository {
     return HorarioCita.deLista(data['slots']);
   }
 
+  /// Cuánto descuenta un cupón del negocio en el servicio, antes de agendar (ADR
+  /// 0220): no lo usa; al agendar se vuelve a validar. Un cupón que no sirve
+  /// responde 422 con el motivo ([DioException]).
+  Future<({int descuentoMinor, int totalMinor})> revisarCupon({
+    required String codigo,
+    required String servicioId,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/citas/cupon',
+      queryParameters: {'codigo': codigo, 'oferta_id': servicioId},
+    );
+    final data = (res.data?['data'] ?? const {}) as Map<String, dynamic>;
+
+    return (
+      descuentoMinor: (data['descuento_minor'] as num?)?.toInt() ?? 0,
+      totalMinor: (data['total_minor'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar),
   /// la orden a pagar para confirmarla (si la hay) y quién la atenderá (sin
   /// [profesionalId], el negocio asigna a quien esté libre). [pagar] solo en un
-  /// servicio con anticipo (ADR 0161): `anticipo` o `todo`.
+  /// servicio con anticipo (ADR 0161): `anticipo` o `todo`. Con [cupon], su
+  /// descuento (ADR 0220); si no sirve, 422 y no se agenda.
   Future<({String estado, String? profesional, String? ordenId})> agendarCita({
     required String servicioId,
     required String sucursalId,
@@ -870,6 +890,7 @@ class CuentaRepository {
     String? nota,
     bool aceptaWhatsapp = false,
     String? pagar,
+    String? cupon,
   }) async {
     final pedido = <String, Object?>{
       'oferta_id': servicioId,
@@ -883,6 +904,8 @@ class CuentaRepository {
       if (aceptaWhatsapp) 'acepta_whatsapp': true,
       // Con anticipo: pagar solo el anticipo (por omisión) o todo (ADR 0161).
       'pagar': ?pagar,
+      // El cupón ya revisado; el servidor lo vuelve a validar (ADR 0220).
+      'cupon': ?cupon,
     };
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/citas',

@@ -17,11 +17,13 @@ use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Throwable;
 
 /**
@@ -119,15 +121,21 @@ class EnviarMensajesTenant
 
                 try {
                     $this->entregar($mensaje);
-                    if ($mensaje->canal === CanalComunicacion::WhatsApp) {
-                        $this->saldoWhatsApp->gastar('mensaje:'.$mensaje->getKey(), $unidades);
-                    }
                     $mensaje->estado = EstadoMensaje::Enviado;
                     $mensaje->enviado_en = Carbon::now();
                     $mensaje->ultimo_error = null;
                     $enviados++;
+                    // Ya salió: lo que se anota después (su saldo) nunca lo vuelve fallido.
+                    if ($mensaje->canal === CanalComunicacion::WhatsApp) {
+                        try {
+                            $this->saldoWhatsApp->gastar('mensaje:'.$mensaje->getKey(), $unidades);
+                        } catch (Throwable $e) {
+                            report($e);
+                        }
+                    }
                 } catch (Throwable $e) {
-                    $mensaje->estado = EstadoMensaje::Fallido;
+                    // Si pudo haber salido, queda incierto y no se reintenta (ADR 0227).
+                    $mensaje->estado = self::pudoHaberSalido($e) ? EstadoMensaje::Incierto : EstadoMensaje::Fallido;
                     $mensaje->ultimo_error = Str::limit($e->getMessage(), 250);
                     // Agotó sus intentos: ya no se reintenta, el superadmin lo sabe.
                     if ($mensaje->intentos >= self::MAX_INTENTOS) {
@@ -180,8 +188,8 @@ class EnviarMensajesTenant
 
     /**
      * Los que quedaron «enviando» de una pasada que se cortó: no se sabe si salieron, así
-     * que no se reintentan (como máximo una vez); quedan fallidos, con el motivo, para
-     * revisarlos en la bandeja de salida.
+     * que no se reintentan (como máximo una vez); quedan inciertos (ADR 0227), con el
+     * motivo, para revisarlos en la bandeja de salida y, si hace falta, reenviarlos.
      */
     private function cerrarEnviosCortados(): void
     {
@@ -189,10 +197,31 @@ class EnviarMensajesTenant
             ->where('estado', EstadoMensaje::Enviando->value)
             ->where('updated_at', '<', now()->subMinutes(self::MINUTOS_ENVIO_CORTADO))
             ->update([
-                'estado' => EstadoMensaje::Fallido->value,
-                'intentos' => self::MAX_INTENTOS,
-                'ultimo_error' => 'El envío se cortó y no se sabe si salió: no se vuelve a mandar para no repetirlo.',
+                'estado' => EstadoMensaje::Incierto->value,
+                'ultimo_error' => 'El envío se cortó y no se sabe si salió: no se vuelve a mandar solo para no repetirlo.',
             ]);
+    }
+
+    /**
+     * ¿El error llegó cuando el proveedor ya pudo haberlo recibido? Se agotó el tiempo o se
+     * cortó la conexión a media entrega: sí. No se pudo conectar, o el proveedor contestó
+     * con un rechazo: no (se puede reintentar sin repetirlo).
+     */
+    public static function pudoHaberSalido(Throwable $e): bool
+    {
+        $texto = strtolower($e->getMessage());
+        if (str_contains($texto, 'curl error 6') || str_contains($texto, 'curl error 7')
+            || str_contains($texto, 'could not be established') || str_contains($texto, 'could not resolve')) {
+            return false;
+        }
+        if ($e instanceof ConnectionException) {
+            return true;
+        }
+        if ($e instanceof TransportExceptionInterface) {
+            return str_contains($texto, 'timed out') || str_contains($texto, 'timeout') || str_contains($texto, 'lost');
+        }
+
+        return false;
     }
 
     private function entregar(MensajeTenant $mensaje): void
@@ -214,13 +243,18 @@ class EnviarMensajesTenant
             $wamid = $this->whatsapp->enviarPlantilla($mensaje->destinatario, $plantilla, $mensaje->parametros['valores'] ?? []);
             // Para ubicarlo cuando Meta avise si se entregó, se leyó o falló (ADR 0074).
             if ($wamid !== null) {
-                WhatsAppEnvio::query()->firstOrCreate(['wamid' => $wamid], [
-                    'estudio_id' => $this->gestor->actual()?->getKey(),
-                    'origen' => WhatsAppEnvio::ORIGEN_MENSAJE,
-                    'referencia_id' => $mensaje->getKey(),
-                    // Para reconocerlo si contesta (ADR 0083).
-                    'telefono_huella' => TelefonoWhatsApp::huella($mensaje->destinatario),
-                ]);
+                // Ya salió: si no se puede anotar, no se vuelve a mandar (ADR 0227).
+                try {
+                    WhatsAppEnvio::query()->firstOrCreate(['wamid' => $wamid], [
+                        'estudio_id' => $this->gestor->actual()?->getKey(),
+                        'origen' => WhatsAppEnvio::ORIGEN_MENSAJE,
+                        'referencia_id' => $mensaje->getKey(),
+                        // Para reconocerlo si contesta (ADR 0083).
+                        'telefono_huella' => TelefonoWhatsApp::huella($mensaje->destinatario),
+                    ]);
+                } catch (Throwable $e) {
+                    report($e);
+                }
             }
 
             return;

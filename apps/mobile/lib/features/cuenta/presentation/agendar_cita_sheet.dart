@@ -10,6 +10,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
+import 'campo_cupon.dart';
 import 'cuenta_screen.dart';
 import 'elegir_profesional.dart';
 
@@ -17,7 +18,8 @@ import 'elegir_profesional.dart';
 /// equipo o alguien, por su foto, como en la web), día y hora libre. Si el servicio
 /// se paga para reservar, la cita queda apartada hasta pagarla; si pide anticipo,
 /// elige pagar solo el anticipo o todo (ADR 0161). Los servicios de su bono
-/// aparecen «Con tu bono» y no se pagan (ADR 0091).
+/// aparecen «Con tu bono» y no se pagan (ADR 0091), y lo ya pagado por adelantado
+/// tampoco (ADR 0218). En lo que se paga, puede poner un cupón (ADR 0220).
 ///
 /// Con [servicioId] (y [sucursalId]) llega con ese servicio (y esa sede) ya
 /// elegidos, p. ej. desde un presupuesto aceptado; si el negocio ya no lo ofrece en
@@ -66,6 +68,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   bool _pagarTodo = false;
   // Nota para el negocio (opcional): alergias, preferencias, primera vez…
   final _nota = TextEditingController();
+  // El cupón ya revisado (ADR 0220); se limpia al cambiar de servicio.
+  String? _cupon;
 
   @override
   void initState() {
@@ -153,6 +157,20 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   /// El anticipo del servicio elegido (null: se paga completo o con su bono).
   int? get _anticipo => _servicio?.anticipoAlAgendar;
 
+  /// Cuánto descuenta el cupón en el servicio elegido (revisarlo no lo gasta).
+  Future<int> _revisarCupon(String codigo) async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    final servicio = _servicio;
+    if (repo == null || servicio == null) {
+      return 0;
+    }
+    final revisado = await repo.revisarCupon(
+      codigo: codigo,
+      servicioId: servicio.id,
+    );
+    return revisado.descuentoMinor;
+  }
+
   bool get _listo =>
       _servicio != null &&
       _profesional != null &&
@@ -230,6 +248,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         nota: _nota.text.trim().isEmpty ? null : _nota.text.trim(),
         aceptaWhatsapp: _ofrecerWhatsapp && _aceptaWhatsapp,
         pagar: pagar,
+        cupon: _servicio!.admiteCupon ? _cupon : null,
       );
       await ref.read(cuentaProvider.notifier).recargar();
       // Si el negocio cobra en línea, la cita apartada se paga desde el aviso.
@@ -387,6 +406,11 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                   const SizedBox(height: 16),
                   _selector('Servicio', opciones.servicios, _servicio, (v) {
                     setState(() {
+                      // El cupón se revisó sobre el anterior: con otro, se quita
+                      // (su campo también, por su `key`).
+                      if (v?.id != _servicio?.id) {
+                        _cupon = null;
+                      }
                       _servicio = v;
                       // Otro servicio, otro anticipo: se vuelve a lo de omisión.
                       _pagarTodo = false;
@@ -409,6 +433,18 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         'Se descuenta una sesión de tu bono; no pagas al agendar.',
+                        style: TextStyle(color: context.colores.textoSuave),
+                      ),
+                    )
+                  else if ((_servicio?.prepagados ?? 0) > 0)
+                    Padding(
+                      key: const Key('servicio-prepagado'),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        _servicio!.prepagados == 1
+                            ? 'Ya lo pagaste: no pagas al agendar. Te queda 1 vez.'
+                            : 'Ya lo pagaste: no pagas al agendar. Te quedan '
+                                  '${_servicio!.prepagados} veces.',
                         style: TextStyle(color: context.colores.textoSuave),
                       ),
                     ),
@@ -543,6 +579,17 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                         'Quiero recibir la confirmación y los recordatorios de mi cita por WhatsApp',
                       ),
                     ),
+                  // Cupón (ADR 0220): solo en lo que se paga. Con otro servicio,
+                  // otro campo (vacío).
+                  if (_servicio?.admiteCupon ?? false)
+                    CampoCupon(
+                      key: ValueKey('cupon-${_servicio!.id}'),
+                      revisar: _revisarCupon,
+                      dinero: (minor) =>
+                          Formato.dinero(minor, _servicio!.moneda),
+                      alCambiar: (codigo) => _cupon = codigo,
+                      deshabilitado: _agendando,
+                    ),
                   if (_anticipo != null)
                     _ElegirAnticipo(
                       servicio: _servicio!,
@@ -570,12 +617,17 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     padding: const EdgeInsets.only(bottom: 12),
     child: DropdownButtonFormField<OpcionCita>(
       initialValue: valor,
+      // Un nombre largo se corta en vez de desbordar la hoja.
+      isExpanded: true,
       decoration: InputDecoration(labelText: etiqueta),
       items: lista
           .map(
             (o) => DropdownMenuItem(
               value: o,
-              child: Text(o.conPlan ? '${o.nombre} · Con tu bono' : o.nombre),
+              child: Text(
+                o.conPlan ? '${o.nombre} · Con tu bono' : o.nombre,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           )
           .toList(),

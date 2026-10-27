@@ -171,11 +171,14 @@ class PublicoCitasController
 
     /**
      * Cuánto descuenta un cupón en un servicio (ADR 0220), para mostrarlo antes de
-     * agendar. No lo usa: se aplica al agendar.
+     * agendar. No lo usa: se aplica al agendar. Desde la cuenta del cliente
+     * (`/mi/citas/cupon`) no hace falta la página pública: agenda con su cuenta.
      */
     public function cupon(Request $request, GestionarPromocionesTenant $promociones): JsonResponse
     {
-        $this->paginaDeCitas($request);
+        if (! $request->attributes->get('usuario_tenant') instanceof Usuario) {
+            $this->paginaDeCitas($request);
+        }
         $validado = $request->validate([
             'codigo' => ['required', 'string', 'max:64'],
             'oferta_id' => ['required', 'string'],
@@ -233,7 +236,7 @@ class PublicoCitasController
             // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
             'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
         ]);
-        if (! app(VerificarRecaptcha::class)->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
+        if (! app(VerificarRecaptcha::class)->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip(), 'cita')) {
             throw ValidationException::withMessages([
                 'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
             ]);

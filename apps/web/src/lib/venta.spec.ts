@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { crearVenta } from "./venta";
+import { crearVenta, derechoVendido } from "./venta";
 
 const api = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api }));
 // La sucursal de la barra (ADR 0175): se cobra en su caja.
-const sede = vi.hoisted(() => ({ fija: { value: null as string | null } }));
+const sede = vi.hoisted(() => ({
+  fija: { value: null as string | null },
+  varias: { value: false },
+}));
 vi.mock("@/lib/sucursalOperativa", () => ({ useSucursales: () => sede }));
 
 const orden = {
@@ -24,6 +27,15 @@ describe("vender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sede.fija.value = null;
+    sede.varias.value = false;
+  });
+
+  it("con varias sucursales y «Todas» en la barra, dice que falta elegir la caja", () => {
+    expect(crearVenta().sinSucursal.value).toBe(false);
+    sede.varias.value = true;
+    expect(crearVenta().sinSucursal.value).toBe(true);
+    sede.fija.value = "S2";
+    expect(crearVenta().sinSucursal.value).toBe(false);
   });
 
   it("vende y cobra de una vez, en la caja de la sucursal de la barra", async () => {
@@ -63,5 +75,30 @@ describe("vender", () => {
     await venta.vender("/b", { ...orden, comprador_id: "p2" }, "efectivo");
     const [primera, segunda] = claves();
     expect(primera).not.toBe(segunda);
+  });
+});
+
+describe("el derecho que dejó la venta", () => {
+  const d = (id: string, disponible: number, saldo = disponible) => ({
+    id,
+    ilimitado: false,
+    saldo,
+    disponible,
+  });
+
+  it("es el nuevo, aunque no sea el primero de la lista", () => {
+    const antes = [d("viejo", 3000, 5000)];
+    const despues = [d("viejo", 3000, 5000), d("nuevo", 2500)];
+    expect(derechoVendido(antes, despues)?.id).toBe("nuevo");
+  });
+
+  it("si se sumó a uno que ya tenía (clases extra), el que cambió", () => {
+    const antes = [d("a", 1000), d("b", 4000)];
+    const despues = [d("a", 1000), d("b", 6000)];
+    expect(derechoVendido(antes, despues)?.id).toBe("b");
+  });
+
+  it("sin cambios, ninguno", () => {
+    expect(derechoVendido([d("a", 1000)], [d("a", 1000)])).toBeNull();
   });
 });

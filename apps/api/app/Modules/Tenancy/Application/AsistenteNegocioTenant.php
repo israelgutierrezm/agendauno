@@ -90,6 +90,7 @@ class AsistenteNegocioTenant
         ], $mensajes);
         $propuestas = [];
         $texto = '';
+        $paro = '';
 
         for ($vuelta = 0; $vuelta < self::VUELTAS; $vuelta++) {
             $respuesta = $this->llamarModelo($estudio, $usuario, $conversacion);
@@ -99,7 +100,8 @@ class AsistenteNegocioTenant
                 static fn (array $b): string => (string) ($b['text'] ?? ''),
                 array_values(array_filter($bloques, static fn (mixed $b): bool => is_array($b) && ($b['type'] ?? '') === 'text')),
             )));
-            if ($usos === [] || ($respuesta['stop_reason'] ?? '') !== 'tool_use') {
+            $paro = (string) ($respuesta['stop_reason'] ?? '');
+            if ($usos === [] || $paro !== 'tool_use') {
                 break;
             }
 
@@ -121,8 +123,13 @@ class AsistenteNegocioTenant
             $conversacion[] = ['role' => 'user', 'content' => $resultados];
         }
 
+        // Si el modelo se niega (`refusal`), se dice con claridad en lugar de quedar a medias.
         return [
-            'respuesta' => $texto !== '' ? $texto : 'No pude contestar eso. Intenta con otra pregunta.',
+            'respuesta' => match (true) {
+                $paro === 'refusal' => 'No puedo ayudarte con eso. Pregúntame por los datos y la operación de tu negocio.',
+                $texto !== '' => $texto,
+                default => 'No pude contestar eso. Intenta con otra pregunta.',
+            },
             'propuestas' => $propuestas,
         ];
     }

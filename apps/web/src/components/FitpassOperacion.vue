@@ -11,7 +11,12 @@ import { useToastStore } from "@/stores/toast";
  * su asistencia se marca allá. Aquí: qué clases se ofrecen en Fitpass (con el nombre de
  * su «disciplina» allá), sus horarios de los próximos días para capturarlos (y las
  * canceladas, para quitarlas) y lo que falta marcar en su panel antes de 48 horas.
+ *
+ * Con `operacion` (recepción, en el pase de lista) no se configuran las clases: solo
+ * los horarios (con `agenda.ver`) y lo que falta marcar (con `checkins.registrar`).
+ * Cada parte se pide solo a quien tiene su permiso.
  */
+const props = defineProps<{ operacion?: boolean }>();
 interface ClaseFitpass {
   oferta_id: string;
   nombre: string;
@@ -52,19 +57,31 @@ const porMarcar = ref<PorMarcar[]>([]);
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
+const verClases = computed(
+  () => !props.operacion && sesion.puede("integraciones.configurar"),
+);
+const verHorarios = computed(() => sesion.puede("agenda.ver"));
+const verPorMarcar = computed(() => sesion.puede("checkins.registrar"));
+
 async function cargar(): Promise<void> {
   error.value = null;
   try {
     const [c, h, p] = await Promise.all([
-      api.get<{ data: ClaseFitpass[] }>(`${base.value}/clases`),
-      api.get<{ data: HorarioFitpass[] }>(`${base.value}/horarios`, {
-        params: { dias: 7 },
-      }),
-      api.get<{ data: PorMarcar[] }>(`${base.value}/por-marcar`),
+      verClases.value
+        ? api.get<{ data: ClaseFitpass[] }>(`${base.value}/clases`)
+        : null,
+      verHorarios.value
+        ? api.get<{ data: HorarioFitpass[] }>(`${base.value}/horarios`, {
+            params: { dias: 7 },
+          })
+        : null,
+      verPorMarcar.value
+        ? api.get<{ data: PorMarcar[] }>(`${base.value}/por-marcar`)
+        : null,
     ]);
-    clases.value = c.data.data;
-    horarios.value = h.data.data;
-    porMarcar.value = p.data.data;
+    clases.value = c?.data.data ?? [];
+    horarios.value = h?.data.data ?? [];
+    porMarcar.value = p?.data.data ?? [];
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -85,11 +102,13 @@ async function guardarClases(): Promise<void> {
     );
     clases.value = data.data;
     toast.exito(t("fitpass.clasesGuardadas"));
-    const h = await api.get<{ data: HorarioFitpass[] }>(
-      `${base.value}/horarios`,
-      { params: { dias: 7 } },
-    );
-    horarios.value = h.data.data;
+    if (verHorarios.value) {
+      const h = await api.get<{ data: HorarioFitpass[] }>(
+        `${base.value}/horarios`,
+        { params: { dias: 7 } },
+      );
+      horarios.value = h.data.data;
+    }
   } catch (e) {
     toast.error(mensajeDeError(e));
   } finally {
@@ -177,7 +196,7 @@ onMounted(cargar);
   <div class="mt-5 space-y-5" data-prueba="fitpass-operacion">
     <p v-if="error" class="tu-error-campo" role="alert">{{ error }}</p>
 
-    <section>
+    <section v-if="verClases">
       <h3 class="font-medium">{{ $t("fitpass.clasesTitulo") }}</h3>
       <p class="tu-hint">{{ $t("fitpass.clasesAyuda") }}</p>
       <ul class="mt-2 space-y-2">
@@ -212,7 +231,7 @@ onMounted(cargar);
       </button>
     </section>
 
-    <section>
+    <section v-if="verHorarios">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h3 class="font-medium">{{ $t("fitpass.horariosTitulo") }}</h3>
         <button
@@ -265,7 +284,7 @@ onMounted(cargar);
       </div>
     </section>
 
-    <section>
+    <section v-if="verPorMarcar">
       <h3 class="font-medium">
         {{ $t("fitpass.porMarcarTitulo") }}
         <span class="tabular-nums">{{ porMarcar.length }}</span>

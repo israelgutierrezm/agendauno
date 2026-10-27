@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
-use App\Modules\Tenancy\Application\AnularCobroTenant;
-use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
+use App\Modules\Tenancy\Application\PagoDeOrdenTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -17,7 +16,6 @@ use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Models\OfertaTenant;
-use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -25,7 +23,6 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
-use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
@@ -60,8 +57,6 @@ class AgendaTenantController
         private readonly ReservasTenant $reservas,
         private readonly VerificarAgendaTenant $agenda,
         private readonly ResolverAccesoTenant $resolver,
-        private readonly CorregirMetodoPagoTenant $corregirMetodo,
-        private readonly AnularCobroTenant $anularCobro,
         private readonly ModalidadNegocioTenant $modalidad,
         private readonly ParametrosTenant $parametros,
     ) {}
@@ -505,21 +500,8 @@ class AgendaTenantController
     {
         // Con anticipo (ADR 0161), el último cobro: el del saldo si ya se pagó.
         $orden = $titular->saldoOrden?->estado === EstadoOrden::Pagada ? $titular->saldoOrden : $titular->orden;
-        if ($orden === null || $orden->estado !== EstadoOrden::Pagada) {
-            return null;
-        }
-        $pago = $orden->pagos->first(fn (PagoTenant $p): bool => $p->estado !== EstadoPago::Pendiente && $p->estado !== EstadoPago::Rechazado);
-        if (! $pago instanceof PagoTenant) {
-            return null;
-        }
 
-        return [
-            'id' => (string) $pago->ulid,
-            'metodo' => $orden->metodo_pago ?? $pago->metodo?->value,
-            'en_caja' => $pago->proveedor === 'manual',
-            'corregible' => $this->corregirMetodo->impedimento($pago, conFactura: false) === null,
-            'anulable' => $this->anularCobro->impedimento($pago->setRelation('orden', $orden), completo: false) === null,
-        ];
+        return app(PagoDeOrdenTenant::class)->presentar($orden);
     }
 
     /**

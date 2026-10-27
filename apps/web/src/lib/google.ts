@@ -1,4 +1,4 @@
-import { enSubdominioDeEstudio } from "@/lib/tenant";
+import { enSubdominioDeEstudio, esHostAjeno } from "@/lib/tenant";
 
 /**
  * Integracion con Google Identity Services (GIS) para el SSO tenant-local. Carga el
@@ -40,7 +40,11 @@ export function clientIdGoogle(): string | undefined {
  * subdominio de un negocio (Google rechazaría ese origen).
  */
 export function googleEnEsteSitio(host?: string): boolean {
-  return clientIdGoogle() !== undefined && !enSubdominioDeEstudio(host);
+  return (
+    clientIdGoogle() !== undefined &&
+    !enSubdominioDeEstudio(host) &&
+    !esHostAjeno(host)
+  );
 }
 
 /**
@@ -48,7 +52,13 @@ export function googleEnEsteSitio(host?: string): boolean {
  * conecta) desde el dominio raíz.
  */
 export function googleEnDominioRaiz(host?: string): boolean {
-  return clientIdGoogle() !== undefined && enSubdominioDeEstudio(host);
+  // En el dominio propio de un negocio (ADR 0189) no: su dominio raíz no es el de la
+  // plataforma y Google no admite orígenes ajenos (ADR 0224). Se entra con correo.
+  return (
+    clientIdGoogle() !== undefined &&
+    enSubdominioDeEstudio(host) &&
+    !esHostAjeno(host)
+  );
 }
 
 let cargando: Promise<void> | null = null;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\ColaDeMensajes;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,14 @@ class MensajeTenant extends Model
         'persona_id', 'usuario_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
         'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en', 'clave_envio', 'parametros', 'entregado_en', 'leido_en',
     ];
+
+    /** Un mensaje nuevo en cola le dice al envío que ese negocio tiene algo (ADR 0224). */
+    protected static function booted(): void
+    {
+        static::created(static function (MensajeTenant $mensaje): void {
+            app(ColaDeMensajes::class)->hayNuevo($mensaje->difusion_id === null ? ColaDeMensajes::AVISOS : ColaDeMensajes::CAMPANAS);
+        });
+    }
 
     /**
      * Promocional (una campaña) o de operación (recordatorios, recibos, avisos): solo lo

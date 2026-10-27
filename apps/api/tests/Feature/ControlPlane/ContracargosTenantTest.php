@@ -492,3 +492,19 @@ it('un contracargo perdido sobre un pago ya devuelto por completo no registra ot
         ->and($estado['devoluciones'])->toBe(1)
         ->and(collect($estado['incidencias'])->firstWhere('tipo', 'contracargo')['detalle'])->toContain('ya se había devuelto por completo');
 });
+
+it('una devolución del panel a un pago viejo se encuentra con «Reconsultar este pago» o la conciliación por fechas (ADR 0227)', function (): void {
+    $c = pagoConStripeCobrado();
+    $this->cobros->stripe[] = devolucionDelPanelDeStripe('re_panel_viejo', 89900);
+    // El pago tiene 40 días: la revisión de cada noche ya no lo ve.
+    $this->travel(40)->days();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
+    expect(devolucionesEnLaPasarelaDe($c['slug'], $c['pago'])['devoluciones'])->toBe([]);
+
+    $this->postJson("/api/v1/app/{$c['slug']}/pagos/{$c['pago']}/reconsultar", [], conBearer($c['bearer']))
+        ->assertOk()->assertJsonPath('data.registradas', 1)->assertJsonPath('data.estado', 'reembolsado');
+    // Otra vez no la repite; tampoco la conciliación por fechas.
+    $this->postJson("/api/v1/app/{$c['slug']}/pagos/{$c['pago']}/reconsultar", [], conBearer($c['bearer']))->assertOk()->assertJsonPath('data.registradas', 0);
+    $this->artisan('agendauno:conciliar-reembolsos', ['--desde' => now()->subDays(60)->toDateString()])->assertSuccessful();
+    expect(devolucionesEnLaPasarelaDe($c['slug'], $c['pago'])['devoluciones'])->toBe([['re_panel_viejo', 89900, 'pasarela_externa']]);
+});

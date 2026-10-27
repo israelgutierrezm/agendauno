@@ -24,4 +24,5 @@ cita, pero no se le asignaba a nadie. El dueño lo pidió para la V1.
   y en el corte.
 - **Mis comisiones** (`GET /mis-comisiones`, con la función de comisiones del plan):
   quien atiende ve solo lo suyo del periodo (ganado, propinas y por venir). En la web
-  es una pantalla de su menú en los negocios de citas.
+  es una pantalla de su menú en los negocios de citas; en la app, un acceso de su
+  Inicio (`InstructorScreen`) con la misma regla (citas y la función del plan).

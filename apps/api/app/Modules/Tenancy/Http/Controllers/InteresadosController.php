@@ -46,7 +46,7 @@ class InteresadosController
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
         ]);
 
-        if (! $this->recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip())) {
+        if (! $this->recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip(), 'interesados')) {
             throw ValidationException::withMessages([
                 'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
             ]);

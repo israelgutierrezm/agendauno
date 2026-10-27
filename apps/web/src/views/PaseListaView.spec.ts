@@ -6,7 +6,11 @@ import PaseListaView from "./PaseListaView.vue";
 
 enableAutoUnmount(afterEach);
 
-const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const api = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+  delete: vi.fn(),
+}));
 const permisos = vi.hoisted(() => new Set<string>());
 const toast = vi.hoisted(() => ({ exito: vi.fn(), info: vi.fn() }));
 const confirmo = vi.hoisted(() => ({ asistencia: vi.fn(), lista: vi.fn() }));
@@ -71,7 +75,11 @@ function montar() {
     props: { id: "s1" },
     global: {
       plugins: [i18n],
-      stubs: { BotonPantallaCompleta: true, AgregarAClase: true },
+      stubs: {
+        BotonPantallaCompleta: true,
+        AgregarAClase: true,
+        FitpassOperacion: true,
+      },
     },
   });
 }
@@ -314,6 +322,135 @@ describe("pase de lista en su propia pantalla", () => {
           { id: "48212", nombre: "Beto Paz" },
         ],
       },
+    );
+  });
+
+  it("antes de la clase, quien gestiona reservas cancela una invitación (con confirmación)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-09T15:00:00Z"));
+    permisos.add("reservas.gestionar");
+    const invitado = {
+      id: "i1",
+      nombre: "Luz Mar",
+      anfitrion: "Ana Ruiz",
+      estado: "reservado",
+    };
+    api.get
+      .mockResolvedValueOnce({
+        data: { data: [], meta: { ...meta(false), invitados: [invitado] } },
+      })
+      .mockResolvedValue({
+        data: { data: [], meta: { ...meta(false), invitados: [] } },
+      });
+    api.delete.mockResolvedValue({ data: {} });
+    const w = montar();
+    await flushPromises();
+
+    const seccion = w.get('[data-prueba="invitados-clase"]');
+    expect(seccion.text()).toContain("Luz Mar");
+    await seccion.get('[data-prueba="cancelar-invitado"]').trigger("click");
+    await flushPromises();
+
+    expect(confirmo.lista).toHaveBeenCalledWith(
+      expect.stringContaining("recupera su pase"),
+      expect.objectContaining({
+        peligro: true,
+        aceptar: "Cancelar invitación",
+      }),
+    );
+    expect(api.delete).toHaveBeenCalledWith("/api/v1/app/demo/invitados/i1");
+    expect(w.find('[data-prueba="invitados-clase"]').exists()).toBe(false);
+  });
+
+  it("sin permiso de reservas, o ya empezada la clase, no se cancela la invitación", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-09T16:10:00Z"));
+    permisos.add("reservas.gestionar");
+    api.get.mockResolvedValue({
+      data: {
+        data: [],
+        meta: {
+          ...meta(true),
+          invitados: [
+            {
+              id: "i1",
+              nombre: "Luz Mar",
+              anfitrion: null,
+              estado: "reservado",
+            },
+          ],
+        },
+      },
+    });
+    const empezada = montar();
+    await flushPromises();
+    expect(empezada.find('[data-prueba="cancelar-invitado"]').exists()).toBe(
+      false,
+    );
+    empezada.unmount();
+
+    vi.setSystemTime(new Date("2030-01-09T15:00:00Z"));
+    permisos.delete("reservas.gestionar");
+    api.get.mockResolvedValue({
+      data: {
+        data: [],
+        meta: {
+          ...meta(false),
+          invitados: [
+            {
+              id: "i1",
+              nombre: "Luz Mar",
+              anfitrion: null,
+              estado: "reservado",
+            },
+          ],
+        },
+      },
+    });
+    const sinPermiso = montar();
+    await flushPromises();
+    expect(sinPermiso.find('[data-prueba="cancelar-invitado"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("con Fitpass activo, recepción ve lo pendiente en Fitpass Admin sin ir a Integraciones", async () => {
+    permisos.add("checkins.registrar");
+    api.get.mockResolvedValue({
+      data: { data: [], meta: { ...meta(false), fitpass: true } },
+    });
+    const w = montar();
+    await flushPromises();
+
+    const seccion = w.get('[data-prueba="fitpass-admin"]');
+    expect(seccion.text()).toContain("Pendientes en Fitpass Admin");
+    expect(w.findComponent({ name: "FitpassOperacion" }).exists()).toBe(false);
+    await seccion.get('[data-prueba="ver-fitpass-admin"]').trigger("click");
+    const fitpass = w.findComponent({ name: "FitpassOperacion" });
+    expect(fitpass.exists()).toBe(true);
+    expect(fitpass.props("operacion")).toBe(true);
+  });
+
+  it("sin Fitpass activo, o sin permisos de recepción, no aparece", async () => {
+    permisos.add("checkins.registrar");
+    api.get.mockResolvedValue({
+      data: { data: [], meta: { ...meta(false), fitpass: false } },
+    });
+    const sinFitpass = montar();
+    await flushPromises();
+    expect(sinFitpass.find('[data-prueba="fitpass-admin"]').exists()).toBe(
+      false,
+    );
+    sinFitpass.unmount();
+
+    permisos.clear();
+    api.get.mockResolvedValue({
+      data: { data: [], meta: { ...meta(false), fitpass: true } },
+    });
+    const sinPermiso = montar();
+    await flushPromises();
+    expect(sinPermiso.find('[data-prueba="fitpass-admin"]').exists()).toBe(
+      false,
     );
   });
 });

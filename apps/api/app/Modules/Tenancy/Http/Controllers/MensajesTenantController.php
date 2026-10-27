@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\ColaDeMensajes;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,5 +99,23 @@ class MensajesTenantController
                 'ultimo_error' => $m->ultimo_error,
             ])->all(),
         ]);
+    }
+
+    /**
+     * Reenvía un mensaje incierto o agotado (ADR 0227): vuelve a la cola con sus intentos
+     * en cero. Quien lo pide ya revisó que no le llegó (o acepta que le llegue dos veces).
+     */
+    public function reenviar(Request $request): JsonResponse
+    {
+        $mensaje = app(AlcancePersonaTenant::class)->acotada(MensajeTenant::query(), $request, 'persona_id', true)
+            ->where('ulid', (string) $request->route('mensaje'))->firstOrFail();
+        if (! in_array($mensaje->estado, [EstadoMensaje::Incierto, EstadoMensaje::Fallido], true)) {
+            throw ValidationException::withMessages(['mensaje' => ['Solo se reenvía un mensaje sin confirmar o que no salió.']]);
+        }
+        $mensaje->update(['estado' => EstadoMensaje::Encolado->value, 'intentos' => 0, 'ultimo_error' => null]);
+        // El envío de cada minuto ya no lo salta (ADR 0224).
+        app(ColaDeMensajes::class)->hayNuevo($mensaje->difusion_id === null ? ColaDeMensajes::AVISOS : ColaDeMensajes::CAMPANAS);
+
+        return response()->json(['data' => ['id' => $mensaje->ulid, 'estado' => EstadoMensaje::Encolado->value]]);
     }
 }

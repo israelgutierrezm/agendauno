@@ -80,6 +80,11 @@ export const conexiones = {
     ultimoUso: "Último uso {fecha}",
     nuncaUsada: "Sin usar",
     vacio: "Aún no creas llaves de API.",
+    // A qué dirección pregunta otro sistema con cada permiso (GET, solo lectura).
+    direcciones: "Qué consultar",
+    direccionesAyuda:
+      "Con una llave que tenga el permiso, otro sistema lee por GET en estas direcciones, con la llave en el encabezado X-API-Key.",
+    copiarDireccion: "Copiar dirección de {permiso}",
     // Anidados: la clave del permiso ("miembros.ver") se usa tal cual como ruta.
     scopes: {
       miembros: { ver: "Miembros" },
@@ -203,8 +208,12 @@ export const comunicacionesAuto = {
     entregado: "Entregado",
     leido: "Leído",
     fallido: "Falló",
+    // Pudo haber salido (ADR 0227): no se manda otra vez solo.
+    incierto: "Sin confirmar",
     descartado: "Descartado",
   },
+  reenviar: "Reenviar",
+  reenviado: "El mensaje volvió a la cola.",
 };
 
 // Consentimiento de avisos por WhatsApp que registra el equipo (ADR 0069).
@@ -333,6 +342,18 @@ export const creditosFicha = {
   agregarCitas: "Agregar sesiones",
   creditosCitas: "Sesiones",
   agregadosCitas: "Sesiones agregadas.",
+  // Quitar a mano lo que no debía tener (ajuste con motivo; no devuelve dinero).
+  quitar: "Quitar créditos",
+  quitarCitas: "Quitar sesiones",
+  quitarAyuda:
+    "Se descuentan de lo que tiene disponible en este plan y quedan en sus movimientos con el motivo. No se devuelve dinero.",
+  quitarAyudaCitas:
+    "Se descuentan de lo que tiene disponible en este bono y quedan en sus movimientos con el motivo. No se devuelve dinero.",
+  quitarMotivoPh: "Clase tomada sin reservar",
+  quitarMotivoPhCitas: "Sesión tomada sin agendar",
+  disponibles: "Disponibles: {n}",
+  quitados: "Créditos quitados.",
+  quitadosCitas: "Sesiones quitadas.",
   sinMovimientos: "Sin movimientos.",
   verMas: "Ver más ({n})",
   saldo: "Saldo {n}",
@@ -474,6 +495,12 @@ export const miCuentaExtra = {
 export const reembolsosPago = {
   // El botón de la fila: dice qué se reembolsa.
   reembolsarPago: "Reembolsar pago",
+  // ADR 0227: le pregunta a la pasarela por devoluciones hechas en su panel.
+  reconsultar: "Reconsultar este pago",
+  reconsultaSinCambios:
+    "La pasarela no tiene devoluciones de este pago que falten aquí.",
+  reconsultaConDevoluciones:
+    "Se registró una devolución hecha en la pasarela. | Se registraron {n} devoluciones hechas en la pasarela.",
   ver: "Ver reembolsos",
   ocultar: "Ocultar reembolsos",
   por: "por {actor}",
@@ -572,6 +599,33 @@ export const instructorClase = {
 };
 
 export const plataformaAdmin = {
+  // Alta asistida de un negocio y corregir el contacto de su dueño (ADR 0226).
+  alta: {
+    abrir: "Dar de alta un negocio",
+    titulo: "Alta de un negocio",
+    ayuda:
+      "Para quien no puede registrarse solo, también con el registro cerrado. A su dueño le llega el correo para activar su cuenta; al entrar acepta el aviso de privacidad y los términos.",
+    nombre: "Nombre del negocio",
+    giro: "Giro",
+    elegirGiro: "Elige el giro",
+    clases: "Clases",
+    citas: "Citas",
+    pais: "País",
+    crear: "Dar de alta",
+    creado: "Negocio dado de alta. Su activación va a {correo}.",
+  },
+  contacto: {
+    corregir: "Corregir contacto",
+    nombre: "Nombre del dueño",
+    primerApellido: "Primer apellido",
+    correo: "Correo",
+    correoAyuda:
+      "Es con el que entra: solo se corrige si aún no activa su cuenta (le llega una activación nueva).",
+    lada: "Lada",
+    whatsapp: "WhatsApp",
+    guardar: "Guardar contacto",
+    guardado: "Contacto guardado.",
+  },
   // Embudo de la plataforma (C08).
   embudo: {
     texto:

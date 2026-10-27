@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CajasTenant;
+use App\Modules\Tenancy\Application\ConciliarReembolsosTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Devoluciones (refunds) de un pago del estudio (data plane del tenant). Total o
@@ -37,6 +41,31 @@ class ReembolsosTenantController
         return response()->json([
             'data' => $lista->map(fn (ReembolsoTenant $r): array => $this->presentar($r))->all(),
         ]);
+    }
+
+    /**
+     * «Reconsultar este pago» (ADR 0227): le pregunta a la pasarela si el cobro tiene
+     * devoluciones que aquí no se registraron (hechas en su panel, con el aviso perdido),
+     * también de pagos más viejos que los que se revisan cada noche. Idempotente.
+     */
+    public function reconsultar(Request $request, ConciliarReembolsosTenant $conciliar): JsonResponse
+    {
+        $pago = PagosTenantController::pagoDeMiSede($request, $this->acceso);
+        if (! in_array($pago->proveedor, ProveedorPasarela::enLinea(), true) || ($pago->referencia_externa ?? '') === '') {
+            throw ValidationException::withMessages(['pago' => ['Solo un cobro en línea se puede reconsultar con su pasarela.']]);
+        }
+        try {
+            $registradas = $conciliar->revisarPago($pago);
+        } catch (Throwable $e) {
+            report($e);
+
+            throw ValidationException::withMessages(['pago' => ['La pasarela no respondió. Inténtalo en unos minutos.']]);
+        }
+
+        return response()->json(['data' => [
+            'registradas' => $registradas,
+            'estado' => $pago->refresh()->estado->value,
+        ]]);
     }
 
     public function store(Request $request): JsonResponse

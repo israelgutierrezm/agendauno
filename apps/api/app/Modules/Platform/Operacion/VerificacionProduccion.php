@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Application\TiposDeCambio;
 use App\Modules\Tenancy\Comunicaciones\ColaDeMensajes;
+use App\Modules\Tenancy\Comunicaciones\Push\ClienteWebPush;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
@@ -265,6 +266,9 @@ class VerificacionProduccion
                 $this->punto('Correo', 'Servidor SMTP configurado', $servidor, "Ahora: {$host}. Define MAIL_HOST, MAIL_PORT y las credenciales de tu proveedor."),
             ] : []),
             $this->punto('Correo', 'Remitente propio', $remitente !== '' && ! str_ends_with($remitente, '@example.com'), "Ahora: {$remitente}. Usa un dominio con SPF y DKIM."),
+            // Push en la web (ADR 0225): sin llaves, los avisos push solo llegan a la app.
+            $this->punto('Correo', 'Avisos en el navegador (push en la web)', app(ClienteWebPush::class)->configurado(),
+                'Genera las llaves con php artisan agendauno:generar-vapid y ponlas en PUSH_WEB_PUBLICA y PUSH_WEB_PRIVADA: sin ellas, quien no tiene la app no recibe avisos push.', critico: false),
         ];
     }
 

@@ -60,6 +60,10 @@ export default {
     ayuda:
       "Vienen con el pase de invitado de un alumno: ocupan lugar y no son alumnos.",
     de: "invitado de {nombre}",
+    // Antes de la clase, quien gestiona reservas cancela la invitación.
+    cancelar: "Cancelar invitación",
+    cancelarConfirmar:
+      "¿Cancelar la invitación de {nombre}? Su lugar queda libre y el alumno que lo invitó recupera su pase del mes.",
     estados: {
       reservado: "Por marcar",
       asistio: "Llegó",

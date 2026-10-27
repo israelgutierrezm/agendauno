@@ -1,3 +1,4 @@
+import { fijarDominioPropio } from "@/lib/tenant";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DOMINIO_PUBLICO } from "./tenant";
@@ -48,6 +49,14 @@ describe("Google por dominio", () => {
     expect(googleEnEsteSitio(`barberia.${DOMINIO_PUBLICO}`)).toBe(false);
     expect(googleEnEsteSitio("barberia.localhost")).toBe(false);
     expect(googleEnDominioRaiz(`barberia.${DOMINIO_PUBLICO}`)).toBe(true);
+  });
+
+  it("en el dominio propio de un negocio no se ofrece (ADR 0224)", () => {
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "cliente.apps.googleusercontent.com");
+    fijarDominioPropio({ host: "reservas.fluo.mx", slug: "fluo" });
+    expect(googleEnEsteSitio("reservas.fluo.mx")).toBe(false);
+    expect(googleEnDominioRaiz("reservas.fluo.mx")).toBe(false);
+    fijarDominioPropio(null);
   });
 
   it("no carga Google en el subdominio de un negocio", async () => {

@@ -76,3 +76,25 @@ it('el enlace web abre la sesión de la app en la web una sola vez y solo a una 
     parse_str((string) parse_url($url2, PHP_URL_QUERY), $consulta2);
     $this->postJson("/api/v1/app/{$otro['slug']}/enlace-web/canjear", ['codigo' => $consulta2['enlace']])->assertUnprocessable();
 });
+
+it('el enlace web vence, y deja de servir si se cierra la sesión de la app que lo pidió (ADR 0227)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $cliente = alumnoConSesion($e);
+    $codigo = function () use ($e, $cliente): string {
+        $url = (string) $this->postJson("/api/v1/app/{$e['slug']}/yo/enlace-web", ['destino' => '/mi-cuenta'], conBearer($cliente['bearer']))->json('data.url');
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $consulta);
+
+        return (string) $consulta['enlace'];
+    };
+
+    // Vale pocos minutos.
+    $viejo = $codigo();
+    $this->travel(3)->minutes();
+    $this->postJson("/api/v1/app/{$e['slug']}/enlace-web/canjear", ['codigo' => $viejo])->assertUnprocessable();
+    alRelojDePrueba();
+
+    // Pedido y luego cerrada la sesión de la app: ya no abre la web.
+    $pendiente = $codigo();
+    $this->postJson("/api/v1/app/{$e['slug']}/logout", [], conBearer($cliente['bearer']))->assertOk();
+    $this->postJson("/api/v1/app/{$e['slug']}/enlace-web/canjear", ['codigo' => $pendiente])->assertUnprocessable();
+});

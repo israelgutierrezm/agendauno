@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisosNavegador from "@/components/AvisosNavegador.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
@@ -352,6 +353,8 @@ async function copiarCalendario(): Promise<void> {
 // Google Calendar y Outlook en las dos direcciones (ADR 0199): solo quien atiende, y
 // solo si la plataforma los tiene configurados (lo dice la tarjeta al cargar).
 const calendariosDisponibles = ref(false);
+// Los avisos en este navegador se muestran si el navegador y la plataforma pueden.
+const avisosNavegadorDisponible = ref(false);
 
 const aparienciaAbierta = ref(false);
 </script>
@@ -927,6 +930,15 @@ const aparienciaAbierta = ref(false);
             <p class="mp-ayuda">{{ $t("calendariosExternos.ayuda") }}</p>
           </div>
           <ConectarCalendarios @disponible="calendariosDisponibles = $event" />
+        </div>
+
+        <!-- Avisos en este navegador (push en la web, ADR 0225) -->
+        <div v-show="avisosNavegadorDisponible" class="mp-fila">
+          <div>
+            <h3 class="mp-titulo">{{ $t("avisosNavegador.titulo") }}</h3>
+            <p class="mp-ayuda">{{ $t("avisosNavegador.ayuda") }}</p>
+          </div>
+          <AvisosNavegador @disponible="avisosNavegadorDisponible = $event" />
         </div>
 
         <!-- Apariencia -->

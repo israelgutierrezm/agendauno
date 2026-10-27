@@ -58,6 +58,9 @@ function rutasExclusivasPorModalidad(): array
         'plantillas-horario.eliminar' => 'clases',
         'plantillas-horario.cambiar' => 'clases',
         'plantillas-horario.generar' => 'clases',
+        // Terminar una programación semanal desde una fecha (ADR 0223).
+        'plantillas-horario.fin' => 'clases',
+        'plantillas-horario.terminar' => 'clases',
         'grupos.index' => 'clases',
         'grupos.store' => 'clases',
         'grupos.inscripciones.index' => 'clases',
@@ -148,6 +151,14 @@ function rutasExclusivasPorModalidad(): array
         'citas.disponibilidad' => 'citas',
         'citas.dias' => 'citas',
         'citas.agendar' => 'citas',
+        // Cupones al agendar (ADR 0220), también desde la cuenta, y la cita sin cuenta por
+        // su enlace firmado (ADR 0221).
+        'citas.cupon' => 'citas',
+        'mi.citas.cupon' => 'citas',
+        'citas.enlace' => 'citas',
+        'citas.enlace.cancelar' => 'citas',
+        'citas.enlace.reprogramar.opciones' => 'citas',
+        'citas.enlace.reprogramar' => 'citas',
         'reservas.historial' => 'citas',
         'reservas.cobro' => 'citas',
         'importaciones.citas.catalogos' => 'citas',
@@ -346,6 +357,12 @@ it('un negocio de la otra modalidad recibe 403 MODALITY_NOT_AVAILABLE y uno de l
         $obtenido = [];
         $esperado = [];
         foreach (rutasExclusivasPorModalidad() as $nombre => $modalidad) {
+            // Las públicas que cambian algo llevan el límite de «login» (5 por minuto):
+            // cada una en su propio minuto, para que responda su modalidad y no 429.
+            $ruta = app(Router::class)->getRoutes()->getByName('api.v1.app.'.$nombre);
+            if ($ruta !== null && in_array('throttle:login', $ruta->gatherMiddleware(), true)) {
+                $this->travel(61)->seconds();
+            }
             $obtenido[$nombre] = $negada(llamarRutaDeModalidad($e, $nombre)) ? 'negada' : 'pasa';
             $esperado[$nombre] = $modalidad === $delNegocio ? 'pasa' : 'negada';
         }

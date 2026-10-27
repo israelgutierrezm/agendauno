@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Comunicaciones;
 
 use App\Modules\Tenancy\Comunicaciones\Push\ClienteFcm;
+use App\Modules\Tenancy\Comunicaciones\Push\ClienteWebPush;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 
@@ -32,7 +33,8 @@ enum CanalComunicacion: string
     public static function disponibles(): array
     {
         $canales = [self::Interno, self::Email];
-        if (app(ClienteFcm::class)->configurado()) {
+        // A la app (FCM) o al navegador (push en la web, ADR 0225).
+        if (app(ClienteFcm::class)->configurado() || app(ClienteWebPush::class)->configurado()) {
             $canales[] = self::Push;
         }
         if (app(ClienteWhatsApp::class)->activoPara(app(GestorDeConexionTenant::class)->actual())) {

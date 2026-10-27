@@ -123,7 +123,8 @@ it('los demás avisos al equipo vienen apagados y solo aplican a sus eventos', f
     $venta = collect($r->json('data'))->first(fn (array $p): bool => $p['clave'] === 'orden.pagada' && $p['destinatario'] === 'equipo');
     expect($venta['activo'])->toBeFalse()
         ->and($r->json('destinatarios.equipo'))->toContain('privacidad.baja_solicitada', 'orden.pagada')
-        ->and($r->json('destinatarios.profesional'))->toContain('reserva.confirmada');
+        // En clases no hay «profesional de la cita»: no se le ofrece ese destinatario.
+        ->and($r->json('destinatarios.profesional'))->toBe([]);
 
     // Una reserva no se avisa "al equipo" ni una venta "al profesional".
     $this->putJson("/api/v1/app/{$e['slug']}/plantillas-mensaje", [

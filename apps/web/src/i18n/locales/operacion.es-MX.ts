@@ -986,6 +986,26 @@ export default {
   // Ficha del miembro: todo su historial, por páginas.
   ficha: {
     verTodo: "Ver todo el historial",
+    // Dar un plan sin cobro (ADR 0181): siempre con su motivo.
+    cortesia: {
+      boton: "Dar de cortesía",
+      titulo: "Dar un plan de cortesía",
+      tituloCitas: "Dar un bono de cortesía",
+      ayuda:
+        "Se activa hoy y sin cobro: no queda venta ni pago por cobrar. El motivo queda en la bitácora.",
+      plan: "Plan",
+      planCitas: "Bono",
+      elegir: "Elige un plan",
+      elegirCitas: "Elige un bono",
+      sinPlanes: "Aún no hay planes a la venta.",
+      sinPlanesCitas: "Aún no hay bonos a la venta.",
+      motivo: "Motivo",
+      motivoPh: "Compensación por una clase cancelada",
+      motivoPhCitas: "Compensación por una cita cancelada",
+      motivoAyuda: "Al menos 3 letras.",
+      confirmar: "Dar de cortesía",
+      hecho: "Listo: {plan} quedó activo para {persona}, sin cobro.",
+    },
   },
   // Usuarios: el equipo aparte de los alumnos con cuenta.
   usuarios: {

@@ -211,7 +211,7 @@ export default {
     },
     descripciones: {
       negocio:
-        "El logo del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
+        "El logo del negocio, sus sucursales y tabletas de llegada, datos fiscales y cómo se llaman las cosas.",
       servicios:
         "Qué se ofrece y a qué precio: servicios, combos y bonos, y los espacios que usan.",
       serviciosClases:
@@ -2072,6 +2072,7 @@ export default {
     resultado: {
       enviados: "{n} enviados",
       fallidos: "{n} no se pudieron enviar",
+      sinConfirmar: "{n} sin confirmar (revísalos en la bandeja de salida)",
       descartados: "{n} no se mandaron (no desean promociones o se canceló)",
     },
     pausar: "Pausar",
@@ -2265,6 +2266,7 @@ export default {
     comprobante: {
       enviado: "Recibo enviado",
       fallido: "El recibo no se pudo enviar",
+      incierto: "Recibo sin confirmar",
       pendiente: "Recibo por enviar",
     },
     reembolso: {
@@ -2368,8 +2370,9 @@ export default {
       // En citas lo que se vende son bonos de sesiones (ADR 0130).
       subtituloCitas: "Vende un bono a un alumno.",
       administrarPlanesCitas: "Administrar bonos",
+      // Lo disponible del bono recién vendido, con decimales (1000 unidades = 1).
       exitoPackCitas:
-        "Vendido. {persona} tiene 1 sesión en su bono. | Vendido. {persona} tiene {saldo} sesiones en su bono.",
+        "Vendido. {persona} tiene 1 sesión disponible en este bono. | Vendido. {persona} tiene {saldo} sesiones disponibles en este bono.",
       exitoMembresiaCitas: "Vendido. {persona} tiene un bono activo.",
       miembro: "Alumno",
       producto: "Producto",
@@ -2377,7 +2380,9 @@ export default {
       elegir: "Elige…",
       cobrar: "Cobrar y activar",
       cobrando: "Cobrando…",
-      exitoPack: "Vendido. {persona} tiene {saldo} créditos.",
+      // Lo disponible del plan recién vendido, con decimales (1000 unidades = 1).
+      exitoPack:
+        "Vendido. Con este plan, {persona} tiene 1 crédito disponible. | Vendido. Con este plan, {persona} tiene {saldo} créditos disponibles.",
       exitoVenta: "Venta registrada para {persona}.",
       exitoMembresia: "Vendido. {persona} tiene una membresía activa.",
       sinProductos: "Primero crea un producto.",

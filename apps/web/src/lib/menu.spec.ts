@@ -148,6 +148,23 @@ describe("registro de acceso", () => {
       expect(puedeEntrar(store.rutaInicio, store), `${rol}`).toBe(true);
     }
   });
+
+  it("un rol propio sin facturación, reservas ni agenda entra a la primera área de su menú", () => {
+    setActivePinia(createPinia());
+    const store = useSesionTenantStore();
+    store.usuario = { rol: "custom", permisos: ["miembros.ver"] } as never;
+    expect(store.rutaInicio).toBe("miembros");
+    expect(store.rutaInicio).toBe(
+      menuVisible(store)[0]!.areas[0]!.destino.ruta,
+    );
+
+    store.usuario = { rol: "custom", permisos: ["tareas.ver"] } as never;
+    expect(store.rutaInicio).toBe("tareas");
+
+    // Sin ninguna pantalla de trabajo, su perfil.
+    store.usuario = { rol: "custom", permisos: [] } as never;
+    expect(store.rutaInicio).toBe("mi-perfil");
+  });
 });
 
 describe("menú del negocio", () => {
@@ -258,6 +275,30 @@ describe("menú del negocio", () => {
     expect(areas(s)).toEqual(["inicio"]);
     expect(destino(s, "inicio")).toBe("tareas");
     expect(puedeEntrar("panel", s)).toBe(false);
+  });
+
+  it("el kiosco de llegada está en Configuración › Negocio, para quien administra el negocio", () => {
+    const negocio = CATEGORIAS_CONFIGURACION.find(
+      (c) => c.clave === "negocio",
+    )!;
+    expect(negocio.opciones.find((op) => op.clave === "kiosco")).toMatchObject({
+      ruta: "configuracion",
+      hash: "#kiosco",
+    });
+    const visibles = (s: Sesion) =>
+      vistasVisibles({ ...negocio, vistas: negocio.opciones }, s).map(
+        (x) => x.clave,
+      );
+    // En clases y en citas.
+    for (const modalidad of ["clases", "citas"] as const) {
+      expect(visibles(sesion(["estudio.gestionar"], { modalidad }))).toContain(
+        "kiosco",
+      );
+    }
+    // Su API pide `estudio.gestionar`: quien solo configura integraciones no lo ve.
+    expect(visibles(sesion(["integraciones.configurar"]))).not.toContain(
+      "kiosco",
+    );
   });
 
   it("un rol solo de integraciones llega a Configuración sin permiso del negocio", () => {

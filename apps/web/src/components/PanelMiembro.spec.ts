@@ -5,7 +5,9 @@ import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
 import { avisosWhatsApp } from "@/i18n/locales/gestion.es-MX";
 import confirmaciones from "@/i18n/locales/confirmaciones.es-MX";
+import cupon from "@/i18n/locales/cupon.es-MX";
 import planes from "@/i18n/locales/planes.es-MX";
+import sucursalOperativa from "@/i18n/locales/sucursalOperativa.es-MX";
 import PanelMiembro from "./PanelMiembro.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
@@ -13,12 +15,17 @@ vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 const permisos = vi.hoisted(() => ({
   lista: ["miembros.gestionar"],
   esCitas: false,
+  // Con varias sucursales, la de la barra decide en qué caja entra el cobro.
+  usuario: undefined as
+    { ulid: string; sucursales: { id: string; nombre: string }[] } | undefined,
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     terminologia: { miembro: "Cliente" },
     esCitas: permisos.esCitas,
+    usuario: permisos.usuario,
+    moneda: "MXN",
     puede: (p: string) => permisos.lista.includes(p),
   }),
 }));
@@ -57,7 +64,16 @@ function montar() {
           locale: "es",
           missingWarn: false,
           fallbackWarn: false,
-          messages: { es: { ...es, avisosWhatsApp, planes, confirmaciones } },
+          messages: {
+            es: {
+              ...es,
+              avisosWhatsApp,
+              planes,
+              confirmaciones,
+              cupon,
+              sucursalOperativa,
+            },
+          },
         }),
       ],
       stubs: { RouterLink: true },
@@ -69,6 +85,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   permisos.lista = ["miembros.gestionar"];
   permisos.esCitas = false;
+  permisos.usuario = undefined;
 });
 
 describe("resumen adaptado a citas o clases", () => {
@@ -241,5 +258,110 @@ describe("venta rápida", () => {
       expect.stringContaining("1,500"),
       expect.anything(),
     );
+  });
+
+  const paquete = {
+    ...plan,
+    id: "p2",
+    nombre: "Paquete 8 clases",
+    tipo: "paquete",
+    ilimitado: false,
+    creditos_incluidos: 8000,
+    cobra_inscripcion: false,
+    permanencia_meses: null,
+    condiciones: null,
+  };
+  async function abrirVentaDe(producto: typeof paquete) {
+    permisos.lista = ["ordenes.gestionar", "productos.ver"];
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/productos")
+          ? { data: { data: [producto] } }
+          : resumen(undefined),
+      ),
+    );
+    const w = montar();
+    await flushPromises();
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("Vender"))!
+      .trigger("click");
+    await flushPromises();
+    await w.get("select").setValue(producto.id);
+    await flushPromises();
+    return w;
+  }
+
+  it("aplica un cupón revisado contra el precio del plan y la orden lo lleva", async () => {
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/promociones/validar")
+          ? { data: { data: { descuento_minor: 20000, total_minor: 80000 } } }
+          : { data: { data: { id: "o1" } } },
+      ),
+    );
+    confirmar.mockResolvedValueOnce(true);
+    const w = await abrirVentaDe(paquete);
+
+    await w.get('[data-prueba="abrir-cupon"]').trigger("click");
+    await w.get("#cc-codigo").setValue("verano");
+    await w.get('[data-prueba="aplicar-cupon"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/promociones/validar",
+      { codigo: "verano", subtotal_minor: 100000 },
+    );
+    expect(w.get('[data-prueba="total-con-cupon"]').text()).toContain("800");
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Cobrar")!
+      .trigger("click");
+    await flushPromises();
+    // Se confirma el total con el descuento y la orden lleva el código.
+    expect(confirmar).toHaveBeenCalledWith(
+      expect.stringContaining("800"),
+      expect.anything(),
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/ordenes",
+      expect.objectContaining({
+        comprador_id: "caro",
+        codigo_promo: "verano",
+      }),
+    );
+  });
+
+  it("un código que no se revisó no viaja en la orden", async () => {
+    api.post.mockResolvedValue({ data: { data: { id: "o1" } } });
+    confirmar.mockResolvedValueOnce(true);
+    const w = await abrirVentaDe(paquete);
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Cobrar")!
+      .trigger("click");
+    await flushPromises();
+    const [, cuerpo] = api.post.mock.calls.find(([url]) =>
+      String(url).endsWith("/ordenes"),
+    )!;
+    expect(cuerpo).not.toHaveProperty("codigo_promo");
+  });
+
+  it("con varias sucursales y «Todas» en la barra, pide elegir la sucursal antes de cobrar", async () => {
+    permisos.usuario = {
+      ulid: "u-panel",
+      sucursales: [
+        { id: "s1", nombre: "Centro" },
+        { id: "s2", nombre: "Norte" },
+      ],
+    };
+    const w = await abrirVentaDe(paquete);
+
+    expect(w.get('[data-prueba="elige-sucursal"]').text()).toContain(
+      "Elige la sucursal",
+    );
+    const cobrar = w.findAll("button").find((b) => b.text() === "Cobrar")!;
+    expect(cobrar.attributes("disabled")).toBeDefined();
   });
 });

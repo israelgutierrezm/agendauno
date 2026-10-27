@@ -7,6 +7,10 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import BitacoraPlataforma from "@/components/BitacoraPlataforma.vue";
 import EmbudoPlataforma from "@/components/EmbudoPlataforma.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import AltaNegocioPlataforma from "@/components/AltaNegocioPlataforma.vue";
+import ContactoDuenoPlataforma, {
+  type CamposContacto,
+} from "@/components/ContactoDuenoPlataforma.vue";
 import EstadoVacioListado from "@/components/EstadoVacioListado.vue";
 import LayoutPlataforma, {
   type GrupoPlataforma,
@@ -143,6 +147,8 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     whatsapp_verificado?: boolean;
     // ¿Ya activó su cuenta? (ADR 0216)
     cuenta_activa?: boolean | null;
+    // Por partes, para corregirlo (ADR 0226).
+    campos?: CamposContacto;
   };
   onboarding_completo: boolean;
   // Lo más que se extiende su prueba de una vez (parámetro de la plataforma).
@@ -251,6 +257,10 @@ const codigoDesarrollo = ref<string | null>(null);
 const operador = ref<string | null>(null);
 // Qué puede hacer quien entró (ADR 0215): solo el perfil total ve la configuración.
 const perfilOperador = ref<string>("total");
+// Alta asistida y corregir el contacto (ADR 0226): soporte y total.
+const puedeAltaAsistida = computed(() =>
+  ["total", "soporte"].includes(perfilOperador.value),
+);
 const SOLO_TOTAL: Pestana[] = [
   "tarifas",
   "parametros",
@@ -1621,6 +1631,14 @@ function borrar(): void {
 
       <!-- Negocios: la búsqueda y los filtros arriba, en la misma tarjeta; 15 por
            página en el servidor, con una sola paginación al pie. -->
+      <!-- Alta asistida (ADR 0226): quien no puede registrarse solo. -->
+      <AltaNegocioPlataforma
+        v-if="pestana === 'estudios' && puedeAltaAsistida"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+        @creado="(slug: string) => abrirFicha({ slug })"
+      />
       <div
         v-if="pestana === 'estudios'"
         class="mt-5 tu-card overflow-hidden"
@@ -2844,6 +2862,14 @@ function borrar(): void {
               >
                 {{ $t("plataformaAdmin.ficha.whatsappVerificado") }}
               </span>
+              <ContactoDuenoPlataforma
+                v-if="ficha.contacto.campos && puedeAltaAsistida"
+                :api-url="apiUrl"
+                :token="token"
+                :slug="ficha.slug"
+                :campos="ficha.contacto.campos"
+                @guardado="recargarFicha"
+              />
               <!-- Aún no activa su cuenta: se le reenvía (ADR 0216). -->
               <div
                 v-if="ficha.contacto.cuenta_activa === false"

@@ -7,7 +7,6 @@ import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
-import KioscosNegocio from "@/components/KioscosNegocio.vue";
 import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import MedicionNegocio from "@/components/MedicionNegocio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -97,7 +96,9 @@ interface Entrega {
   entregado_en: string | null;
 }
 // Medición: su GA4 y su Meta (ADR 0143).
-type Pestana = "bienestar" | "llaves" | "webhooks" | "medicion" | "kiosco";
+// El kiosco de llegada vive en Configuración › Negocio (lo activa quien administra el
+// negocio, `estudio.gestionar`), no aquí.
+type Pestana = "bienestar" | "llaves" | "webhooks" | "medicion";
 
 // Lo secreto se captura como contraseña; los códigos (Gym ID, gimnasio, plan), no.
 const SECRETAS = new Set(["api_key", "webhook_secret", "place_api_key"]);
@@ -112,13 +113,12 @@ const conBienestar = computed(
   () => !sesion.esCitas && sesion.estudio?.bienestar_posible === true,
 );
 // La pestaña va en la dirección (`?pestana=webhooks`): recargar o compartir el enlace
-// abre la misma. Sin bienestar, la primera es Llaves; el kiosco, solo con permiso.
+// abre la misma. Sin bienestar, la primera es Llaves.
 const pestanas = computed<Pestana[]>(() => [
   ...(conBienestar.value ? (["bienestar"] as const) : []),
   "llaves",
   "webhooks",
   "medicion",
-  ...(sesion.puede("estudio.gestionar") ? (["kiosco"] as const) : []),
 ]);
 const pestana = usePestanaEnUrl(pestanas);
 const TEXTO_PESTANA: Record<Pestana, string> = {
@@ -126,7 +126,6 @@ const TEXTO_PESTANA: Record<Pestana, string> = {
   llaves: "conexiones.llaves",
   webhooks: "conexiones.webhooks",
   medicion: "medicion.negocio.pestana",
-  kiosco: "kiosco.panel.titulo",
 };
 const opcionesPestana = computed(() =>
   pestanas.value.map((clave) => ({ clave, texto: t(TEXTO_PESTANA[clave]) })),
@@ -385,6 +384,30 @@ async function revocar(l: LlaveApi): Promise<void> {
     toast.error(mensajeDeError(e));
   }
 }
+
+// Lo que otro sistema consulta con cada permiso (API de integración, solo lectura):
+// la dirección completa del negocio, por la que pregunta con `X-API-Key`.
+const RUTA_DE_ALCANCE: Record<string, string> = {
+  "miembros.ver": "miembros",
+  "agenda.ver": "sesiones",
+  "reservas.ver": "reservas",
+  "derechos.ver": "derechos",
+  "ordenes.ver": "ordenes",
+};
+const origenApi = computed(
+  () =>
+    // Sin VITE_API_URL (producción), la API está en el mismo dominio.
+    (api.defaults?.baseURL || window.location.origin).replace(/\/+$/, "") +
+    `/api/v1/app/${sesion.slug}/integracion`,
+);
+const direcciones = computed(() =>
+  scopesDisponibles.value
+    .filter((s) => RUTA_DE_ALCANCE[s] !== undefined)
+    .map((s) => ({
+      alcance: s,
+      url: `${origenApi.value}/${RUTA_DE_ALCANCE[s]}`,
+    })),
+);
 
 async function cargarLlaves(): Promise<void> {
   const { data } = await api.get<{ data: LlaveApi[]; scopes: string[] }>(
@@ -874,6 +897,48 @@ onMounted(cargar);
             }}</span>
           </li>
         </ul>
+
+        <!-- A qué dirección pregunta otro sistema con cada permiso. -->
+        <section
+          v-if="direcciones.length > 0"
+          class="mt-5 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+          data-prueba="direcciones-api"
+        >
+          <h3 class="text-sm font-semibold">
+            {{ $t("conexiones.llave.direcciones") }}
+          </h3>
+          <p class="mt-0.5 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("conexiones.llave.direccionesAyuda") }}
+          </p>
+          <ul class="mt-2">
+            <li
+              v-for="d in direcciones"
+              :key="d.alcance"
+              class="int-fila text-sm"
+              :data-alcance="d.alcance"
+            >
+              <div class="min-w-0">
+                <p class="font-medium">
+                  {{ $t(`conexiones.llave.scopes.${d.alcance}`) }}
+                </p>
+                <code class="block truncate text-xs">GET {{ d.url }}</code>
+              </div>
+              <button
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico shrink-0"
+                :aria-label="
+                  $t('conexiones.llave.copiarDireccion', {
+                    permiso: $t(`conexiones.llave.scopes.${d.alcance}`),
+                  })
+                "
+                @click="copiar(d.url)"
+              >
+                {{ $t("conexiones.copiar") }}
+              </button>
+            </li>
+          </ul>
+        </section>
       </div>
 
       <ModalDialogo
@@ -1244,8 +1309,6 @@ onMounted(cargar);
 
     <!-- GA4 y Meta del negocio (ADR 0143) -->
     <MedicionNegocio v-if="!cargando && pestana === 'medicion'" class="mt-5" />
-    <!-- Kiosco de llegada (ADR 0183) -->
-    <KioscosNegocio v-if="!cargando && pestana === 'kiosco'" class="mt-5" />
   </section>
 </template>
 

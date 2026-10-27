@@ -312,7 +312,8 @@ class PagosTenantController
 
     /**
      * Cómo va el comprobante de cada orden de la página (el recibo que se le manda al
-     * cliente al pagarse): `enviado`, `fallido` o `pendiente`; sin entrada, no se mandó
+     * cliente al pagarse): `enviado`, `fallido`, `incierto` (pudo haber salido, ADR 0227)
+     * o `pendiente`; sin entrada, no se mandó
      * (el negocio no lo envía o el cliente no tiene a dónde).
      *
      * @param  Collection<int, PagoTenant>  $pagos
@@ -339,6 +340,7 @@ class PagosTenantController
                 $estado = match ($m->estado) {
                     EstadoMensaje::Enviado => 'enviado',
                     EstadoMensaje::Fallido => 'fallido',
+                    EstadoMensaje::Incierto => 'incierto',
                     EstadoMensaje::Encolado => 'pendiente',
                     default => null,
                 };

@@ -7,9 +7,12 @@ namespace App\Modules\Platform\Operacion;
 use App\Modules\Platform\Acceso\DesafioPlataforma;
 use App\Modules\Platform\Acceso\SesionPlataforma;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AvisoPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use App\Modules\Tenancy\Models\TokenAccesoTenant;
 use App\Modules\Tenancy\Models\VerificacionWhatsApp;
@@ -37,8 +40,9 @@ use Illuminate\Support\Facades\Schema;
  *   Mercado Pago y OpenPay ya procesados o fallidos. Los pendientes se quedan.
  * - Del superadmin (ADR 0132): los códigos por correo vencidos hace más de un día y
  *   las sesiones vencidas o cerradas hace más de 30 días. La bitácora se queda.
- * Borra por lotes para no bloquear las tablas. No toca historial del negocio: los
- * mensajes, los pagos y la bitácora se quedan.
+ * - De cada negocio (ADR 0224), con plazos largos: los eventos del outbox ya publicados
+ *   (también son el historial de una cita) y los mensajes que ya no están por salir.
+ * Borra por lotes para no bloquear las tablas. Los pagos y la bitácora se quedan.
  */
 class LimpiezaDeRegistros
 {
@@ -50,7 +54,7 @@ class LimpiezaDeRegistros
     ) {}
 
     /**
-     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int, acceso_plataforma: int, avisos_pasarela: int}
+     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int, acceso_plataforma: int, avisos_pasarela: int, eventos_publicados: int, mensajes_enviados: int}
      */
     public function ejecutar(): array
     {
@@ -69,11 +73,15 @@ class LimpiezaDeRegistros
                     ->where('expira_en', '<', $ahora->copy()->subDays(30))
                     ->orWhere('cerrada_en', '<', $ahora->copy()->subDays(30)))),
             'avisos_pasarela' => 0,
+            'eventos_publicados' => 0,
+            'mensajes_enviados' => 0,
         ];
 
         $limiteSesiones = $this->limite($ahora, 'limpieza.dias_sesiones_tarjeta');
         $limiteAvisos = $this->limite($ahora, 'limpieza.dias_avisos_pasarela');
-        Estudio::query()->chunkById(100, function (Collection $estudios) use (&$borrados, $limiteSesiones, $limiteAvisos): void {
+        $limiteEventos = $this->limite($ahora, 'limpieza.dias_eventos_publicados');
+        $limiteMensajes = $this->limite($ahora, 'limpieza.dias_mensajes_enviados');
+        Estudio::query()->chunkById(100, function (Collection $estudios) use (&$borrados, $limiteSesiones, $limiteAvisos, $limiteEventos, $limiteMensajes): void {
             /** @var Collection<int, Estudio> $estudios */
             foreach ($estudios as $estudio) {
                 if (! $this->gestor->baseDeDatosExiste($estudio)) {
@@ -87,6 +95,15 @@ class LimpiezaDeRegistros
                         ->where('estado', '!=', AvisoPasarelaTenant::PENDIENTE)
                         ->where('recibido_en', '<', $limiteAvisos))
                     : 0);
+                $borrados['eventos_publicados'] += $this->gestor->ejecutarEn($estudio, fn (): int => $this->borrar(
+                    EventoOutboxTenant::query()->whereNotNull('publicado_en')->where('publicado_en', '<', $limiteEventos),
+                ));
+                // Los que ya no están por salir (enviados, descartados o agotados).
+                $borrados['mensajes_enviados'] += $this->gestor->ejecutarEn($estudio, fn (): int => $this->borrar(
+                    MensajeTenant::query()
+                        ->whereNotIn('estado', [EstadoMensaje::Encolado->value, EstadoMensaje::Enviando->value])
+                        ->where('created_at', '<', $limiteMensajes),
+                ));
                 // Con el plazo de cada negocio.
                 $borrados['sesiones_vencidas'] += $this->gestor->ejecutarEn($estudio, function (): int {
                     $limite = Carbon::now()->subDays($this->parametros->entero('sesion.dias_inactividad'));

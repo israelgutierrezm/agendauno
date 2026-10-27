@@ -40,7 +40,9 @@ final class PerfilesPlataforma
         ],
         'soporte' => [
             'estudios.extender-prueba', 'estudios.terminologia.guardar', 'estudios.modulos', 'estudios.whatsapp',
-            'estudios.reenviar-activacion',
+            'estudios.reenviar-activacion', 'estudios.aprovisionar',
+            // Alta asistida y corregir el contacto del dueño (ADR 0226).
+            'estudios.store', 'estudios.contacto',
             'demos.horario.guardar', 'demos.actualizar',
             'errores.update', 'alertas.atender',
             'wellhub.solicitudes.asignar', 'wellhub.solicitudes.descartar',

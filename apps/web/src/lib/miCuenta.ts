@@ -497,12 +497,17 @@ export function useMiCuenta() {
       accion(() => api.post(`${base.value}/mi/reservas/${r.id}/aceptar`, {})),
     aceptarWaiver: (w: Waiver) =>
       accion(() => api.post(`${base.value}/mi/waivers/${w.id}/aceptar`, {})),
-    // Con permanencia (B04), aceptando sus condiciones.
-    comprar: (p: Producto, aceptaCondiciones = false) =>
+    // Con permanencia (B04), aceptando sus condiciones. Con cupón (ADR 0220), el
+    // código viaja con la compra: el servidor lo valida al crear la orden (el alumno
+    // no tiene una ruta para revisarlo antes) y el total con descuento se ve al pagar.
+    comprar: (p: Producto, aceptaCondiciones = false, codigoPromo = "") =>
       accion(async () => {
         const pedido = {
           items: [{ producto_id: p.id, cantidad: 1 }],
           ...(aceptaCondiciones ? { acepta_condiciones: true } : {}),
+          ...(codigoPromo.trim() !== ""
+            ? { codigo_promo: codigoPromo.trim() }
+            : {}),
         };
         await api.post(`${base.value}/mi/ordenes`, {
           ...pedido,

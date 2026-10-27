@@ -141,10 +141,22 @@ mismo. Así no hay CORS entre subdominios.
    4. `php artisan agendauno:dominios-propios` escribe el archivo con los dominios que
       se sirven (el programador lo repite cada 10 minutos).
 
-   Con `docker-compose.cloudflare.yml` (Traefik solo deja entrar a Cloudflare) los
-   dominios de los negocios no llegan: se necesitaría Cloudflare for SaaS (nombres de
-   host personalizados), que es otra decisión. **Sin validar en producción**: el flujo
-   está probado con DNS simulado, no con un dominio y un certificado reales.
+   Las reglas de los dominios propios apuntan al servicio `agendauno-web-propios`
+   (`DOMINIOS_PROPIOS_SERVICIO`), que es el puerto 81 de nginx (ADR 0224): ahí la IP real
+   sale siempre de `X-Forwarded-For`. Con `docker-compose.cloudflare.yml`, los dominios de
+   la plataforma solo dejan entrar a Cloudflare y su IP real viene de `CF-Connecting-IP`;
+   un dominio propio llega directo, y en el puerto 81 esa cabecera no cuenta (nadie la
+   puede inventar para saltarse los límites por IP). Si tu Traefik llama distinto a su
+   punto de entrada HTTPS, ajusta `TRAEFIK_ENTRADA` en `api.env` y `web.env`.
+   **Sin validar en producción**: el flujo está probado con DNS simulado, no con un
+   dominio y un certificado reales.
+
+   Con dominios propios, en la consola de reCAPTCHA quita «Verificar el origen de las
+   soluciones de reCAPTCHA» (la lista de dominios): la API revisa que el token venga de
+   un dominio de la plataforma o del dominio propio activo de un negocio, y de la acción
+   esperada. «Entrar con Google» solo funciona en los dominios de la plataforma (los
+   orígenes autorizados del cliente OAuth no se pueden abrir a cualquier dominio): en un
+   dominio propio no se ofrece y se entra con correo y contraseña.
 5. **Correo**: cuenta SMTP (Resend, Postmark, Amazon SES, Brevo…) con el dominio del
    remitente verificado (SPF y DKIM).
 6. **Facturación (opcional)**: llave de FacturAPI (`FACTURAPI_LLAVE` o en la

@@ -629,6 +629,7 @@ class OpcionCita {
     this.moneda = 'MXN',
     this.anticipoMinor,
     this.profesionales,
+    this.prepagados = 0,
   });
 
   final String id;
@@ -648,6 +649,7 @@ class OpcionCita {
     final anticipo = anticipoMinor;
     final precio = precioMinor;
     return conPlan ||
+            prepagados > 0 ||
             anticipo == null ||
             precio == null ||
             anticipo <= 0 ||
@@ -655,6 +657,14 @@ class OpcionCita {
         ? null
         : anticipo;
   }
+
+  /// Servicio: cuántas veces ya lo pagó por adelantado (un presupuesto, ADR 0218);
+  /// se agenda sin pagar de nuevo.
+  final int prepagados;
+
+  /// ¿Se le puede poner un cupón al agendar? (ADR 0220): solo en lo que se paga; no
+  /// con su bono, ni lo ya pagado por adelantado, ni un servicio sin precio.
+  bool get admiteCupon => !conPlan && prepagados == 0 && (precioMinor ?? 0) > 0;
 
   /// Sede: zona, dirección y cómo llegar (M06), para saber dónde será la cita.
   final String? region;
@@ -722,6 +732,7 @@ class OpcionCita {
     profesionales: j['profesionales'] is List
         ? (j['profesionales'] as List).whereType<String>().toList()
         : null,
+    prepagados: (j['prepagados'] as num?)?.toInt() ?? 0,
   );
 }
 

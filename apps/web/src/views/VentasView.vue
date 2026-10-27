@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
+import CorregirCobro from "@/components/CorregirCobro.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -16,7 +17,7 @@ import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { claveSegunModalidad } from "@/lib/menu";
-import { crearVenta } from "@/lib/venta";
+import { crearVenta, derechoVendido, type DerechoDeVenta } from "@/lib/venta";
 import {
   queIncluyePlan,
   reglasDePlan,
@@ -24,7 +25,6 @@ import {
 } from "@/lib/ventaDePlan";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { SECCIONES, fechaLarga, seccionDe, type Plan } from "@/lib/planes";
-import { useSucursales } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -44,6 +44,15 @@ interface Orden {
   metodo_pago?: string | null;
   pagada_en?: string | null;
   lineas?: { producto: string | null; cantidad: number }[];
+  // Su cobro en caja, para corregir la forma de pago o anularlo (ADR 0086/0087); la
+  // misma forma que el de una cita en la agenda.
+  pago?: {
+    id: string;
+    metodo: string | null;
+    en_caja?: boolean;
+    corregible: boolean;
+    anulable: boolean;
+  } | null;
 }
 // Lo de hoy en el negocio, calculado en el API sobre todas las órdenes.
 interface ResumenOrdenes {
@@ -177,12 +186,11 @@ function cuando(iso: string | null | undefined): string {
   ).format(d);
 }
 
+// Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
 // Con varias sucursales, el cobro entra en la caja de la elegida en la barra
 // (ADR 0175): con «Todas» no se sabe a cuál, así que se pide elegirla.
-const barraSucursales = useSucursales();
-const sinSucursalParaCobrar = computed(
-  () => barraSucursales.varias.value && barraSucursales.fija.value === null,
-);
+const cobro = crearVenta();
+const sinSucursalParaCobrar = cobro.sinSucursal;
 
 // `enSegundoPlano`: tras una venta se actualiza sin desmontar el formulario.
 async function cargar(enSegundoPlano = false): Promise<void> {
@@ -251,8 +259,62 @@ const total = computed(
     (cobraInscripcion.value ? inscripcion.value : 0),
 );
 
-// Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
-const cobro = crearVenta();
+// Los planes que ya tiene quien compra (al elegirlo): tras vender, el aviso dice lo
+// disponible del plan recién vendido (no el saldo total ni el primero de la lista).
+const derechosAntes = ref<DerechoDeVenta[] | null>(null);
+let pedidoDerechos = 0;
+async function derechosDe(id: string): Promise<DerechoDeVenta[] | null> {
+  try {
+    const { data } = await api.get<{ data: DerechoDeVenta[] }>(
+      `${base.value}/miembros/${id}/derechos`,
+    );
+    return Array.isArray(data.data) ? data.data : null;
+  } catch {
+    return null;
+  }
+}
+watch(
+  () => venta.value.compradorId,
+  async (id) => {
+    const mio = ++pedidoDerechos;
+    derechosAntes.value = null;
+    if (id === "") {
+      return;
+    }
+    const lista = await derechosDe(id);
+    if (mio === pedidoDerechos) {
+      derechosAntes.value = lista;
+    }
+  },
+);
+/**
+ * «Vendido. Con este plan, Ana tiene 2.5 créditos disponibles.» (1000 unidades = 1
+ * crédito, con decimales). Sin saber cuál se vendió, solo que la venta quedó.
+ */
+async function mensajeDeVenta(
+  personaId: string,
+  nombre: string,
+  antes: DerechoDeVenta[] | null,
+): Promise<string> {
+  const despues = antes !== null ? await derechosDe(personaId) : null;
+  const vendido =
+    antes !== null && despues !== null ? derechoVendido(antes, despues) : null;
+  if (vendido === null) {
+    return t("ventas.vender.exitoVenta", { persona: nombre });
+  }
+  if (vendido.ilimitado) {
+    return tm("ventas.vender.exitoMembresia", { persona: nombre });
+  }
+  const n = Math.max(0, vendido.disponible ?? 0) / 1000;
+  const saldo = n.toLocaleString("es-MX", { maximumFractionDigits: 3 });
+  // En citas: el bono y sus sesiones (ADR 0130).
+  return t(
+    sesion.esCitas ? "ventas.vender.exitoPackCitas" : "ventas.vender.exitoPack",
+    { persona: nombre, saldo },
+    n === 1 ? 1 : 2,
+  );
+}
+
 async function vender(): Promise<void> {
   const producto = productoSel.value;
   const persona = comprador.value;
@@ -279,6 +341,8 @@ async function vender(): Promise<void> {
   }
   vendiendo.value = true;
   error.value = null;
+  // Lo que tenía antes de esta venta: el aviso habla del plan que se vendió.
+  const antes = derechosAntes.value;
   try {
     await cobro.vender(
       base.value,
@@ -314,31 +378,29 @@ async function vender(): Promise<void> {
   venta.value.productoId = "";
   venta.value.codigoPromo = "";
   promoPreview.value = null;
-  let mensaje = t("ventas.vender.exitoVenta", { persona: nombre });
-  try {
-    // Lo que le quedó: su membresía o sus créditos.
-    const der = await api.get<{
-      data: Array<{ ilimitado: boolean; saldo: number | null }>;
-    }>(`${base.value}/miembros/${persona.id}/derechos`);
-    const ultimo = der.data.data[0];
-    if (ultimo) {
-      const saldo = Math.round((ultimo.saldo ?? 0) / 1000);
-      // En citas: el bono y sus sesiones (ADR 0130).
-      mensaje = ultimo.ilimitado
-        ? tm("ventas.vender.exitoMembresia", { persona: nombre })
-        : sesion.esCitas
-          ? t("ventas.vender.exitoPackCitas", { persona: nombre, saldo }, saldo)
-          : t("ventas.vender.exitoPack", { persona: nombre, saldo });
-    }
-  } catch {
-    // Sin el detalle del derecho basta con confirmar la venta.
-  }
-  toast.exito(mensaje);
+  toast.exito(await mensajeDeVenta(persona.id, nombre, antes));
   try {
     await cargar(true);
   } finally {
     vendiendo.value = false;
   }
+}
+
+// ---- Corregir un cobro en caja hecho con error (la forma de pago, o anularlo) ----
+const corrigiendo = ref<string | null>(null);
+function corregible(o: Orden): boolean {
+  const p = o.pago;
+  return (
+    !!p &&
+    p.en_caja !== false &&
+    ((p.corregible && sesion.puede("ordenes.gestionar")) ||
+      (p.anulable && sesion.puede("pagos.reembolsar")))
+  );
+}
+const conCorregir = computed(() => ordenes.value.some(corregible));
+async function alCorregir(): Promise<void> {
+  corrigiendo.value = null;
+  await cargar(true);
 }
 
 // ---- Indicadores (los de hoy en el negocio, de todas las órdenes) ----
@@ -712,60 +774,87 @@ onMounted(cargar);
                   {{ $t("ventas.vender.metodo") }}
                 </th>
                 <th>{{ $t("ventas.ordenes.colEstado") }}</th>
+                <th v-if="conCorregir" class="text-right"></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="o in ordenes" :key="o.id" data-prueba="orden-reciente">
-                <td
-                  :data-etiqueta="$t('ventas.ordenes.colComprador')"
-                  class="font-medium"
-                >
-                  {{ o.comprador ?? "—" }}
-                </td>
-                <td
-                  :data-etiqueta="$t('ventas.ordenes.colTotal')"
-                  class="text-right font-medium tabular-nums"
-                >
-                  {{ dinero(o.total_minor, o.moneda) }}
-                </td>
-                <td
-                  :data-etiqueta="$t('ventasVisual.col.cuando')"
-                  class="whitespace-nowrap vv-suave"
-                >
-                  {{ cuando(o.pagada_en) }}
-                </td>
-                <td
-                  :data-etiqueta="tm('ventasVisual.col.plan')"
-                  class="hidden md:table-cell"
-                >
-                  {{
-                    (o.lineas ?? [])
-                      .map((l) => l.producto ?? "")
-                      .filter(Boolean)
-                      .join(", ") || "—"
-                  }}
-                </td>
-                <td
-                  :data-etiqueta="$t('ventas.vender.metodo')"
-                  class="hidden sm:table-cell vv-suave"
-                >
-                  {{ nombreMetodo(o.metodo_pago) }}
-                </td>
-                <td :data-etiqueta="$t('ventas.ordenes.colEstado')">
-                  <span
-                    class="tu-estado"
-                    :style="{
-                      '--tono':
-                        o.estado === 'pagada' ? 'var(--exito)' : 'var(--aviso)',
-                    }"
-                    >{{
-                      o.estado === "pagada"
-                        ? $t("ventas.ordenes.pagada")
-                        : $t("ventas.ordenes.pendiente")
-                    }}</span
+              <template v-for="o in ordenes" :key="o.id">
+                <tr data-prueba="orden-reciente">
+                  <td
+                    :data-etiqueta="$t('ventas.ordenes.colComprador')"
+                    class="font-medium"
                   >
-                </td>
-              </tr>
+                    {{ o.comprador ?? "—" }}
+                  </td>
+                  <td
+                    :data-etiqueta="$t('ventas.ordenes.colTotal')"
+                    class="text-right font-medium tabular-nums"
+                  >
+                    {{ dinero(o.total_minor, o.moneda) }}
+                  </td>
+                  <td
+                    :data-etiqueta="$t('ventasVisual.col.cuando')"
+                    class="whitespace-nowrap vv-suave"
+                  >
+                    {{ cuando(o.pagada_en) }}
+                  </td>
+                  <td
+                    :data-etiqueta="tm('ventasVisual.col.plan')"
+                    class="hidden md:table-cell"
+                  >
+                    {{
+                      (o.lineas ?? [])
+                        .map((l) => l.producto ?? "")
+                        .filter(Boolean)
+                        .join(", ") || "—"
+                    }}
+                  </td>
+                  <td
+                    :data-etiqueta="$t('ventas.vender.metodo')"
+                    class="hidden sm:table-cell vv-suave"
+                  >
+                    {{ nombreMetodo(o.metodo_pago) }}
+                  </td>
+                  <td :data-etiqueta="$t('ventas.ordenes.colEstado')">
+                    <span
+                      class="tu-estado"
+                      :style="{
+                        '--tono':
+                          o.estado === 'pagada'
+                            ? 'var(--exito)'
+                            : 'var(--aviso)',
+                      }"
+                      >{{
+                        o.estado === "pagada"
+                          ? $t("ventas.ordenes.pagada")
+                          : $t("ventas.ordenes.pendiente")
+                      }}</span
+                    >
+                  </td>
+                  <td v-if="conCorregir" class="tu-celda-acciones">
+                    <button
+                      v-if="corregible(o)"
+                      type="button"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      :aria-expanded="corrigiendo === o.id"
+                      data-prueba="corregir-venta-plan"
+                      @click="corrigiendo = corrigiendo === o.id ? null : o.id"
+                    >
+                      {{ $t("corregirCobro.corregir") }}
+                    </button>
+                  </td>
+                </tr>
+                <!-- Cobro en caja con error: corregir la forma o anularlo -->
+                <tr v-if="corrigiendo === o.id && o.pago">
+                  <td colspan="7" class="tu-celda-detalle">
+                    <CorregirCobro
+                      :base="base"
+                      :pago="o.pago"
+                      @cambiado="alCorregir"
+                    />
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>

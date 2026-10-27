@@ -20,6 +20,7 @@ import {
   type Capacidades,
   type ModalidadServicio,
 } from "@/lib/modalidad";
+import { menuVisible } from "@/lib/menu";
 import { esInstructor, esMiembro, type RolDisponible } from "@/lib/roles";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
@@ -39,6 +40,9 @@ export interface UsuarioTenant {
   // Personal sin sucursal asignada en un negocio con varias: no ve nada hasta que
   // le asignen una (ADR 0098).
   sin_sucursal?: boolean;
+  // ¿Ve todo el negocio? Quien solo ve sus sucursales no entra a lo que es de todo el
+  // negocio (bitácora, conciliación de plataformas; ADR 0227).
+  todo_el_negocio?: boolean;
   nombre: string;
   email: string;
   // Rol ACTIVO: con el que entró (el menú, su inicio y los permisos son de este).
@@ -230,7 +234,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     () => estudio.value?.estado === "cancelled" && !!estudio.value?.baja,
   );
 
-  const rutaInicio = computed<string>(() => {
+  // Con su tipo anotado: el último recurso consulta el menú de esta misma sesión.
+  const rutaInicio = computed<string>((): string => {
     const u = usuario.value;
     if (u === null) {
       return "entrar";
@@ -258,8 +263,12 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     if (puede("agenda.ver")) {
       return "agenda";
     }
-    // Sin pantallas de trabajo con este rol: su perfil.
-    return "mi-perfil";
+    // Un rol propio sin facturación, reservas ni agenda (p. ej. solo alumnos o solo
+    // reportes): la primera área que su menú le muestra. Sin ninguna, su perfil.
+    return (
+      menuVisible(useSesionTenantStore())[0]?.areas[0]?.destino.ruta ??
+      "mi-perfil"
+    );
   });
 
   /** ¿Puede entrar con más de un rol? Entonces elige al entrar y cambia arriba. */

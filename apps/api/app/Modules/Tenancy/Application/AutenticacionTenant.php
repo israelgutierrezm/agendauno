@@ -106,17 +106,31 @@ class AutenticacionTenant
      * Un código de un solo uso para abrir la web con la sesión de la app (ADR 0211):
      * lo que se hace en la web (pago automático con OpenPay, conectar un calendario)
      * sin volver a escribir la contraseña. Vale pocos minutos y solo se guarda su hash.
+     * Queda ligado a la sesión que lo pidió (ADR 0227): si se cierra o se revoca, ya no
+     * sirve.
      */
-    public function crearEnlaceWeb(string $estudio, Usuario $usuario, string $destino): string
+    public function crearEnlaceWeb(string $estudio, Usuario $usuario, string $destino, ?int $tokenId = null): string
     {
         $codigo = Str::random(48);
         Cache::put(self::claveEnlace($estudio, $codigo), [
             'usuario' => $usuario->getKey(),
             'rol' => $usuario->rolActivo(),
             'destino' => $destino,
+            'token' => $tokenId,
         ], now()->addMinutes(self::MINUTOS_ENLACE_WEB));
 
         return $codigo;
+    }
+
+    /** El id de la sesión del bearer (`{id}|{secreto}`), o null. */
+    public static function idDeToken(?string $bearer): ?int
+    {
+        if (! is_string($bearer) || ! str_contains($bearer, '|')) {
+            return null;
+        }
+        $id = explode('|', $bearer, 2)[0];
+
+        return ctype_digit($id) ? (int) $id : null;
     }
 
     /**
@@ -126,12 +140,20 @@ class AutenticacionTenant
      */
     public function canjearEnlaceWeb(string $estudio, #[\SensitiveParameter] string $codigo): ?array
     {
-        $datos = Cache::pull(self::claveEnlace($estudio, $codigo));
-        if (! is_array($datos)) {
+        // Una sola vez aunque lleguen dos a la vez (ADR 0227): solo quien logra borrarlo lo
+        // canjea (borrar es atómico en el almacén; leer y borrar por separado, no).
+        $clave = self::claveEnlace($estudio, $codigo);
+        $datos = Cache::get($clave);
+        if (! is_array($datos) || ! Cache::forget($clave)) {
             return null;
         }
         $usuario = Usuario::query()->find($datos['usuario'] ?? null);
         if (! $usuario instanceof Usuario || ! $usuario->activo) {
+            return null;
+        }
+        // La sesión de la app que lo pidió debe seguir abierta.
+        if (isset($datos['token']) && ! TokenAccesoTenant::query()->whereKey((int) $datos['token'])
+            ->where('tokenable_type', Usuario::class)->where('tokenable_id', $usuario->getKey())->exists()) {
             return null;
         }
 

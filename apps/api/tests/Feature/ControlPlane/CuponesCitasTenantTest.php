@@ -93,3 +93,16 @@ it('el negocio aplica el cupón al cobrar la cita y en el mostrador; el uso se c
         ->and(enNegocioCupon($e['slug'], fn () => PromocionTenant::query()->value('usos')))->toBe(2)
         ->and($venta->json('data.id'))->not->toBeNull();
 });
+
+it('desde su cuenta el cliente revisa el cupón aunque el negocio no tenga página pública', function (): void {
+    ['e' => $e, 'sede' => $sede] = barberiaConCupon();
+    $cliente = alumnoConSesion($e, 'Lu', 'lu@cupon.mx');
+    Estudio::query()->where('slug', $e['slug'])->update(['publicado' => false]);
+    $consulta = http_build_query(['codigo' => 'corte20', 'oferta_id' => $sede['oferta']]);
+
+    // La página pública está cerrada: sin cuenta no se consulta.
+    $this->getJson("/api/v1/app/{$e['slug']}/citas/cupon?{$consulta}")->assertNotFound();
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/citas/cupon?{$consulta}", conBearer($cliente['bearer']))
+        ->assertOk()->assertJsonPath('data.descuento_minor', 6000);
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/citas/cupon?{$consulta}")->assertUnauthorized();
+});

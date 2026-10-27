@@ -24,6 +24,14 @@ export default {
   pausarCitas:
     "¿Pausar el bono hasta el {fecha}? Mientras tanto no puede usarlo.",
   pausarAceptar: "Pausar",
+  // Quitar créditos a mano (ajuste del ledger con motivo).
+  quitarCreditos:
+    "¿Quitar 1 crédito de «{plan}»? Le quedarán {quedan} disponibles. Queda en sus movimientos con el motivo y no se devuelve dinero. | ¿Quitar {n} créditos de «{plan}»? Le quedarán {quedan} disponibles. Queda en sus movimientos con el motivo y no se devuelve dinero.",
+  quitarCreditosCitas:
+    "¿Quitar 1 sesión de «{plan}»? Le quedarán {quedan} disponibles. Queda en sus movimientos con el motivo y no se devuelve dinero. | ¿Quitar {n} sesiones de «{plan}»? Le quedarán {quedan} disponibles. Queda en sus movimientos con el motivo y no se devuelve dinero.",
+  // Plan de cortesía (ADR 0181): sin cobro y con su motivo.
+  cortesia:
+    "¿Dar «{plan}» de cortesía a {persona}? Se activa hoy, sin cobro ni venta, y el motivo queda en la bitácora.",
   canjear: "¿Canjear la recompensa? Se le descuentan los puntos.",
   canjearAceptar: "Canjear",
   entregarCanje: "¿Marcar el canje como entregado?",
