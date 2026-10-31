@@ -99,14 +99,17 @@ const conVersionOscura = computed(
 .agendauno-logo__imagen--oscura {
   display: none;
 }
-/* `.dark` vive en <html>; el alcance solo marca el último selector. */
-.dark .agendauno-logo--adaptable {
+/* `.dark` vive en <html> y `.tu-public-footer` tiene fondo oscuro fijo. */
+.dark .agendauno-logo--adaptable,
+.tu-public-footer .agendauno-logo--adaptable {
   background: transparent;
 }
-.dark .agendauno-logo__imagen--clara {
+.dark .agendauno-logo__imagen--clara,
+.tu-public-footer .agendauno-logo__imagen--clara {
   display: none;
 }
-.dark .agendauno-logo__imagen--oscura {
+.dark .agendauno-logo__imagen--oscura,
+.tu-public-footer .agendauno-logo__imagen--oscura {
   display: block;
 }
 </style>

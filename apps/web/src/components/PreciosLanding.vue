@@ -438,140 +438,147 @@ function elegirModo(valor: Modo) {
       </template>
     </p>
 
-    <!-- Cómo se cobra, con ejemplos de los precios publicados. -->
-    <section class="precios-ejemplos" aria-labelledby="precios-ejemplos-titulo">
-      <h3 id="precios-ejemplos-titulo">Así se cobra</h3>
-      <dl>
-        <div>
-          <dt>Qué se cobra</dt>
-          <dd v-if="modo === 'clases' && ejemploClases">
-            Los alumnos activos de cada mes, al cerrarlo. Por ejemplo, con
-            {{ ejemploClases.capacidad }} en octubre, octubre cuesta
-            {{ dolares(ejemploClases.importe) }} {{ monedaClases }}.
-          </dd>
-          <dd v-else-if="modo === 'citas' && ejemploCitas">
-            El plan y los profesionales que contratas, por adelantado. Por
-            ejemplo, Premium con {{ ejemploCitas.profesionales }} profesionales:
-            {{ dolares(ejemploCitas.mensual) }} {{ monedaCitas }} al mes o
-            {{ dolares(ejemploCitas.anual) }} {{ monedaCitas }} al año.
-          </dd>
+    <!-- Cómo se cobra y tabla completa, en dos desplegables limpios lado a lado. -->
+    <div class="precios-acordeones">
+      <details class="precios-detalle precios-ejemplos">
+        <summary id="precios-ejemplos-titulo">
+          Así se cobra: moneda, impuestos, pasarelas y facturación
+        </summary>
+        <div class="precios-reglas">
+          <dl>
+            <div>
+              <dt>Qué se cobra</dt>
+              <dd v-if="modo === 'clases' && ejemploClases">
+                Los alumnos activos de cada mes, al cerrarlo. Por ejemplo, con
+                {{ ejemploClases.capacidad }} en octubre, octubre cuesta
+                {{ dolares(ejemploClases.importe) }} {{ monedaClases }}.
+              </dd>
+              <dd v-else-if="modo === 'citas' && ejemploCitas">
+                El plan y los profesionales que contratas, por adelantado. Por
+                ejemplo, Premium con
+                {{ ejemploCitas.profesionales }} profesionales:
+                {{ dolares(ejemploCitas.mensual) }} {{ monedaCitas }} al mes o
+                {{ dolares(ejemploCitas.anual) }} {{ monedaCitas }} al año.
+              </dd>
+            </div>
+            <div>
+              <dt>Moneda e impuestos</dt>
+              <dd>
+                En {{ moneda
+                }}<template v-if="moneda !== 'MXN'"
+                  >; en México, en pesos al tipo de cambio FIX del Banco de
+                  México vigente el día en que se emite el cargo</template
+                >, más IVA del {{ iva }} %. Fuera de México, sin IVA. Puedes
+                pedir la factura de cada cargo.
+              </dd>
+            </div>
+            <div>
+              <dt>Cobros en línea a tus clientes*</dt>
+              <dd>
+                Llegan a tu propia cuenta de Stripe, Mercado Pago u OpenPay: el
+                procesador descuenta su comisión antes de depositarte, según lo
+                que tengas contratado con él. {{ marca }} no cobra comisión
+                sobre tus ventas.
+              </dd>
+            </div>
+            <div v-if="timbre.precio_minor > 0">
+              <dt>Facturar a tus clientes*</dt>
+              <dd>
+                Cada factura usa un timbre:
+                {{ pesos(timbre.precio_minor) }} MXN por timbre, en paquetes
+                desde {{ timbre.paquetes[0] }}. Solo si facturas.
+              </dd>
+            </div>
+          </dl>
+          <p
+            v-if="vigenteDesde"
+            class="precios-vigencia"
+            data-prueba="precios-vigencia"
+          >
+            Tarifa vigente desde el {{ vigenteDesde }}: la misma que verás al
+            contratar.
+          </p>
         </div>
-        <div>
-          <dt>Moneda e impuestos</dt>
-          <dd>
-            En {{ moneda
-            }}<template v-if="moneda !== 'MXN'"
-              >; en México, en pesos al tipo de cambio FIX del Banco de México
-              vigente el día en que se emite el cargo</template
-            >, más IVA del {{ iva }} %. Fuera de México, sin IVA. Puedes pedir
-            la factura de cada cargo.
-          </dd>
-        </div>
-        <div>
-          <dt>Cobros en línea a tus clientes*</dt>
-          <dd>
-            Llegan a tu propia cuenta de Stripe, Mercado Pago u OpenPay: el
-            procesador descuenta su comisión antes de depositarte, según lo que
-            tengas contratado con él. {{ marca }} no cobra comisión sobre tus
-            ventas.
-          </dd>
-        </div>
-        <div v-if="timbre.precio_minor > 0">
-          <dt>Facturar a tus clientes*</dt>
-          <dd>
-            Cada factura usa un timbre: {{ pesos(timbre.precio_minor) }} MXN por
-            timbre, en paquetes desde {{ timbre.paquetes[0] }}. Solo si
-            facturas.
-          </dd>
-        </div>
-      </dl>
-      <p
-        v-if="vigenteDesde"
-        class="precios-vigencia"
-        data-prueba="precios-vigencia"
-      >
-        Tarifa vigente desde el {{ vigenteDesde }}: la misma que verás al
-        contratar.
-      </p>
-    </section>
+      </details>
 
-    <details :key="modo" class="precios-detalle">
-      <summary>
-        {{
-          modo === "clases"
-            ? "Ver todos los rangos y qué cuenta como alumno activo"
-            : "Ver el precio según tu número de profesionales"
-        }}
-      </summary>
-      <div v-if="modo === 'clases'" class="precios-reglas">
-        <table>
-          <caption>
-            Tarifa mensual para estudios y academias ·
-            {{
-              monedaClases
-            }}
-            más impuestos
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Alumnos activos</th>
-              <th scope="col">Precio mensual</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="banda in rangos" :key="banda.capacidad">
-              <th scope="row">{{ banda.capacidad }}</th>
-              <td>{{ dolares(banda.subtotal) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p>
-          Cuenta una persona con una reserva confirmada en una sesión no
-          cancelada o una compra pagada durante el mes. No cuenta solo por estar
-          registrada. Se excluyen personas archivadas, no facturables y personal
-          del negocio.
-        </p>
-        <p>
-          Se aplica una sola banda a todo el mes, no un precio por cada alumno.
-          Sin alumnos activos, la suscripción de ese mes es de
-          {{ dolares(0) }} {{ monedaClases }}. Se cobra al cerrar el mes.
-        </p>
-      </div>
-      <div v-else class="precios-reglas">
-        <table>
-          <caption>
-            Precio mensual por profesionales contratados ·
-            {{
-              monedaCitas
-            }}
-            más impuestos
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Profesionales</th>
-              <th scope="col">Premium</th>
-              <th scope="col">Pro</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">1 (Individual)</th>
-              <td colspan="2">{{ dolares(desde.individual) }}</td>
-            </tr>
-            <tr v-for="fila in tabla" :key="fila.profesionales">
-              <th scope="row">{{ fila.profesionales }}</th>
-              <td>{{ dolares(fila.premium) }}</td>
-              <td>{{ dolares(fila.pro) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p>
-          Pagas por los profesionales que contratas, por adelantado. Puedes
-          cambiar de plan cuando quieras: subir se cobra al momento por los días
-          que faltan y bajar aplica desde el siguiente periodo.
-        </p>
-      </div>
-    </details>
+      <details :key="modo" class="precios-detalle">
+        <summary>
+          {{
+            modo === "clases"
+              ? "Ver todos los rangos y qué cuenta como alumno activo"
+              : "Ver el precio según tu número de profesionales"
+          }}
+        </summary>
+        <div v-if="modo === 'clases'" class="precios-reglas">
+          <table>
+            <caption>
+              Tarifa mensual para estudios y academias ·
+              {{
+                monedaClases
+              }}
+              más impuestos
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Alumnos activos</th>
+                <th scope="col">Precio mensual</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="banda in rangos" :key="banda.capacidad">
+                <th scope="row">{{ banda.capacidad }}</th>
+                <td>{{ dolares(banda.subtotal) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Cuenta una persona con una reserva confirmada en una sesión no
+            cancelada o una compra pagada durante el mes. No cuenta solo por
+            estar registrada. Se excluyen personas archivadas, no facturables y
+            personal del negocio.
+          </p>
+          <p>
+            Se aplica una sola banda a todo el mes, no un precio por cada
+            alumno. Sin alumnos activos, la suscripción de ese mes es de
+            {{ dolares(0) }} {{ monedaClases }}. Se cobra al cerrar el mes.
+          </p>
+        </div>
+        <div v-else class="precios-reglas">
+          <table>
+            <caption>
+              Precio mensual por profesionales contratados ·
+              {{
+                monedaCitas
+              }}
+              más impuestos
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Profesionales</th>
+                <th scope="col">Premium</th>
+                <th scope="col">Pro</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">1 (Individual)</th>
+                <td colspan="2">{{ dolares(desde.individual) }}</td>
+              </tr>
+              <tr v-for="fila in tabla" :key="fila.profesionales">
+                <th scope="row">{{ fila.profesionales }}</th>
+                <td>{{ dolares(fila.premium) }}</td>
+                <td>{{ dolares(fila.pro) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Pagas por los profesionales que contratas, por adelantado. Puedes
+            cambiar de plan cuando quieras: subir se cobra al momento por los
+            días que faltan y bajar aplica desde el siguiente periodo.
+          </p>
+        </div>
+      </details>
+    </div>
     <aside
       class="precios-contacto"
       :aria-label="
@@ -629,17 +636,23 @@ function elegirModo(valor: Modo) {
 .precios {
   margin-top: 2.25rem;
 }
-.precios-ejemplos {
-  margin-top: 1.5rem;
+.precios-acordeones {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.35rem;
+  align-items: start;
 }
-.precios-ejemplos h3 {
-  font-weight: 600;
-  font-size: 1.05rem;
+@media (min-width: 768px) {
+  .precios-acordeones {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.precios-acordeones > .precios-detalle {
+  margin-top: 0;
 }
 .precios-ejemplos dl {
   display: grid;
   gap: 0.9rem;
-  margin-top: 0.75rem;
 }
 @media (min-width: 768px) {
   .precios-ejemplos dl {

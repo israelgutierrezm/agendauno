@@ -30,9 +30,9 @@ function contraste(a: string, b: string): number {
 describe("legibilidad de la paleta comercial", () => {
   const claro = tokens(".tu-marketing");
   const oscuro = { ...claro, ...tokens(".dark .tu-marketing") };
-  it("usa texto blanco en los botones rosas y el turquesa institucional en los negocios animados", () => {
+  it("usa texto blanco en los botones principales (#0d3b6e) y el azul claro (#3a8fd4) en los negocios animados", () => {
     expect(claro["--marketing-cta-contraste"]).toBe("#ffffff");
-    expect(claro["--marketing-negocios"]).toBe("#1098ad");
+    expect(claro["--marketing-negocios"]).toBe("#3a8fd4");
     for (const paleta of [claro, oscuro]) {
       for (const fondo of ["--fondo", "--superficie"]) {
         // El texto animado es grande (20 px) y negrita.
@@ -68,15 +68,15 @@ describe("legibilidad de la paleta comercial", () => {
         ).toBeGreaterThanOrEqual(4.5);
       }
     }
-    // El verde Bootstrap se reserva a los dos titulares grandes, no a texto pequeño.
+    // El azul claro (#3a8fd4) se reserva a titulares grandes, no a texto pequeño.
     for (const fondo of ["--fondo", "--superficie"]) {
       expect(
         contraste(paleta["--marketing-enfasis"]!, paleta[fondo]!),
       ).toBeGreaterThanOrEqual(3);
     }
   });
-  it("usa el verde Bootstrap en énfasis grandes y un éxito legible para texto pequeño", () => {
-    expect(claro["--marketing-enfasis"]).toBe("#198754");
+  it("usa el azul claro (#3a8fd4) en énfasis grandes y un éxito legible para texto pequeño", () => {
+    expect(claro["--marketing-enfasis"]).toBe("#3a8fd4");
     expect(claro["--exito"]).toBe("#198754");
     expect(oscuro["--exito"]).toBe("#198754");
     expect(contraste(claro["--exito"]!, "#ffffff")).toBeGreaterThanOrEqual(4.5);
@@ -125,7 +125,7 @@ describe("legibilidad de la paleta comercial", () => {
       contraste("#ffffff", claro["--marketing-operacion"]!),
     ).toBeGreaterThanOrEqual(4.5);
   });
-  it("TurnoUno sustituye los acentos rosas por turquesa sin cambiar AgendaUno ni los estados", () => {
+  it("TurnoUno unifica los acentos en la gama azul (#0d3b6e y #3a8fd4) sin cambiar los estados", () => {
     const selector = '.tu-marketing[data-producto="turnouno"]';
     const turnoClaro = { ...claro, ...tokens(selector) };
     const turnoOscuro = {
@@ -133,11 +133,11 @@ describe("legibilidad de la paleta comercial", () => {
       ...tokens(selector),
       ...tokens(`.dark ${selector}`),
     };
-    expect(claro["--marketing-cta"]).toBe("#c43b80");
+    expect(claro["--marketing-cta"]).toBe("#0d3b6e");
     expect(claro["--marketing-rosa"]).toBe("#e7549b");
-    expect(turnoClaro["--marketing-rosa"]).toBe("#1098ad");
-    expect(turnoClaro["--marketing-cta"]).toBe("#007e91");
-    expect(turnoOscuro["--marketing-rosa"]).toBe("#74d4df");
+    expect(turnoClaro["--marketing-rosa"]).toBe("#3a8fd4");
+    expect(turnoClaro["--marketing-cta"]).toBe("#0d3b6e");
+    expect(turnoOscuro["--marketing-rosa"]).toBe("#68b5f5");
     for (const paleta of [turnoClaro, turnoOscuro]) {
       expect(paleta["--exito"]).toBe("#198754");
       for (const fondo of ["--marketing-cta", "--marketing-cta-hover"]) {

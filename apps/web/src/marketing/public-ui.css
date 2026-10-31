@@ -1,7 +1,7 @@
 /* Reglas compartidas SOLO por las pantallas públicas, no por el panel operativo. */
 .tu-public-shell {
   --public-title: clamp(1.75rem, 3vw, 2.25rem);
-  --public-shadow: 0 12px 36px -24px rgb(3 27 78 / 24%);
+  --public-shadow: 0 14px 38px -22px rgb(13 59 110 / 24%);
 }
 .tu-public-shell .tu-public-back {
   display: inline-flex;

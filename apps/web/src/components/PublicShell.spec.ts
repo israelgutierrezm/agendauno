@@ -279,12 +279,13 @@ describe("encabezado público", () => {
   it("muestra el nuevo logo dentro de una barra compacta", async () => {
     const vista = await montar();
     expect(vista.findComponent(LogoAgendaUno).props()).toMatchObject({
-      ancho: 192,
+      ancho: 156,
       variante: "horizontal",
     });
-    expect(vista.get(".tu-public-container").classes()).toContain("min-h-18");
-    expect(vista.get(".tu-public-container").classes()).toContain("py-2");
+    expect(vista.get(".tu-public-container").classes()).toContain("min-h-13");
+    expect(vista.get(".tu-public-container").classes()).toContain("py-1");
     expect(vista.classes()).toContain("tu-marketing");
+    expect(vista.find('[data-prueba="subir-inicio"]').exists()).toBe(true);
     vista.unmount();
   });
   it("conserva el control de tema independiente y accesible", async () => {

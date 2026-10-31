@@ -26,7 +26,7 @@ import CarruselNegocios from "@/components/CarruselNegocios.vue";
 import FuncionesLanding from "@/components/FuncionesLanding.vue";
 import PreciosLanding from "@/components/PreciosLanding.vue";
 import ProductoDemo from "@/components/ProductoDemo.vue";
-import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
+import ModulosLanding from "@/components/ModulosLanding.vue";
 import ModalidadView from "./ModalidadView.vue";
 
 /*
@@ -64,6 +64,11 @@ function router() {
         solucion: vacia,
       }),
       { path: "/registro", name: "registro", component: vacia },
+      {
+        path: "/preguntas-frecuentes",
+        name: "preguntas-frecuentes",
+        component: vacia,
+      },
     ],
   });
 }
@@ -301,7 +306,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
   });
 
   it.each(MODOS_PRUEBA)(
-    "%s: «Lo nuevo» va después de los sellos y antes de la agenda, en la banda gris del hero",
+    "%s: el producto aparece antes de las funciones avanzadas, que se consultan a demanda",
     (modo) => {
       const vista = montar(modo);
       const novedades = vista.get("#novedades");
@@ -311,10 +316,14 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       const raiz = vista.get(".tu-landing").element;
       const hijos = Array.from(raiz.children);
       expect(
-        [".tu-hero", ".tu-confianza", "#novedades", "#producto"].map(
-          (selector) => hijos.indexOf(raiz.querySelector(selector)!),
+        [".tu-hero", ".tu-confianza", "#producto"].map((selector) =>
+          hijos.indexOf(raiz.querySelector(selector)!),
         ),
-      ).toEqual([0, 1, 2, 3]);
+      ).toEqual([0, 1, 2]);
+      expect(vista.get("#soluciones details #novedades").exists()).toBe(true);
+      expect(
+        vista.get("#soluciones details").attributes("open"),
+      ).toBeUndefined();
       // Sus seis novedades, en el orden declarado.
       expect(
         novedades
@@ -465,7 +474,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
         ProductoDemo,
         PreciosLanding,
         FuncionesLanding,
-        SolucionesEnlaces,
+        ModulosLanding,
       ]) {
         expect(vista.findComponent(componente).props("modo")).toBe(modo);
       }

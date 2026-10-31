@@ -139,6 +139,19 @@ function organizacionYSoftware(
       url: SITE_URL,
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
+      inLanguage: "es-MX",
+      featureList:
+        MODO_COMERCIAL === "clases"
+          ? [
+              "Horario semanal de clases con cupo y lista de espera",
+              "Membresías, paquetes de créditos y cobros recurrentes",
+              "Asistencia con pase QR, punto de venta, inventario y corte de caja",
+            ]
+          : [
+              "Agenda por profesional y página pública para agendar citas en línea",
+              "Cobro o anticipo al agendar y recordatorios automáticos por correo",
+              "Punto de venta, inventario, corte de caja y comisiones del equipo",
+            ],
       description: conCierre(
         MODALIDADES[MODO_COMERCIAL].seo.description,
         registroAbierto,
@@ -307,10 +320,13 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
     "/activar": "Activa tu cuenta | AgendaUno",
     // Adonde llevan los botones de demo de la landing (ADR 0204).
     "/demo": "Agenda una demo | AgendaUno",
+    "/preguntas-frecuentes": "Preguntas frecuentes | AgendaUno",
   };
   const descripciones: Record<string, string> = {
     "/demo":
       "Agenda una llamada gratis para ver AgendaUno con los casos de tu negocio.",
+    "/preguntas-frecuentes":
+      "Resuelve tus dudas sobre reservas, pagos, facturación, migración y planes en AgendaUno.",
   };
   return {
     title: titulos[ruta] ?? "AgendaUno",

@@ -277,10 +277,25 @@ function medir(placement: string): void {
   padding-block: 4rem 5rem;
 }
 .solucion-etiqueta {
-  color: var(--enlace);
-  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 26%, var(--borde));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acento) 9%, var(--superficie));
+  color: var(--primario);
+  font-size: 0.78rem;
   font-weight: 600;
+  letter-spacing: 0.04em;
   margin: 1.5rem 0 1rem;
+}
+.solucion-etiqueta::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: var(--acento);
 }
 h1 {
   font-size: clamp(1.85rem, 3.5vw, 3.2rem);
@@ -352,8 +367,8 @@ h3 {
   padding: 1.25rem;
   border-radius: 1.2rem;
   background: var(--superficie);
-  border: 1px solid var(--borde);
-  box-shadow: 0 14px 35px #031b4e18;
+  border: 1px solid color-mix(in srgb, var(--acento) 26%, var(--borde));
+  box-shadow: 0 14px 35px rgb(13 59 110 / 16%);
 }
 .solucion-reserva div {
   display: grid;

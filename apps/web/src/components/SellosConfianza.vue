@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { productoDeModalidad } from "@/lib/producto";
@@ -19,7 +19,6 @@ import { useRegistroDelProducto } from "@/marketing/registroProducto";
 const props = defineProps<{ modo?: Modo | null }>();
 const { t } = useI18n();
 const precios = usePreciosPublicos();
-// El producto de su modalidad o, sin ella, el de la página.
 const { abierto: registroAbierto } = useRegistroDelProducto(
   props.modo ? productoDeModalidad(props.modo) : undefined,
 );
@@ -39,6 +38,7 @@ const sellos = computed<Sello[]>(() =>
     ? ["prueba", "configuracion", "cobro", "cancelacion"]
     : ["proximamente", "configuracion", "cobro"],
 );
+const activo = ref(0);
 
 function texto(sello: Sello): string {
   if (sello === "proximamente") {
@@ -66,12 +66,15 @@ function texto(sello: Sello): string {
         :style="{ '--sellos': sellos.length }"
       >
         <li
-          v-for="sello in sellos"
+          v-for="(sello, i) in sellos"
           :key="sello"
           class="tu-confianza-item"
+          :class="{ 'tu-confianza-item--activo': activo === i }"
           :data-sello="sello"
+          @mouseenter="activo = i"
+          @click="activo = i"
         >
-          <span class="tu-confianza-punto" aria-hidden="true"></span>
+          <span class="tu-confianza-punto" aria-hidden="true" />
           <span>{{ texto(sello) }}</span>
         </li>
       </ul>
@@ -81,35 +84,81 @@ function texto(sello: Sello): string {
 
 <style scoped>
 .tu-confianza {
-  background: var(--fondo);
-  padding: 0 0 2.5rem;
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  margin-top: -0.95rem;
+  padding: 0 0 1.7rem;
 }
 .tu-confianza-grid {
+  position: relative;
+  overflow: hidden;
   display: grid;
-  gap: 0.75rem;
-  padding: 1.1rem 1.25rem;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 28%, var(--borde));
   border-radius: var(--radio-tarjeta, 18px);
-  background: var(--superficie);
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 36px -22px rgb(13 59 110 / 28%);
 }
 .tu-confianza-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
-  color: var(--texto-suave);
-  font-size: 0.82rem;
+  gap: 0.5rem;
+  padding: 0.32rem 0.65rem;
+  border-radius: 10px;
+  color: var(--texto);
+  font-size: 0.78rem;
   font-weight: 500;
   text-align: center;
+  cursor: pointer;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
-/* Estado como punto + texto, sin íconos. */
+.tu-confianza-item:hover,
+.tu-confianza-item--activo {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #3a8fd4 13%, var(--superficie)) 0%,
+    color-mix(in srgb, #0d3b6e 8%, var(--superficie)) 100%
+  );
+  color: var(--primario);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #3a8fd4 32%, transparent);
+}
 .tu-confianza-punto {
-  width: 0.45rem;
-  height: 0.45rem;
+  width: 0.5rem;
+  height: 0.5rem;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--exito);
+  background: var(--acento);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--acento) 22%, transparent);
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+.tu-confianza-item:hover .tu-confianza-punto,
+.tu-confianza-item--activo .tu-confianza-punto {
+  background: var(--primario);
+  transform: scale(1.15);
 }
 @media (min-width: 1024px) {
+  .tu-confianza {
+    display: flex;
+    align-items: center;
+    height: 3.25rem;
+    min-height: 0;
+    padding: 0 0 0.45rem;
+    box-sizing: border-box;
+  }
+  .tu-confianza > div {
+    width: 100%;
+  }
   .tu-confianza-grid {
     grid-template-columns: repeat(var(--sellos, 4), minmax(0, 1fr));
   }

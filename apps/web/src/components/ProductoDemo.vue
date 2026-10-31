@@ -24,8 +24,38 @@ const modo = computed<Modo>(() => props.modo ?? modelo.value);
 const semana = computed(() => fijo.value && modo.value === "clases");
 
 const seleccion = ref(0);
+const tabVisual = ref<"agenda" | "flujo" | "caja" | "pulso">("agenda");
 watch(modo, () => {
   seleccion.value = 0;
+  tabVisual.value = "agenda";
+});
+
+const tabsVisuales = computed(() =>
+  modo.value === "clases"
+    ? ([
+        { id: "agenda", titulo: "Agenda en vivo", metrica: "5 horarios hoy" },
+        { id: "flujo", titulo: "Pase QR de entrada", metrica: "92% a tiempo" },
+        { id: "caja", titulo: "Cobros y caja", metrica: "$3,600 MXN" },
+        { id: "pulso", titulo: "Pulso del estudio", metrica: "+18% retención" },
+      ] as const)
+    : ([
+        { id: "agenda", titulo: "Agenda en vivo", metrica: "9 espacios hoy" },
+        {
+          id: "flujo",
+          titulo: "Confirmación y llegada",
+          metrica: "89% atendidas",
+        },
+        { id: "caja", titulo: "Anticipos y caja", metrica: "$3,150 MXN" },
+        { id: "pulso", titulo: "Pulso del negocio", metrica: "+22% regresos" },
+      ] as const),
+);
+
+const porcentajeEvento = computed(() => {
+  const porcentajesClases = [75, 100, 50, 70, 83];
+  const porcentajesCitas = [78, 92, 65, 85];
+  return modo.value === "clases"
+    ? (porcentajesClases[seleccion.value] ?? 75)
+    : (porcentajesCitas[seleccion.value] ?? 80);
 });
 
 interface EventoDemo {
@@ -282,6 +312,215 @@ function cambiar(valor: Modo): void {
           Citas por profesional
         </button>
       </div>
+      <div
+        v-else
+        class="demo-glide-tabs"
+        role="group"
+        aria-label="Vistas interactivas del sistema"
+      >
+        <button
+          v-for="tab in tabsVisuales"
+          :key="tab.id"
+          type="button"
+          class="demo-glide-tab"
+          :class="{ 'demo-glide-tab--activo': tabVisual === tab.id }"
+          :aria-pressed="tabVisual === tab.id"
+          @click="tabVisual = tab.id"
+        >
+          <span class="demo-glide-punto" aria-hidden="true" />
+          <span class="demo-glide-tab-titulo">{{ tab.titulo }}</span>
+          <strong class="demo-glide-tab-metrica">{{ tab.metrica }}</strong>
+        </button>
+      </div>
+    </div>
+
+    <!-- Franja visual interactiva estilo GlideApps / AccessGrid con gráficas SVG en vivo -->
+    <div v-if="fijo" class="demo-glide-lienzo" aria-hidden="true">
+      <!-- Vista 1: Gráfica de barras interactivas sincronizada con los bloques -->
+      <div v-if="tabVisual === 'agenda'" class="demo-glide-panel">
+        <div class="demo-glide-kpis">
+          <div
+            v-for="(ev, idx) in eventos"
+            :key="ev.titulo + idx"
+            class="demo-glide-barra-card"
+            :class="{ 'es-activa': seleccion === idx }"
+            @click="seleccion = idx"
+          >
+            <div class="demo-glide-barra-top">
+              <span>{{ ev.hora }}</span>
+              <strong>{{
+                idx === 1
+                  ? "100%"
+                  : idx === 0
+                    ? "75%"
+                    : idx === 2
+                      ? "60%"
+                      : "82%"
+              }}</strong>
+            </div>
+            <div class="demo-glide-barra-pista">
+              <span
+                class="demo-glide-barra-relleno"
+                :style="{
+                  width:
+                    idx === 1
+                      ? '100%'
+                      : idx === 0
+                        ? '75%'
+                        : idx === 2
+                          ? '60%'
+                          : '82%',
+                }"
+              />
+            </div>
+            <small>{{ ev.titulo }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista 2: Pasos de confirmación y recepción responsivos -->
+      <div v-else-if="tabVisual === 'flujo'" class="demo-glide-panel">
+        <div class="demo-glide-kpis">
+          <div
+            v-for="pasoFlujo in [
+              {
+                etapa: 'Paso 1',
+                valor: '100%',
+                ancho: '100%',
+                titulo: 'Reserva en línea',
+              },
+              {
+                etapa: 'Paso 2',
+                valor: 'Automático',
+                ancho: '100%',
+                titulo: 'Aviso enviado',
+              },
+              {
+                etapa: 'Paso 3',
+                valor: '92%',
+                ancho: '92%',
+                titulo: 'Pase en recepción',
+              },
+              {
+                etapa: 'Paso 4',
+                valor: 'Al día',
+                ancho: '100%',
+                titulo: 'Historial actualizado',
+              },
+            ]"
+            :key="pasoFlujo.titulo"
+            class="demo-glide-barra-card"
+          >
+            <div class="demo-glide-barra-top">
+              <span>{{ pasoFlujo.etapa }}</span>
+              <strong>{{ pasoFlujo.valor }}</strong>
+            </div>
+            <div class="demo-glide-barra-pista">
+              <span
+                class="demo-glide-barra-relleno"
+                :style="{ width: pasoFlujo.ancho }"
+              />
+            </div>
+            <small>{{ pasoFlujo.titulo }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista 3: Desglose responsivo de cobros y corte de caja -->
+      <div v-else-if="tabVisual === 'caja'" class="demo-glide-panel">
+        <div class="demo-glide-kpis">
+          <div
+            v-for="kpiCaja in [
+              {
+                medio: 'Tarjeta',
+                monto: '$2,100',
+                ancho: '68%',
+                detalle: 'Liquidado en línea',
+              },
+              {
+                medio: 'Efectivo',
+                monto: '$1,500',
+                ancho: '48%',
+                detalle: 'Registrado en caja',
+              },
+              {
+                medio: 'Saldos',
+                monto: '$0 MXN',
+                ancho: '100%',
+                detalle: 'Sin adeudos hoy',
+              },
+              {
+                medio: 'Arqueo',
+                monto: 'Cuadrado',
+                ancho: '100%',
+                detalle: 'Corte verificado',
+              },
+            ]"
+            :key="kpiCaja.medio"
+            class="demo-glide-barra-card"
+          >
+            <div class="demo-glide-barra-top">
+              <span>{{ kpiCaja.medio }}</span>
+              <strong>{{ kpiCaja.monto }}</strong>
+            </div>
+            <div class="demo-glide-barra-pista">
+              <span
+                class="demo-glide-barra-relleno"
+                :style="{ width: kpiCaja.ancho }"
+              />
+            </div>
+            <small>{{ kpiCaja.detalle }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista 4: Indicadores responsivos de asistencia y retención -->
+      <div v-else class="demo-glide-panel">
+        <div class="demo-glide-kpis">
+          <div
+            v-for="kpiPulso in [
+              {
+                etiqueta: 'Ocupación',
+                cifra: '88%',
+                ancho: '88%',
+                detalle: 'Promedio semanal',
+              },
+              {
+                etiqueta: 'Asistencia',
+                cifra: '92%',
+                ancho: '92%',
+                detalle: 'Sin inasistencias',
+              },
+              {
+                etiqueta: 'Renovación',
+                cifra: '84%',
+                ancho: '84%',
+                detalle: 'Planes activos',
+              },
+              {
+                etiqueta: 'Nuevos',
+                cifra: '+18%',
+                ancho: '76%',
+                detalle: 'Este mes',
+              },
+            ]"
+            :key="kpiPulso.etiqueta"
+            class="demo-glide-barra-card"
+          >
+            <div class="demo-glide-barra-top">
+              <span>{{ kpiPulso.etiqueta }}</span>
+              <strong>{{ kpiPulso.cifra }}</strong>
+            </div>
+            <div class="demo-glide-barra-pista">
+              <span
+                class="demo-glide-barra-relleno"
+                :style="{ width: kpiPulso.ancho }"
+              />
+            </div>
+            <small>{{ kpiPulso.detalle }}</small>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="demo-cuerpo">
       <div class="demo-calendario">
@@ -394,6 +633,9 @@ function cambiar(valor: Modo): void {
           :class="{ 'demo-estado-punto': fijo, atencion: actual.atencion }"
           >{{ actual.estado }}</span
         >
+        <div v-if="fijo" class="demo-detalle-barra" aria-hidden="true">
+          <span :style="{ width: porcentajeEvento + '%' }" />
+        </div>
         <p class="demo-nota">{{ actual.nota }}</p>
         <div class="demo-detalle-pie">
           <span v-if="!fijo" aria-hidden="true">◷ </span>Todo empieza con una
@@ -472,6 +714,138 @@ function cambiar(valor: Modo): void {
   background: var(--superficie);
   color: var(--primario-fuerte);
   box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
+}
+.demo-glide-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.demo-glide-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 26%, var(--borde));
+  border-radius: 999px;
+  background: var(--fondo);
+  color: var(--texto-suave);
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition:
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    color 0.22s ease,
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
+}
+.demo-glide-tab:hover {
+  border-color: var(--acento);
+  color: var(--texto);
+  transform: translateY(-1px);
+}
+.demo-glide-tab--activo {
+  border-color: #0d3b6e;
+  background: #0d3b6e;
+  color: #ffffff;
+  box-shadow: 0 8px 20px -10px rgb(13 59 110 / 45%);
+}
+.demo-glide-punto {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #3a8fd4;
+}
+.demo-glide-tab--activo .demo-glide-punto {
+  background: #3a8fd4;
+  box-shadow: 0 0 0 3px rgb(58 143 212 / 28%);
+}
+.demo-glide-tab-titulo {
+  font-weight: 500;
+}
+.demo-glide-tab-metrica {
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acento) 12%, var(--superficie));
+  color: var(--primario);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.demo-glide-tab--activo .demo-glide-tab-metrica {
+  background: #3a8fd4;
+  color: #ffffff;
+}
+.demo-glide-lienzo {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--borde);
+  background: color-mix(in srgb, #3a8fd4 7%, var(--fondo));
+}
+.demo-glide-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.65rem;
+}
+.demo-glide-barra-card {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 22%, var(--borde));
+  border-radius: 12px;
+  background: var(--superficie);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.demo-glide-barra-card:hover,
+.demo-glide-barra-card.es-activa {
+  border-color: #3a8fd4;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -16px rgb(13 59 110 / 35%);
+}
+.demo-glide-barra-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--texto-suave);
+}
+.demo-glide-barra-top strong {
+  color: var(--primario);
+}
+.demo-glide-barra-pista {
+  height: 6px;
+  margin: 0.38rem 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, #3a8fd4 16%, var(--fondo));
+  overflow: hidden;
+}
+.demo-glide-barra-relleno {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #3a8fd4;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.demo-glide-barra-card small {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.demo-detalle-barra {
+  height: 5px;
+  margin-top: 0.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #3a8fd4 18%, var(--superficie));
+  overflow: hidden;
+}
+.demo-detalle-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #3a8fd4;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .demo-cuerpo {
   display: grid;

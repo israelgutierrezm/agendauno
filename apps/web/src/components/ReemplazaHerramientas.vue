@@ -111,7 +111,26 @@ const incluido = computed(() => INCLUIDO[props.modo]);
         role="row"
       >
         <span role="cell" class="reemplaza-hoy">{{ h.hoy }}</span>
-        <span role="cell">{{ h.con }}</span>
+        <span role="cell" class="reemplaza-con">
+          <svg
+            class="reemplaza-flecha"
+            viewBox="0 0 18 18"
+            width="15"
+            height="15"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle cx="9" cy="9" r="8" fill="#3a8fd4" fill-opacity="0.16" />
+            <path
+              d="M5.5 9h7m-3-3 3 3-3 3"
+              stroke="#0d3b6e"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>{{ h.con }}</span>
+        </span>
       </div>
     </div>
     <div class="solo-aqui">
@@ -126,38 +145,47 @@ const incluido = computed(() => INCLUIDO[props.modo]);
 <style scoped>
 .reemplaza {
   display: grid;
-  gap: 1.5rem;
+  gap: 1.25rem;
   grid-template-columns: minmax(0, 1fr);
 }
 @media (min-width: 900px) {
   .reemplaza {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-columns: minmax(0, 3.1fr) minmax(0, 1.9fr);
+    align-items: start;
   }
 }
 .reemplaza-tabla {
-  border: 1px solid var(--borde);
-  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--acento) 24%, var(--borde));
+  border-radius: 18px;
   overflow: hidden;
   background: var(--superficie);
+  box-shadow: 0 12px 30px -24px rgb(13 59 110 / 22%);
 }
 .reemplaza-fila {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 1rem;
-  padding: 0.8rem 1rem;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.62rem 1rem;
   border-top: 1px solid var(--borde);
-  font-size: 0.95rem;
+  font-size: 0.86rem;
+  transition: background-color 0.2s ease;
+}
+.reemplaza-fila:not(.reemplaza-cabeza):hover {
+  background: color-mix(in srgb, #3a8fd4 6%, var(--superficie));
 }
 .reemplaza-cabeza {
   border-top: 0;
+  background: color-mix(in srgb, var(--acento) 10%, var(--superficie));
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--texto-suave);
+  color: var(--primario);
 }
 .reemplaza-hoy {
   color: var(--texto-suave);
+  font-size: 0.82rem;
   text-decoration: line-through;
   text-decoration-color: color-mix(
     in srgb,
@@ -165,21 +193,42 @@ const incluido = computed(() => INCLUIDO[props.modo]);
     transparent
   );
 }
+.reemplaza-con {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 500;
+  color: var(--texto);
+}
+.reemplaza-flecha {
+  flex-shrink: 0;
+}
 .solo-aqui {
-  padding: 1.25rem;
-  border: 1px solid var(--borde);
-  border-radius: 16px;
-  background: var(--superficie);
+  padding: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 26%, var(--borde));
+  border-top: 3px solid var(--primario);
+  border-radius: 18px;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 85% 15%,
+      color-mix(in srgb, #3a8fd4 14%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  box-shadow: 0 14px 34px -24px rgb(13 59 110 / 24%);
 }
 .solo-aqui h3 {
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
+  color: var(--primario);
 }
 .solo-aqui ul {
-  margin-top: 0.75rem;
+  margin-top: 0.65rem;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.4rem;
   padding-left: 1.1rem;
   list-style: disc;
+  font-size: 0.85rem;
+  line-height: 1.45;
 }
 </style>

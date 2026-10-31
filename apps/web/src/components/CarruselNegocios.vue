@@ -22,6 +22,7 @@ interface Negocio {
   descripcion: string;
   alt: string;
   src: string;
+  href?: string;
 }
 const props = defineProps<{ negocios: readonly Negocio[] }>();
 // Lo de abajo (el botón al registro) recibe el negocio activo y si la persona lo
@@ -170,8 +171,6 @@ onBeforeUnmount(() => {
       @pointerup="terminarGesto"
       @pointercancel="inicio = undefined"
     >
-      <div class="orbita-halo" aria-hidden="true"></div>
-      <div class="orbita-anillo" aria-hidden="true"></div>
       <button
         v-for="(item, i) in negocios"
         :key="item.clave"
@@ -254,6 +253,16 @@ onBeforeUnmount(() => {
     >
       <h3>{{ negocio?.nombre }}</h3>
       <p>{{ negocio?.descripcion }}</p>
+      <template v-for="(item, i) in negocios" :key="item.clave">
+        <a
+          v-if="item.href"
+          v-show="i === activo"
+          :href="item.href"
+          class="orbita-sector-enlace"
+          @pointerenter="pausado = true"
+          >Explorar {{ item.nombre }} <IconoNav nombre="flecha" :tam="16"
+        /></a>
+      </template>
     </div>
     <div class="orbita-categorias" aria-label="Seleccionar tipo de negocio">
       <button
@@ -271,6 +280,25 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.orbita-sector-enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--texto);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+.orbita-sector-enlace:hover {
+  color: var(--enlace);
+}
+.orbita-sector-enlace:focus-visible {
+  outline: 2px solid var(--enlace);
+  outline-offset: 6px;
+  border-radius: 3px;
+}
+
 .orbita {
   position: relative;
   margin-top: 1.5rem;
@@ -282,26 +310,6 @@ onBeforeUnmount(() => {
   perspective: 1200px;
   isolation: isolate;
   touch-action: pan-y;
-}
-.orbita-halo {
-  position: absolute;
-  inset: 3% 8% 0;
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse,
-    color-mix(in srgb, var(--primario) 15%, transparent),
-    transparent 67%
-  );
-}
-.orbita-anillo {
-  position: absolute;
-  left: 5%;
-  right: 5%;
-  bottom: 3%;
-  height: 35%;
-  border: 1px solid color-mix(in srgb, var(--primario) 16%, transparent);
-  border-radius: 50%;
-  transform: rotate(-6deg);
 }
 .orbita-foto {
   position: absolute;
@@ -411,7 +419,7 @@ onBeforeUnmount(() => {
   margin-right: 0.4rem;
 }
 .orbita-detalle {
-  min-height: 6rem;
+  min-height: 9rem;
   margin: 1.3rem auto 0;
   max-width: 35rem;
   padding-inline: 1rem;

@@ -43,14 +43,22 @@ const DatosEstructurados = () =>
 
 <template>
   <div class="preguntas-frecuentes">
-    <h2 class="tu-titulo reveal">{{ titulo }}</h2>
-    <div class="mt-8 space-y-3">
+    <div class="preguntas-cabecera" data-scroll="cabecera">
+      <h2 class="tu-titulo reveal">{{ titulo }}</h2>
+      <slot name="cabecera" />
+    </div>
+    <div class="preguntas-grid mt-8">
       <details
         v-for="(p, i) in preguntas"
         :key="p.clave"
         class="pregunta tu-card p-5 reveal"
         :data-pregunta="p.clave"
-        :style="{ transitionDelay: i * 60 + 'ms' }"
+        data-scroll="acomodo"
+        :style="{
+          transitionDelay: i * 60 + 'ms',
+          '--desplaza-x': i % 2 === 0 ? '-22px' : '22px',
+          '--desplaza-y': '20px',
+        }"
       >
         <summary>
           {{ p.pregunta }}
@@ -78,8 +86,37 @@ const DatosEstructurados = () =>
 </template>
 
 <style scoped>
+.preguntas-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.preguntas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .preguntas-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
 .pregunta {
-  background: var(--sobre-banda, var(--fondo));
+  border: 1px solid color-mix(in srgb, var(--acento) 20%, var(--borde));
+  background: var(--sobre-banda, var(--superficie));
+  box-shadow: 0 10px 26px -22px rgb(13 59 110 / 24%);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.pregunta:hover,
+.pregunta[open] {
+  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
+  box-shadow: 0 14px 32px -22px rgb(13 59 110 / 32%);
 }
 .pregunta summary {
   display: flex;

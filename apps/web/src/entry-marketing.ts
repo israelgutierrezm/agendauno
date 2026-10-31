@@ -49,11 +49,13 @@ export async function render(
         component: { render: () => null },
       },
       // Destinos de los enlaces por nombre: aquí no se renderizan.
-      ...["registro", "entrar", "directorio"].map((name) => ({
-        path: name === "directorio" ? "/negocios" : `/${name}`,
-        name,
-        component: { render: () => null },
-      })),
+      ...["registro", "entrar", "directorio", "preguntas-frecuentes"].map(
+        (name) => ({
+          path: name === "directorio" ? "/negocios" : `/${name}`,
+          name,
+          component: { render: () => null },
+        }),
+      ),
     ],
   });
   // Los textos con la marca del producto de esta landing (ADR 0108).

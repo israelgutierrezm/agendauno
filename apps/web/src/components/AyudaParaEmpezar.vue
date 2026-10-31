@@ -19,37 +19,29 @@ const CONTENIDO: Record<
 > = {
   clases: {
     traes: [
-      "Tus alumnos, con sus datos de contacto",
-      "Tu equipo de instructores",
+      "Alumnos, contacto e instructores",
       "Tus clases y los horarios que se repiten",
-      "Los planes y créditos vigentes de cada alumno, a la fecha de corte que elijas (sin registrarlos como ventas)",
-      "Las reservas que ya tenían en tus próximas clases, con o sin avisarles",
+      "Planes y créditos vigentes a tu fecha de corte",
+      "Las reservas que ya tenían en tus próximas clases",
     ],
     noSeTraslada: [
-      "El historial de pagos y asistencias anteriores: queda en tu sistema anterior",
+      "Pagos y asistencias pasadas (quedan en tu sistema anterior)",
     ],
     configuras: [
-      "Tu sucursal y su horario",
-      "Tus clases, cupos y horarios",
-      "Tus planes y paquetes",
-      "Tu equipo y tu página",
+      "Sucursal, clases, cupos y horarios",
+      "Planes, paquetes, equipo y tu página",
     ],
   },
   citas: {
     traes: [
-      "Tus clientes, con sus datos de contacto",
-      "Tu equipo",
-      "Los bonos vigentes de cada cliente, a la fecha de corte que elijas (sin registrarlos como ventas)",
+      "Clientes, contacto y tu equipo",
+      "Los bonos vigentes de cada cliente a tu fecha de corte",
       "Las citas que ya tenías agendadas, sin avisarle nada a tus clientes",
     ],
-    noSeTraslada: [
-      "El historial de pagos y citas anteriores: queda en tu sistema anterior",
-    ],
+    noSeTraslada: ["Pagos y citas pasadas (quedan en tu sistema anterior)"],
     configuras: [
-      "Tu sucursal",
-      "Tus servicios, con su duración y precio",
-      "Los horarios de atención de cada profesional",
-      "Tu equipo y tu página para agendar",
+      "Sucursal, servicios y precios",
+      "Horarios del equipo y tu página",
     ],
   },
 };
@@ -63,12 +55,15 @@ const whatsapp = computed(() => {
 
 <template>
   <div class="ayuda" data-prueba="ayuda-para-empezar">
-    <h3 class="ayuda-titulo">Cámbiate sin empezar de cero</h3>
-    <p class="ayuda-subtitulo">
-      Trae lo que ya tienes en archivos de Excel o de tu sistema actual. Antes
-      de guardar revisamos cada archivo y te decimos qué filas están listas,
-      cuáles ya existían y cuáles hay que corregir.
-    </p>
+    <div class="ayuda-cabecera">
+      <div>
+        <h3 class="ayuda-titulo">Cámbiate sin empezar de cero</h3>
+        <p class="ayuda-subtitulo">
+          Importa tus archivos de Excel o de tu sistema actual con validación
+          automática fila por fila.
+        </p>
+      </div>
+    </div>
     <div class="ayuda-columnas">
       <section aria-labelledby="ayuda-traes">
         <h4 id="ayuda-traes">Lo que traes</h4>
@@ -83,72 +78,94 @@ const whatsapp = computed(() => {
         </ul>
       </section>
       <section aria-labelledby="ayuda-configuras">
-        <h4 id="ayuda-configuras">El asistente de inicio te guía con</h4>
+        <h4 id="ayuda-configuras">Asistente guiado</h4>
         <ul>
           <li v-for="t in contenido.configuras" :key="t">{{ t }}</li>
         </ul>
       </section>
     </div>
     <p class="ayuda-contacto">
-      <strong>Te ayudamos a dejarlo listo.</strong>
-      Escríbenos a
+      <strong>Te ayudamos a dejarlo listo:</strong>
       <a class="tu-enlace" :href="`mailto:${soporte.correo}`">{{
         soporte.correo
       }}</a
       ><template v-if="whatsapp">
-        o por
+        ·
         <a class="tu-enlace" :href="whatsapp" target="_blank" rel="noopener"
           >WhatsApp</a
         ></template
-      >: te ayudamos a configurar tu negocio y a traer tus datos de otro
-      sistema.
+      >
     </p>
   </div>
 </template>
 
 <style scoped>
 .ayuda {
-  margin-top: 3rem;
-  padding: 1.75rem;
-  border: 1px solid var(--borde);
-  border-radius: 18px;
-  background: var(--fondo);
+  margin-top: 2.25rem;
+  padding: 1.35rem 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 26%, var(--borde));
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      ellipse 60% 60% at 90% 15%,
+      color-mix(in srgb, #3a8fd4 12%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--fondo);
+  box-shadow: 0 14px 34px -24px rgb(13 59 110 / 22%);
+}
+.ayuda-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 .ayuda-titulo {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  color: var(--primario);
 }
 .ayuda-subtitulo {
-  margin-top: 0.5rem;
-  max-width: 46rem;
+  margin-top: 0.25rem;
+  max-width: 34rem;
+  font-size: 0.85rem;
   color: var(--texto-suave);
 }
 .ayuda-columnas {
   display: grid;
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+  gap: 0.85rem;
+  margin-top: 1rem;
 }
 @media (min-width: 900px) {
   .ayuda-columnas {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1.3fr 0.9fr 1fr;
   }
+}
+.ayuda-columnas > section {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 14px;
+  background: var(--superficie);
 }
 .ayuda-columnas h4 {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.84rem;
+  color: var(--primario);
 }
 .ayuda-columnas ul {
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
   display: grid;
-  gap: 0.4rem;
-  padding-left: 1.1rem;
+  gap: 0.28rem;
+  padding-left: 1rem;
   list-style: disc;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
   color: var(--texto-suave);
 }
 .ayuda-contacto {
-  margin-top: 1.5rem;
-  font-size: 0.95rem;
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
 }
 </style>

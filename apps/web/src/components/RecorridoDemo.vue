@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import type { Modo } from "@/marketing/modalidades";
 
 /*
-| De la reserva al resultado (landing): un mismo caso de principio a fin, en cuatro
-| pasos: el cliente reserva → el negocio la recibe → se registra el pago → se consulta
-| el resultado. Datos ficticios y sin API (se prerenderiza), con la misma persona y la
-| misma clase o cita en cada paso. Solo lo que el producto hace hoy.
+| De la reserva al resultado (landing): recorrido interactivo con reproducción
+| automática (estilo video de producto en vivo) y control manual paso a paso.
 */
 const props = defineProps<{ modo: Modo }>();
 const marca = computed(() => PRODUCTOS[productoDeModalidad(props.modo)].nombre);
@@ -37,7 +35,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Tu alumna",
       titulo: "Sofía reserva su lugar",
       texto:
-        "Desde tu página o la app elige la clase y aparta su lugar con los créditos de su paquete.",
+        "Elige su clase desde tu página o la app y aparta lugar con sus créditos.",
       pantalla: "Tu página · Reservar",
       filas: [
         { etiqueta: "Clase", valor: "Pilates Reformer · lunes 18:00" },
@@ -52,7 +50,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Tu estudio",
       titulo: "La reserva llega a tu agenda",
       texto:
-        "La clase suma un lugar ocupado y Sofía aparece en la lista para pasar asistencia al llegar.",
+        "Se descuenta un lugar del cupo y Sofía aparece lista para pasar asistencia.",
       pantalla: "Agenda · Lista de la clase",
       filas: [
         { etiqueta: "Pilates Reformer", valor: "lunes 18:00 · Andrea" },
@@ -67,7 +65,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Recepción",
       titulo: "Se registra el pago",
       texto:
-        "Cuando renueva, cobras su paquete en recepción o ella lo paga en línea desde su cuenta*; queda en su ficha y en el corte de caja.",
+        "Cobras su renovación en recepción o ella paga en línea desde su cuenta*.",
       pantalla: "Cobros · Ficha de Sofía",
       filas: [
         { etiqueta: "Concepto", valor: "Paquete 8 clases" },
@@ -82,7 +80,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Tú",
       titulo: "Consultas el resultado",
       texto:
-        "Al cerrar el día ves en Inicio la asistencia y lo que falta por cobrar o renovar, y en el corte de caja lo cobrado por forma de pago, sin juntar listas a mano.",
+        "Ves asistencia, renovaciones pendientes y el corte de caja cuadrado por forma de pago.",
       pantalla: "Inicio y corte de caja",
       filas: [
         { etiqueta: "Asistencia", valor: "7 de 8 en Pilates Reformer" },
@@ -102,7 +100,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Tu cliente",
       titulo: "Diego agenda su cita",
       texto:
-        "Desde tu página, sin crear una cuenta: elige el servicio, «cualquier profesional» o uno en particular, y la hora.",
+        "Desde tu página, sin crear una cuenta: elige servicio, profesional y hora.",
       pantalla: "Tu página · Agendar",
       filas: [
         { etiqueta: "Servicio", valor: "Corte y barba · 60 min" },
@@ -117,7 +115,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Tu negocio",
       titulo: "Llega a la agenda de Marco",
       texto:
-        "La cita ocupa el horario de Marco (y su espacio, si el servicio lo pide) y Diego recibe su recordatorio.",
+        "Se aparta el horario de Marco y Diego recibe su recordatorio por correo.",
       pantalla: "Agenda · Marco",
       filas: [
         { etiqueta: "17:30", valor: "Corte y barba · Diego", clave: true },
@@ -132,7 +130,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Recepción",
       titulo: "Se registra el pago",
       texto:
-        "Al terminar cobras en recepción, o Diego ya pagó en línea al agendar*; queda en su historial y en el corte de caja.",
+        "Cobras al terminar en recepción o Diego paga en línea al agendar*.",
       pantalla: "Por cobrar · Diego",
       filas: [
         { etiqueta: "Servicio", valor: "Corte y barba" },
@@ -147,7 +145,7 @@ const PASOS: Record<Modo, Paso[]> = {
       quien: "Tú",
       titulo: "Consultas el resultado",
       texto:
-        "Al cerrar el día ves en Inicio las citas atendidas y lo que quedó por cobrar, y en el corte de caja lo cobrado por forma de pago.",
+        "Al cerrar el día ves las citas atendidas y el corte de caja por forma de pago.",
       pantalla: "Inicio y corte de caja",
       filas: [
         { etiqueta: "Citas", valor: "9 · 8 atendidas · 1 no llegó" },
@@ -165,6 +163,43 @@ const PASOS: Record<Modo, Paso[]> = {
 
 const pasos = computed(() => PASOS[props.modo]);
 const actual = ref(0);
+const reproduciendo = ref(false);
+let temporizador: ReturnType<typeof setInterval> | undefined;
+
+function detenerAuto(): void {
+  reproduciendo.value = false;
+  if (temporizador) {
+    clearInterval(temporizador);
+    temporizador = undefined;
+  }
+}
+
+function iniciarAuto(): void {
+  detenerAuto();
+  reproduciendo.value = true;
+  temporizador = setInterval(() => {
+    actual.value = (actual.value + 1) % pasos.value.length;
+  }, 4200);
+}
+
+function alternarAuto(): void {
+  if (reproduciendo.value) detenerAuto();
+  else iniciarAuto();
+}
+
+function elegirPaso(i: number): void {
+  detenerAuto();
+  actual.value = i;
+}
+
+onMounted(() => {
+  const reducido =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  if (!reducido) iniciarAuto();
+});
+
+onBeforeUnmount(() => detenerAuto());
+
 watch(
   () => props.modo,
   () => {
@@ -175,6 +210,7 @@ const paso = computed(() => pasos.value[actual.value]!);
 
 // Flechas izquierda y derecha entre los pasos (patrón de pestañas).
 function mover(delta: number): void {
+  detenerAuto();
   const total = pasos.value.length;
   actual.value = (actual.value + delta + total) % total;
   document
@@ -203,7 +239,8 @@ function mover(delta: number): void {
         :aria-controls="`recorrido-panel-${p.clave}`"
         :tabindex="actual === i ? 0 : -1"
         :data-paso="p.clave"
-        @click="actual = i"
+        :class="{ 'recorrido-paso--auto': actual === i && reproduciendo }"
+        @click="elegirPaso(i)"
       >
         <span class="recorrido-num" aria-hidden="true">{{ i + 1 }}</span>
         <span class="recorrido-paso-texto">
@@ -230,7 +267,7 @@ function mover(delta: number): void {
             type="button"
             class="tu-btn tu-btn-secundario"
             :disabled="actual === 0"
-            @click="actual--"
+            @click="elegirPaso(actual - 1)"
           >
             Anterior
           </button>
@@ -239,15 +276,33 @@ function mover(delta: number): void {
             class="tu-btn tu-btn-secundario"
             :disabled="actual === pasos.length - 1"
             data-prueba="recorrido-siguiente"
-            @click="actual++"
+            @click="elegirPaso(actual + 1)"
           >
             Siguiente
+          </button>
+          <button
+            type="button"
+            class="recorrido-play"
+            :aria-label="
+              reproduciendo
+                ? 'Pausar recorrido automático'
+                : 'Reproducir recorrido automático'
+            "
+            @click="alternarAuto"
+          >
+            <span aria-hidden="true">{{ reproduciendo ? "❚❚" : "▶" }}</span>
           </button>
         </div>
       </div>
       <figure class="recorrido-pantalla" aria-label="Pantalla de ejemplo">
-        <figcaption>{{ paso.pantalla }}</figcaption>
-        <dl>
+        <figcaption class="recorrido-ventana-barra">
+          <span class="recorrido-ventana-punto" aria-hidden="true" />
+          <span class="recorrido-ventana-punto" aria-hidden="true" />
+          <span class="recorrido-ventana-punto" aria-hidden="true" />
+          <span class="recorrido-ventana-titulo">{{ paso.pantalla }}</span>
+        </figcaption>
+
+        <dl :key="paso.clave" class="recorrido-dl-anim">
           <div
             v-for="f in paso.filas"
             :key="f.etiqueta"
@@ -280,6 +335,8 @@ function mover(delta: number): void {
   }
 }
 .recorrido-paso {
+  position: relative;
+  overflow: hidden;
   display: flex;
   gap: 0.7rem;
   align-items: flex-start;
@@ -288,13 +345,38 @@ function mover(delta: number): void {
   border: 1px solid var(--borde);
   border-radius: 14px;
   background: var(--superficie);
+  cursor: pointer;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+.recorrido-paso:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
 }
 .recorrido-paso[aria-selected="true"] {
-  border-color: var(--primario);
-  box-shadow: 0 0 0 1px var(--primario);
+  border-color: var(--acento);
+  box-shadow: 0 10px 26px -18px rgb(13 59 110 / 35%);
+}
+.recorrido-paso--auto::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: #3a8fd4;
+  transform-origin: 0 50%;
+  animation: recorrido-progreso 4.2s linear infinite;
+}
+@keyframes recorrido-progreso {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 .recorrido-num {
   display: inline-grid;
@@ -351,21 +433,69 @@ function mover(delta: number): void {
 }
 .recorrido-navegar {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 1.2rem;
 }
-.recorrido-pantalla {
-  padding: 1.1rem 1.2rem;
-  border: 1px solid var(--borde);
-  border-radius: 14px;
-  background: var(--fondo);
-}
-.recorrido-pantalla figcaption {
+.recorrido-play {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 30%, var(--borde));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acento) 10%, var(--superficie));
+  color: var(--primario);
   font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
+}
+.recorrido-play:hover {
+  background: color-mix(in srgb, var(--acento) 20%, var(--superficie));
+  transform: scale(1.05);
+}
+.recorrido-pantalla {
+  padding: 1.1rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--acento) 24%, var(--borde));
+  border-radius: 16px;
+  background: var(--fondo);
+  box-shadow: 0 16px 36px -24px rgb(13 59 110 / 26%);
+}
+.recorrido-ventana-barra {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--borde) 70%, transparent);
+}
+.recorrido-ventana-punto {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acento) 42%, var(--borde));
+}
+.recorrido-ventana-titulo {
+  margin-left: 0.35rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  color: var(--texto-suave);
+  color: var(--primario);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+}
+.recorrido-dl-anim {
+  animation: recorrido-fade 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes recorrido-fade {
+  from {
+    opacity: 0.35;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .recorrido-pantalla dl {
   display: grid;

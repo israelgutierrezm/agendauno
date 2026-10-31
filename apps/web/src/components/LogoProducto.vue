@@ -58,10 +58,10 @@ const partes = computed(() => {
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1;
-  color: var(--turnouno-marca, var(--texto, #031b4e));
+  color: var(--turnouno-marca, var(--texto, #0d3b6e));
   white-space: nowrap;
 }
 .producto-logo-acento {
-  color: var(--turnouno-acento, var(--acento, #006df7));
+  color: var(--turnouno-acento, var(--acento, #3a8fd4));
 }
 </style>

@@ -621,7 +621,7 @@ function medirRegistro(): void {
   letter-spacing: -0.02em;
   line-height: 1.3;
 }
-/* Con modo (/clases, /citas): íconos sin cuadro teñido y títulos con peso 500. */
+/* Con modo (/clases, /citas): íconos con el azul de marca y títulos con peso 500. */
 .funcionalidades-modo .funcion-icono,
 .funcionalidades-modo .funcion:hover .funcion-icono,
 .funcionalidades-modo .funcion:focus-within .funcion-icono {
@@ -629,7 +629,7 @@ function medirRegistro(): void {
   height: auto;
   border-radius: 0;
   background: transparent;
-  color: var(--texto-suave);
+  color: var(--primario);
   transform: none;
 }
 .funcionalidades-modo .funcion-cabecera h3 {
@@ -647,13 +647,13 @@ function medirRegistro(): void {
   height: 10rem;
   margin-top: 0.9rem;
   padding: 1rem;
-  border: 1px solid color-mix(in srgb, var(--borde) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acento) 22%, var(--borde));
   border-radius: 1rem;
   overflow: hidden;
   background: linear-gradient(
     145deg,
     var(--fondo),
-    color-mix(in srgb, var(--primario) 7%, var(--superficie))
+    color-mix(in srgb, var(--acento) 9%, var(--superficie))
   );
 }
 .funcion-abrir {

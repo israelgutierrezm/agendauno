@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import HechoCon from "@/components/HechoCon.vue";
 import LogoProducto from "@/components/LogoProducto.vue";
@@ -94,6 +94,27 @@ const acceso = computed(() =>
     : { to: { name: "entrar" }, largo: "nav.entrar", corto: "nav.entrarCorto" },
 );
 const anio = new Date().getFullYear();
+const mostrarSubir = ref(false);
+let alDesplazar: (() => void) | undefined;
+
+onMounted(() => {
+  alDesplazar = (): void => {
+    mostrarSubir.value = (window.scrollY || 0) > 280;
+  };
+  window.addEventListener("scroll", alDesplazar, { passive: true });
+  alDesplazar();
+});
+
+onBeforeUnmount(() => {
+  if (alDesplazar) window.removeEventListener("scroll", alDesplazar);
+});
+
+function subirAlInicio(): void {
+  const reducido =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  window.scrollTo({ top: 0, behavior: reducido ? "auto" : "smooth" });
+}
+
 defineEmits<{ alternarTema: [] }>();
 </script>
 
@@ -111,19 +132,8 @@ defineEmits<{ alternarTema: [] }>();
     <a href="#contenido" class="tu-saltar-contenido">Saltar al contenido</a>
     <header v-if="esAcceso || !esRutaPublicaDeNegocio" class="tu-public-nav">
       <div
-        class="tu-public-container min-h-18 py-2 flex items-center justify-between gap-4"
+        class="tu-public-container min-h-13 py-1 flex items-center justify-between gap-3"
       >
-        <RouterLink
-          :to="{ name: 'inicio' }"
-          class="tu-public-brand flex items-center shrink-0"
-        >
-          <LogoProducto
-            :producto="producto"
-            variante="horizontal"
-            :ancho="192"
-          />
-        </RouterLink>
-
         <nav
           v-if="comercial"
           class="tu-public-sections"
@@ -147,6 +157,17 @@ defineEmits<{ alternarTema: [] }>();
             >{{ $t("demoAgendable.cta") }}</RouterLink
           >
         </nav>
+
+        <RouterLink
+          :to="{ name: 'inicio' }"
+          class="tu-public-brand flex items-center shrink-0"
+        >
+          <LogoProducto
+            :producto="producto"
+            variante="horizontal"
+            :ancho="156"
+          />
+        </RouterLink>
 
         <nav
           class="tu-public-actions flex items-center gap-1 sm:gap-2 shrink-0"
@@ -392,6 +413,30 @@ defineEmits<{ alternarTema: [] }>();
         <span>{{ "© " + anio + " " + marca }}</span>
       </div>
     </footer>
+
+    <button
+      v-if="comercial"
+      type="button"
+      class="tu-subir-inicio"
+      :class="{ 'tu-subir-inicio--visible': mostrarSubir }"
+      aria-label="Subir al inicio"
+      data-prueba="subir-inicio"
+      @click="subirAlInicio"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="m18 15-6-6-6 6" />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -411,6 +456,45 @@ defineEmits<{ alternarTema: [] }>();
 }
 .tu-saltar-contenido:focus {
   top: 0.75rem;
+}
+.tu-subir-inicio {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 45;
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 45%, transparent);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0d3b6e 0%, #3a8fd4 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 28px -8px rgb(13 59 110 / 55%);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(14px) scale(0.92);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease;
+}
+.tu-subir-inicio--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+.tu-subir-inicio:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 16px 32px -8px rgb(13 59 110 / 68%);
+}
+.tu-subir-inicio:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
 }
 #contenido:focus {
   outline: none;
@@ -449,43 +533,72 @@ defineEmits<{ alternarTema: [] }>();
   align-items: center;
   min-height: 2.75rem;
 }
-/* Navegación comercial persistente, con contenido centrado. */
+/* Navegación comercial persistente, delgada y con logo al centro en escritorio. */
 .tu-public-nav {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--superficie);
+  background: color-mix(in srgb, var(--superficie) 90%, transparent);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid color-mix(in srgb, var(--borde) 70%, transparent);
 }
 .tu-public-container {
-  width: calc(100% - 7rem);
-  max-width: 80rem;
+  width: calc(100% - 6.5rem);
+  max-width: 82rem;
   margin-inline: auto;
   padding-inline: 1rem;
 }
 .dark .tu-public-nav {
-  background: var(--superficie);
+  background: color-mix(in srgb, var(--superficie) 90%, transparent);
 }
 .tu-public-footer {
-  background: var(--superficie);
-  color: var(--texto-suave);
-  border-top: 1px solid var(--borde);
+  position: relative;
+  background-color: #0d3b6e;
+  color: rgb(255 255 255 / 80%);
+  border-top: 3px solid var(--marketing-rosa, #e12685);
+  --turnouno-marca: #ffffff;
+  --turnouno-acento: #62b5f6;
+}
+.tu-public-footer::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    #3a8fd4 0%,
+    var(--marketing-rosa, #e12685) 50%,
+    #3a8fd4 100%
+  );
+  pointer-events: none;
+}
+.tu-public-footer .tu-hecho-con {
+  color: rgb(255 255 255 / 82%);
+}
+.tu-public-footer .tu-hecho-con:hover,
+.tu-public-footer .tu-hecho-con:focus-visible {
+  color: #ffffff;
 }
 .tu-public-footer-link {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--texto-suave);
+  color: rgb(255 255 255 / 78%);
   font: inherit;
   font-weight: 400;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition: color 0.18s ease;
 }
 .tu-public-footer-link:hover,
 .tu-public-footer-link:focus-visible {
-  color: var(--texto);
+  color: #ffffff;
   text-decoration: underline;
+  text-decoration-color: var(--marketing-rosa, #e12685);
+  text-underline-offset: 4px;
 }
 /* Negocio y acceso: una línea que se parte en el teléfono. */
 .tu-public-footer-fila {
@@ -539,15 +652,17 @@ defineEmits<{ alternarTema: [] }>();
 }
 .tu-public-footer-titulo {
   margin-bottom: 0.15rem;
-  color: var(--texto);
+  color: #ffffff;
   font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .tu-public-footer-base {
   max-width: 80rem;
   margin-inline: auto;
   padding: 1.1rem clamp(1.25rem, 4vw, 3rem) 1.4rem;
-  border-top: 1px solid var(--borde);
+  border-top: 1px solid rgb(255 255 255 / 14%);
+  color: rgb(255 255 255 / 68%);
   font-size: 0.75rem;
 }
 @media (min-width: 900px) {
@@ -559,14 +674,13 @@ defineEmits<{ alternarTema: [] }>();
 .tu-public-theme {
   position: absolute;
   right: 0.75rem;
-  /* Centro de la barra (min-h-18 = 4.5rem). */
-  top: 2.25rem;
+  top: 50%;
   transform: translateY(-50%);
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.35rem;
+  height: 2.35rem;
   margin-left: 0;
   padding: 0;
   border: 0;
@@ -582,27 +696,35 @@ defineEmits<{ alternarTema: [] }>();
   outline-offset: 2px;
   border-radius: 0.5rem;
 }
+.tu-public-nav .tu-btn {
+  min-height: 2.25rem !important;
+  padding-block: 0.35rem;
+  font-size: 0.82rem;
+}
 .tu-public-register {
-  border-radius: 11px;
-  padding-inline: 1.25rem;
+  border-radius: 10px;
+  padding-inline: 1.05rem;
 }
 .tu-public-sections {
   display: none;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 .tu-public-sections a {
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.65rem;
+  padding: 0.38rem 0.65rem;
+  border-radius: 0.55rem;
   color: var(--texto-suave);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 500;
   text-decoration: none;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 .tu-public-sections a:hover,
 .tu-public-sections a[aria-current="page"] {
-  background: var(--superficie-2);
-  color: var(--texto);
+  background: color-mix(in srgb, var(--acento) 10%, var(--superficie-2));
+  color: var(--primario);
 }
 .tu-public-sections a:focus-visible {
   outline: 2px solid var(--primario);
@@ -678,9 +800,23 @@ defineEmits<{ alternarTema: [] }>();
     padding-inline: 0.55rem;
   }
 }
-@media (min-width: 1100px) {
+@media (min-width: 900px) {
+  .tu-public-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+  }
   .tu-public-sections {
     display: flex;
+    justify-self: start;
+  }
+  .tu-public-brand {
+    justify-self: center;
+    grid-column: 2;
+  }
+  .tu-public-actions {
+    justify-self: end;
+    grid-column: 3;
   }
   .tu-public-sections.tu-public-sections-fila {
     display: none;

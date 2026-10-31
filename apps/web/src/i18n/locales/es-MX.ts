@@ -278,7 +278,7 @@ export default {
     // `landing.clases` y `landing.citas`.
     modalidad: {
       probar: "Probar AgendaUno gratis",
-      verAgenda: "Ver la agenda de ejemplo",
+      verAgenda: "Ver cómo funciona",
       demoEtiqueta: "AgendaUno en acción",
       // Las demos se identifican como demos (plan de mejoras C01).
       demoPaginaNota: "Página de ejemplo con datos ficticios.",
@@ -381,7 +381,7 @@ export default {
         membresias: {
           titulo: "Membresías y créditos",
           descripcion:
-            "Vende paquetes de clases y membresías. Cada reserva usa un crédito del alumno.",
+            "Vende paquetes de clases y membresías. Cada reserva respeta el plan y los créditos del alumno.",
           detalle:
             "Consulta créditos disponibles, vigencias y renovaciones desde la ficha de cada alumno. Si cancela a tiempo, el crédito regresa según tu política de cancelación.",
         },
@@ -512,11 +512,11 @@ export default {
       // pagina, preguntas). Sin autorregistro de alumnos ni pago por cuenta propia
       // desde la página (ADR 0093); el QR es pase de entrada.
       hero: {
-        etiqueta: "Software para estudios, academias y gimnasios",
-        titulo: "Tus clases, llenas y en orden.",
-        enfasis: "llenas",
+        etiqueta: "Software para estudios, academias, gimnasios y más",
+        titulo: "Menos pendientes. Más tiempo para tus alumnos.",
+        enfasis: "Más tiempo",
         subtitulo:
-          "Gestiona reservas, clases, membresías y cobros desde una sola agenda. Tu equipo tiene el control; tus alumnos eligen su próxima clase.",
+          "Reservas, cupos, membresías y cobros en una sola agenda. Tu estudio en orden todos los días.",
         avisoTitulo: "Lugar reservado",
         avisoDetalle: "Pole dance · Hoy 18:00 · 2 lugares libres",
       },
@@ -525,14 +525,14 @@ export default {
         titulo: "Tu semana de clases, de un vistazo.",
         enfasis: "de un vistazo",
         subtitulo:
-          "Explora una agenda de ejemplo, sin registrarte: el cupo de cada clase y cuántos lugares quedan.",
+          "Toca cualquier clase para ver su cupo, su lista y cuántos lugares libres quedan.",
         cta: "Quiero organizar mis clases",
       },
       seccion: {
-        titulo: "Lo que tu estudio necesita para crecer.",
-        enfasis: "crecer",
+        titulo: "Una plataforma. Cada parte de tu estudio conectada.",
+        enfasis: "conectada",
         subtitulo:
-          "Hecho para clases con cupo: cada lugar, cada crédito y cada asistencia cuentan.",
+          "Agenda, cobros, alumnos y recepción conectados en un mismo panel.",
       },
       comoFunciona: {
         subtitulo:
@@ -541,13 +541,13 @@ export default {
       recorrido: {
         titulo: "De la reserva al corte del día, en un solo lugar.",
         subtitulo:
-          "Sigue una misma clase: tu alumna reserva, tu estudio la recibe, se registra el pago y ves el resultado.",
+          "Sigue una clase real en 4 pasos: reserva, llegada, cobro y cierre del día.",
       },
       pasos: {
         preparar: {
           titulo: "Arma tu semana",
           texto:
-            "Crea tus clases con su cupo, instructor y horario, y repítelas cada semana. Agrega tus membresías y paquetes de créditos.",
+            "Crea tus clases con cupo, instructor y horario semanal, junto con tus membresías y créditos.",
           ejemplo: "Pilates Reformer",
           linea: "Lunes · 18:00 · Andrea",
           estado: "8 lugares por clase",
@@ -555,7 +555,7 @@ export default {
         invitar: {
           titulo: "Invita a tus alumnos",
           texto:
-            "Da de alta a tus alumnos, uno por uno o con un archivo, e invítalos a su cuenta. Con su membresía o sus créditos reservan su lugar desde tu página.",
+            "Da de alta o importa a tus alumnos e invítalos a reservar su lugar desde tu página.",
           ejemplo: "Tu página de clases",
           linea: "tuestudio.agendauno.mx",
           estado: "Ya soy alumno · Entrar",
@@ -563,7 +563,7 @@ export default {
         operar: {
           titulo: "Pasa lista y cobra",
           texto:
-            "Pasa lista con llegó, retardo o no vino, y registra los pagos en recepción. Si conectas una pasarela, tus alumnos también pagan en línea desde su cuenta*.",
+            "Marca llegó, retardo o falta, y cobra en recepción o en línea desde su cuenta*.",
           ejemplo: "Lista de hoy",
           linea: "Pilates · 18:00 · 7 de 8",
           estado: "Sofía · Retardo",
@@ -581,7 +581,7 @@ export default {
         etiqueta: "Tu página pública",
         titulo: "Tu horario de clases, listo para compartir.",
         subtitulo:
-          "Una página con tus clases, lugares libres, precios, instructores y sucursales. Tus alumnos entran a reservar; quien es nuevo te pide acceso.",
+          "Comparte horarios, lugares libres, planes y sucursales. Tus alumnos reservan; quien es nuevo pide acceso.",
         beneficios: {
           compartir: "Compártela por Instagram, WhatsApp o un código QR",
           lugares:
@@ -602,7 +602,7 @@ export default {
       precio: {
         titulo: "Un plan que crece con tu estudio.",
         subtitulo:
-          "Todas las herramientas desde el primer plan. Tu tarifa mensual se adapta a los alumnos activos de tu estudio.",
+          "Todas las herramientas incluidas. Tu tarifa se adapta a tus alumnos activos del mes.",
       },
       giros: {
         etiqueta: "Para quién es",
@@ -866,10 +866,10 @@ export default {
       // recordatorios solo por correo. Nada de cupos, lista de espera ni clases.
       hero: {
         etiqueta: "Software de citas para profesionales y equipos",
-        titulo: "Tus clientes agendan solos. Tú atiendes.",
-        enfasis: "agendan solos",
+        titulo: "Menos pendientes. Más tiempo para tus clientes.",
+        enfasis: "Más tiempo",
         subtitulo:
-          "Organiza servicios, horarios y cobros en una sola agenda. Comparte tu enlace para que tus clientes elijan servicio, profesional y hora, sin crear una cuenta.",
+          "Servicios, horarios y cobros en una sola agenda. Tus clientes agendan desde tu enlace, sin crear cuenta.",
         avisoTitulo: "Cita confirmada",
         avisoDetalle: "Corte y peinado · Hoy 17:30 · con Ana",
       },
@@ -878,14 +878,14 @@ export default {
         titulo: "La agenda de todo tu equipo, en una vista.",
         enfasis: "en una vista",
         subtitulo:
-          "Explora una agenda de ejemplo, sin registrarte: cada profesional con sus citas, sus servicios y su duración.",
+          "Filtra por profesional y explora sus citas, servicios y horarios disponibles en vivo.",
         cta: "Quiero organizar mis citas",
       },
       seccion: {
-        titulo: "Lo que tu negocio necesita para crecer.",
-        enfasis: "crecer",
+        titulo: "Una plataforma. Cada parte de tu negocio conectada.",
+        enfasis: "conectada",
         subtitulo:
-          "Hecho para citas 1 a 1: el tiempo de cada profesional, bien aprovechado.",
+          "Agenda, cobros, clientes y equipo conectados en un mismo panel.",
       },
       comoFunciona: {
         subtitulo:
@@ -894,13 +894,13 @@ export default {
       recorrido: {
         titulo: "De la cita al corte del día, en un solo lugar.",
         subtitulo:
-          "Sigue una misma cita: tu cliente agenda, llega a la agenda de tu profesional, se registra el pago y ves el resultado.",
+          "Sigue una cita real en 4 pasos: reserva, llegada, cobro y cierre del día.",
       },
       pasos: {
         preparar: {
           titulo: "Configura servicios y horarios",
           texto:
-            "Agrega tus servicios con su duración y precio, y el horario de atención de cada profesional. Con varias sucursales (Premium y Pro), el de cada una.",
+            "Define tus servicios con duración y precio, y el horario de cada profesional o sucursal.",
           ejemplo: "Corte y barba",
           linea: "60 min · $350",
           estado: "Marco, Luis y Alex",
@@ -908,7 +908,7 @@ export default {
         compartir: {
           titulo: "Comparte tu página",
           texto:
-            "Pon tu página para agendar en Instagram, WhatsApp o un código QR. Tus clientes eligen servicio, profesional y hora, sin crear una cuenta.",
+            "Comparte tu enlace en Instagram, WhatsApp o QR para que elijan profesional y hora sin cuenta.",
           ejemplo: "Tu página para agendar",
           linea: "tunegocio.agendauno.mx",
           estado: "Elige servicio y hora",
@@ -916,7 +916,7 @@ export default {
         operar: {
           titulo: "Atiende y cobra",
           texto:
-            "Las citas llegan a la agenda de cada profesional. Registra la llegada y el cobro en recepción, o pide el pago en línea al agendar*.",
+            "Recibe cada cita en la agenda del equipo y cobra en recepción o en línea al agendar*.",
           ejemplo: "Cita de hoy",
           linea: "Corte y barba · 17:30 · Marco",
           estado: "Confirmada · Recordatorio por correo",
@@ -934,7 +934,7 @@ export default {
         etiqueta: "Tu página para agendar",
         titulo: "De tu Instagram a una cita en tu agenda.",
         subtitulo:
-          "Tus clientes eligen servicio, profesional y hora en una página con tus servicios, precios, equipo y sucursales. No necesitan crear una cuenta.",
+          "Comparte servicios, precios, equipo y sucursales para que tus clientes agenden sin crear cuenta.",
         beneficios: {
           compartir: "Compártela por Instagram, WhatsApp o un código QR",
           cualquiera:
@@ -961,7 +961,7 @@ export default {
       precio: {
         titulo: "Tu agenda, a solas o con todo tu equipo.",
         subtitulo:
-          "Individual si atiendes por tu cuenta. Premium o Pro cuando trabajas con un equipo. Elige el plan y los profesionales que necesitas.",
+          "Individual si atiendes por tu cuenta; Premium o Pro para coordinar a todo tu equipo.",
       },
       giros: {
         etiqueta: "Para quién es",
@@ -1125,7 +1125,7 @@ export default {
       // Las filas de ReemplazaHerramientas: si cambian, cambia el número.
       titulo: "Un solo sistema en lugar de ocho.",
       subtitulo:
-        "Lo que hoy resuelves con hojas de cálculo, mensajes a mano y servicios por separado, en un solo lugar y con un solo pago al mes.",
+        "Deja atrás hojas de cálculo y herramientas sueltas con una sola suscripción mensual.",
       aparte: "Si quieres más ayuda",
     },
     heroEscritura: {

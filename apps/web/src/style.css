@@ -104,78 +104,92 @@
   --radio-tarjeta: 18px;
   --radio-imagen: 22px;
   --radio-panel: 28px;
-  --fondo: #f6f8fc;
+  --azul-profundo: #0d3b6e;
+  --azul-marca: #3a8fd4;
+  --turnouno-marca: #0d3b6e;
+  --turnouno-acento: #3a8fd4;
+  --fondo: #f5f8fc;
   --superficie: #fff;
-  --superficie-2: #e9edf5;
-  --texto: #182b39;
-  --texto-suave: #59666b;
-  --borde: #dce1de;
-  --acento: #198754;
+  --superficie-2: #e8eef7;
+  --texto: #0a2239;
+  --texto-suave: #455a70;
+  --borde: #d5e1ef;
+  --acento: #3a8fd4;
   --exito: #198754;
   --exito-texto: #146c43;
   --exito-suave: #d1e7dd;
-  --primario: #007e91;
-  --primario-fuerte: #006574;
+  --primario: #0d3b6e;
+  --primario-fuerte: #08294f;
   --primario-contraste: #fff;
-  --primario-suave: color-mix(in srgb, #007e91 10%, #fff);
-  --enlace: #007487;
-  --marketing-enfasis: #198754;
+  --primario-suave: color-mix(in srgb, #3a8fd4 12%, #fff);
+  --enlace: #0d3b6e;
+  --marketing-enfasis: #3a8fd4;
   --marketing-rosa: #e7549b;
-  --marketing-operacion: #007e91;
-  --marketing-negocios: #1098ad;
-  /* Rosa de acción más profundo para mantener contraste con texto blanco. */
-  --marketing-cta: #c43b80;
+  --marketing-operacion: #0d3b6e;
+  --marketing-negocios: #3a8fd4;
+  /* Azul marino profundo (#0d3b6e) para acciones principales con contraste AAA sobre blanco. */
+  --marketing-cta: #0d3b6e;
   --marketing-cta-contraste: #ffffff;
-  --marketing-cta-hover: #b63273;
+  --marketing-cta-hover: #155293;
   background: var(--fondo);
   color: var(--texto);
 }
 .dark .tu-public-business,
 .dark .tu-marketing {
+  --turnouno-marca: #f3f6fb;
+  --turnouno-acento: #3a8fd4;
   --fondo: #020d24;
   --superficie: #071a3a;
   --superficie-2: #0b2854;
-  --texto: #f3f4ef;
-  --texto-suave: #b3bfbf;
-  --borde: #34444c;
-  --acento: #75b798;
+  --texto: #f3f6fb;
+  --texto-suave: #b0c2d6;
+  --borde: #223b5e;
+  --acento: #3a8fd4;
   --exito: #198754;
   --exito-texto: #75b798;
   --exito-suave: #051b11;
-  --primario: #74d4df;
-  --primario-contraste: #182b39;
-  --primario-fuerte: #a4e8ef;
-  --primario-suave: color-mix(in srgb, #007e91 24%, #071a3a);
-  --enlace: #74d4df;
-  --marketing-enfasis: #75b798;
+  --primario: #68b5f5;
+  --primario-contraste: #0a2239;
+  --primario-fuerte: #96cefa;
+  --primario-suave: color-mix(in srgb, #3a8fd4 24%, #071a3a);
+  --enlace: #68b5f5;
+  --marketing-enfasis: #3a8fd4;
 }
-/* Identidad comercial por producto: AgendaUno conserva el rosa; TurnoUno usa
-   el turquesa de «agenda» en sus acentos, fondos decorativos y acciones. El botón
-   lleva una variante más profunda del mismo tono para contrastar con texto blanco.
-   Solo marketing: no sobrescribe los colores propios de los negocios. */
+/* Identidad comercial por producto: ambos comparten la base azul (#0d3b6e y #3a8fd4);
+   AgendaUno conserva el acento rosa secundario del isotipo y TurnoUno unifica todos
+   sus acentos en la gama azul. Solo marketing: no sobrescribe los colores de negocios. */
 .tu-marketing[data-producto="turnouno"] {
-  --acento: #007e91;
-  --marketing-rosa: #1098ad;
-  --marketing-cta: #007e91;
-  --marketing-cta-hover: #006574;
+  --acento: #3a8fd4;
+  --marketing-rosa: #3a8fd4;
+  --marketing-cta: #0d3b6e;
+  --marketing-cta-hover: #155293;
 }
 .dark .tu-marketing[data-producto="turnouno"] {
-  --acento: #74d4df;
-  --marketing-rosa: #74d4df;
+  --acento: #68b5f5;
+  --marketing-rosa: #68b5f5;
 }
 .tu-public-business .tu-btn,
 .tu-marketing .tu-btn {
   font-weight: 500;
   box-shadow: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 .tu-public-business .tu-btn-primario:hover:not(:disabled),
 .tu-marketing .tu-btn-primario:hover:not(:disabled) {
   background: var(--marketing-cta-hover);
+  box-shadow: 0 12px 26px -10px color-mix(in srgb, #0d3b6e 55%, transparent);
+  transform: translateY(-1px);
 }
 .tu-public-business .tu-btn-primario,
 .tu-marketing .tu-btn-primario {
   background: var(--marketing-cta);
   color: var(--marketing-cta-contraste);
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, #0d3b6e 45%, transparent);
 }
 /* Variante turquesa opcional; las acciones principales usan `--marketing-cta`
    según la marca. En oscuro esta variante clara conserva su texto de contraste. */

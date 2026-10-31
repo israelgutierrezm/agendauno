@@ -265,6 +265,13 @@ export function imagenNegocio(clave: string): string {
   return `/assets/landing/disciplinas/${IMAGEN_NEGOCIO[clave] ?? IMAGEN_NEGOCIO.pilates}`;
 }
 
+export interface CategoriaFaq {
+  clave: string;
+  titulo: string;
+  descripcion: string;
+  preguntas: readonly string[];
+}
+
 export interface ContenidoModalidad {
   modo: Modo;
   ruta: `/${Modo}`;
@@ -298,8 +305,10 @@ export interface ContenidoModalidad {
    * (`p1`–`p3`). Solo lo que el producto ya hace, sin mezclar clases con citas.
    */
   novedades: readonly string[];
-  /** Preguntas frecuentes propias: claves de `landing.{modo}.faq.{clave}`. */
+  /** Preguntas frecuentes principales en la landing: claves de `landing.{modo}.faq.{clave}`. */
   preguntas: readonly string[];
+  /** Todas las preguntas frecuentes organizadas por sección para `/preguntas-frecuentes`. */
+  categoriasFaq: readonly CategoriaFaq[];
   /** Hero de la página: el texto animado y las tres fotos del collage. */
   hero: {
     /** Claves de `landing.heroEscritura.negocios.*`, en orden. */
@@ -354,30 +363,59 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     // Google Wallet (ADR 0195), los widgets para la web del negocio (ADR 0141), las
     // apps, la bandeja de WhatsApp e Instagram (ADR 0200) y la caja (ADR 0175/0177).
     novedades: ["plataformas", "wallet", "widgets", "app", "bandeja", "caja"],
-    // Sin autorregistro de alumnos (ADR 0093) y el QR como pase de entrada. Quién
-    // cambia la modalidad (ADR 0104) va aquí, no en el registro.
+    // En la landing: las 6 preguntas clave de decisión; el resto vive en /preguntas-frecuentes.
     preguntas: [
-      "alumnos",
-      "creditos",
-      "listaEspera",
-      "asistencia",
-      "paseQr",
-      "wallet",
-      "plataformas",
-      "web",
-      "sucursales",
-      // Objeciones de quien ya opera con otro sistema (plan de mejoras C01).
-      "migracion",
-      "preparacion",
-      "pagos",
-      // Objeciones de quien compara proveedores (comparativo del 2026-10-20).
+      "precio",
       "permanencia",
-      "comisiones",
-      "datos",
-      "facturacion",
+      "migracion",
+      "alumnos",
       "soporte",
       "modalidad",
-      "precio",
+    ],
+    categoriasFaq: [
+      {
+        clave: "operacion",
+        titulo: "Agenda, alumnos y accesos",
+        descripcion:
+          "Reservas, créditos, lista de espera, asistencia y pase de entrada.",
+        preguntas: [
+          "alumnos",
+          "creditos",
+          "listaEspera",
+          "asistencia",
+          "paseQr",
+          "wallet",
+        ],
+      },
+      {
+        clave: "pagos",
+        titulo: "Cobros, plataformas y sitio web",
+        descripcion:
+          "Pasarelas, comisiones, CFDI, Wellhub / TotalPass y sucursales.",
+        preguntas: [
+          "pagos",
+          "comisiones",
+          "facturacion",
+          "plataformas",
+          "web",
+          "sucursales",
+        ],
+      },
+      {
+        clave: "cuenta",
+        titulo: "Planes, migración y soporte",
+        descripcion:
+          "Tarifas por alumnos activos, importación de datos y acompañamiento.",
+        preguntas: [
+          "precio",
+          "permanencia",
+          "migracion",
+          "preparacion",
+          "datos",
+          "modalidad",
+          "soporte",
+        ],
+      },
     ],
     hero: {
       escritura: [
@@ -441,26 +479,50 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       "bandeja",
       "app",
     ],
-    // Agendar sin cuenta (ADR 0093), cobro al agendar* (ADR 0065), espacios (ADR 0039)
-    // y quién cambia la modalidad (ADR 0104). Agendar desde la web del negocio (ADR
-    // 0141), presupuestos en línea (ADR 0127) y facturas automáticas* (ADR 0163).
+    // En la landing: las 6 preguntas clave de decisión; el resto vive en /preguntas-frecuentes.
     preguntas: [
-      "cuenta",
-      "cualquierProfesional",
+      "precio",
       "cobro",
-      "web",
-      "presupuestos",
-      "factura",
-      "recordatorios",
-      "paquetes",
-      "espacios",
-      "salud",
-      // Objeciones de quien ya opera con otro sistema (plan de mejoras C01).
+      "cuenta",
       "migracion",
-      "preparacion",
       "soporte",
       "modalidad",
-      "precio",
+    ],
+    categoriasFaq: [
+      {
+        clave: "operacion",
+        titulo: "Agenda, clientes y espacios",
+        descripcion:
+          "Reservas sin cuenta, elección de profesional, recordatorios y cabinas.",
+        preguntas: [
+          "cuenta",
+          "cualquierProfesional",
+          "recordatorios",
+          "paquetes",
+          "espacios",
+          "salud",
+        ],
+      },
+      {
+        clave: "pagos",
+        titulo: "Cobros, facturación y sitio web",
+        descripcion:
+          "Anticipos en línea, presupuestos, CFDI automático y widget web.",
+        preguntas: ["cobro", "presupuestos", "factura", "web"],
+      },
+      {
+        clave: "cuenta",
+        titulo: "Planes, migración y soporte",
+        descripcion:
+          "Tarifas por profesionales, importación de clientes y acompañamiento.",
+        preguntas: [
+          "precio",
+          "migracion",
+          "preparacion",
+          "modalidad",
+          "soporte",
+        ],
+      },
     ],
     hero: {
       escritura: [
@@ -485,3 +547,29 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     otra: "clases",
   },
 };
+
+/** Páginas editoriales existentes; nunca inventar una ruta para un giro. */
+const SOLUCION_DE_NEGOCIO: Readonly<Record<string, string>> = {
+  pilates: "pilates",
+  pole: "pole-dance",
+  hyrox: "crossfit-hyrox",
+  crossfit: "crossfit-hyrox",
+  academias: "academias",
+  danza: "academias",
+  acuaticas: "natacion",
+  yoga: "yoga",
+  barberia: "barberias",
+  estetica: "barberias",
+  dentistas: "dentistas",
+  psicologos: "psicologos",
+  wellness: "spas",
+  spa: "spas",
+  nutriologos: "nutriologos",
+  terapeutas: "terapeutas",
+};
+export function solucionDeNegocio(clave: string): string | undefined {
+  const slug = SOLUCION_DE_NEGOCIO[clave];
+  return slug && soluciones.some((s) => s.slug === slug)
+    ? `/software-para-${slug}`
+    : undefined;
+}

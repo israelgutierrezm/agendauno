@@ -18,7 +18,11 @@ import { navegar } from "@/lib/etiquetas";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { preciosPublicos } from "@/marketing/preciosPublicos";
-import { PRODUCTO_COMERCIAL, seoParaRuta } from "@/marketing/seoConfig";
+import {
+  MODO_COMERCIAL,
+  PRODUCTO_COMERCIAL,
+  seoParaRuta,
+} from "@/marketing/seoConfig";
 import {
   registroDelOtroProducto,
   rutasComerciales,
@@ -60,6 +64,14 @@ const router = createRouter({
       modalidad: ModalidadView,
       solucion: () => import("@/views/SolucionView.vue"),
     }),
+    {
+      path: "/preguntas-frecuentes",
+      alias: ["/faq"],
+      name: "preguntas-frecuentes",
+      component: () => import("@/views/PreguntasFrecuentesView.vue"),
+      meta: { marketing: true, modo: MODO_COMERCIAL },
+      props: (r) => ({ modo: modoDeQuery(r.query.modo) ?? MODO_COMERCIAL }),
+    },
     {
       path: "/aviso-de-privacidad",
       name: "aviso-privacidad",
