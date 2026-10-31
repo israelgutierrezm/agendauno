@@ -8,6 +8,7 @@
 !infra/produccion/nginx-cabeceras.conf
 !infra/produccion/nginx-landing-proxy.conf
 !infra/produccion/nginx-api-interna.conf
+!infra/produccion/nginx-negocio.conf
 !infra/produccion/web-mapas.sh
 
 apps/web/node_modules/
