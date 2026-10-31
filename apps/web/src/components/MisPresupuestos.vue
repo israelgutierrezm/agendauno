@@ -72,7 +72,7 @@ onMounted(cargar);
       </button>
     </template>
   </AvisoTono>
-  <section v-if="lista.length > 0" data-prueba="mis-presupuestos">
+  <section v-else-if="lista.length > 0" data-prueba="mis-presupuestos">
     <h2 class="mp-seccion">{{ t("presupuestos.enLinea.misTitulo") }}</h2>
     <ul class="space-y-3">
       <li v-for="p in lista" :key="p.id" class="tu-card p-4">
