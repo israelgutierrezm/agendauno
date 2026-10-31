@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Application\AcreditarMensajesWhatsAppPagados;
 use App\Modules\Tenancy\Application\ComplementosRentaSaas;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
@@ -13,7 +14,6 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Exceptions\TipoCambioNoDisponible;
 use App\Modules\Tenancy\Models\Estudio;
-use App\Modules\Tenancy\Application\AcreditarMensajesWhatsAppPagados;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Throwable;
