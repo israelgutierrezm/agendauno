@@ -92,3 +92,10 @@ silencio. También en los bordes de cupones, presupuestos y corrección de cobro
 - P26t: la ayuda del superadmin (`es-MX.ts`) no pide `charge.refunded` ni `charge.dispute.created` (archivo en revisión).
 - P26x: la mensualidad de la app con marca usa el precio de hoy; versionarlo requiere historial del parámetro.
 - La reversión de P26w solo cubre la baja del invitado; si deja de pagar sin darse de baja no se revierte, porque el beneficio nace ya con su primer mes pagado.
+
+## Salida a producción con las pasarelas comprobadas
+
+Decisión del dueño (2026-10-31): se abre solo con las pasarelas comprobadas contra el
+proveedor real. `PASARELAS_VALIDADAS` en `api.env` las lista; una que no esté no se ofrece a
+los negocios ni se puede encender. Cada una se agrega al pasar los casos 1 a 8 de
+`docs/VERIFICACION-V1.md` y una compra real con su reembolso.

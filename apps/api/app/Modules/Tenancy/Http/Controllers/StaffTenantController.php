@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\CorteNominaTenant;
@@ -59,6 +60,16 @@ class StaffTenantController
         }
 
         $rol = RolSesionTenant::from((string) $validado['rol']);
+        // En una cita, quien la atiende debe atender citas y dar ese servicio; un sustituto
+        // la cambia de profesional, con aviso al cliente (ADR 0217, 0230).
+        if ($sesion->esCita() && $rol !== RolSesionTenant::Asistente) {
+            $reprogramar = app(ReprogramarTenant::class);
+            $reprogramar->exigirQuienDaElServicio($sesion, (int) $usuario->getKey());
+            if ($rol === RolSesionTenant::Sustituto) {
+                $reprogramar->pasarCitaA($sesion, (int) $usuario->getKey(), $actor instanceof Usuario ? $actor : null);
+                $sesion->refresh();
+            }
+        }
         $asignacion = DB::connection('tenant')->transaction(function () use ($sesion, $usuario, $rol, $sustituyeA): AsignacionSesionTenant {
             // Nadie puede estar en dos clases a la vez (imparta, sustituya o asista):
             // se revalida bajo su candado.

@@ -691,6 +691,9 @@ it('una cita no pasa a quien no da el servicio ni a quien no atiende; pasarla av
         ->assertStatus(422)->assertJsonPath('code', 'SESSION_NOT_BOOKABLE');
     // El camino de la sesión completa tampoco se lo salta.
     $this->postJson("{$app}/sesiones/{$sesion}/reprogramar", ['inicia_en_local' => '2026-10-05 11:00:00', 'instructor_id' => $dos], $dueno)->assertStatus(422);
+    // Sustituto: las mismas reglas que pasar la cita.
+    $this->postJson("{$app}/sesiones/{$sesion}/staff", ['usuario_id' => $dos, 'rol' => 'sustituto'], $dueno)->assertStatus(422);
+    $this->postJson("{$app}/sesiones/{$sesion}/staff", ['usuario_id' => $recep, 'rol' => 'sustituto'], $dueno)->assertStatus(422);
     // Asignar: no da el servicio, no atiende citas o sin nadie.
     $this->putJson("{$app}/sesiones/{$sesion}/instructor", ['instructor_id' => $dos], $dueno)->assertStatus(422);
     $this->putJson("{$app}/sesiones/{$sesion}/instructor", ['instructor_id' => $recep], $dueno)->assertStatus(422);

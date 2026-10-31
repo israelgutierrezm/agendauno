@@ -26,7 +26,7 @@ const props = withDefaults(
     sucursal?: string;
     actividad?: string;
   }>(),
-  { puedePedir: false, sucursal: "", actividad: "" },
+  { puedePedir: false, terminos: null, sucursal: "", actividad: "" },
 );
 const emit = defineEmits<{
   pedir: [{ sesion: string; etiqueta: string }];

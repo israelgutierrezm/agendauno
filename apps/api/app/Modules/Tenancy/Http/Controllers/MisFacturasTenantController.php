@@ -67,7 +67,7 @@ class MisFacturasTenantController
                 'moneda' => $f->moneda,
                 'receptor_rfc' => $f->receptor_rfc,
                 'timbrada_en' => $f->timbrada_en?->toIso8601String(),
-                'cancelada' => $f->cancelacion_estado === EstadoCancelacion::Aceptada,
+                'cancelada' => $f->estado === EstadoFactura::Cancelada || $f->cancelacion_estado === EstadoCancelacion::Aceptada,
             ])->values()->all(),
             'meta' => [
                 'total' => $pagina->total(),
@@ -96,7 +96,8 @@ class MisFacturasTenantController
     private function deLaPersona(PersonaTenant $persona): Builder
     {
         return FacturaTenant::query()
-            ->where('estado', EstadoFactura::Timbrada->value)
+            // También las canceladas: dicen qué pasó con la que le llegó por correo.
+            ->whereIn('estado', [EstadoFactura::Timbrada->value, EstadoFactura::Cancelada->value])
             ->where(fn (Builder $q) => $q
                 ->whereHas('orden', fn (Builder $o) => $o->where('persona_id', $persona->getKey()))
                 ->orWhereHas('venta', fn (Builder $v) => $v->where('persona_id', $persona->getKey())));

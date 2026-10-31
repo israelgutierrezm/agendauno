@@ -52,10 +52,17 @@ enum ProveedorPasarela: string
     }
 
     /**
-     * ¿Se puede usar? Las en línea solo si están implementadas; el resto sí.
+     * ¿Se puede usar? Las en línea, si están implementadas y comprobadas contra la pasarela
+     * real (`PASARELAS_VALIDADAS`, ADR 0231); el resto sí.
      */
     public static function disponible(string $proveedor): bool
     {
-        return ! in_array($proveedor, self::enLinea(), true) || in_array($proveedor, self::implementadas(), true);
+        if (! in_array($proveedor, self::enLinea(), true)) {
+            return true;
+        }
+        $validadas = config('agendauno.pasarelas_validadas');
+
+        return in_array($proveedor, self::implementadas(), true)
+            && (! is_array($validadas) || in_array($proveedor, $validadas, true));
     }
 }

@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 return [
+    // Pasarelas de los negocios ya comprobadas contra el proveedor real (ADR 0231), separadas
+    // por coma. Sin definir, todas (desarrollo y pruebas); en producción se lista cada una
+    // al pasar sus casos de docs/VERIFICACION-V1.md. Las demás no se ofrecen.
+    'pasarelas_validadas' => env('PASARELAS_VALIDADAS') === null
+        ? null
+        : array_values(array_filter(array_map('trim', explode(',', (string) env('PASARELAS_VALIDADAS'))))),
 
     /*
     | Driver de las bases de datos por tenant (data plane). En dev/test cada tenant

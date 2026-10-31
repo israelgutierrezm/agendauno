@@ -834,7 +834,7 @@ class ReservasTenant
             $sinCreditos = $sesion->esCita() ? '' : 'No usa créditos. ';
 
             return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, trim(match (true) {
-                ! $pagada => $sinCreditos,
+                ! $pagada => $sesion->esCita() ? 'La cita se cancela sin ningún cargo.' : $sinCreditos,
                 $quien === QuienCancela::Negocio && $this->seDevuelveSolo($reserva) => $sinCreditos.'Ya está pagada en línea: el pago se devolverá automáticamente.',
                 default => $sinCreditos.'Ya está pagada: el pago no se reembolsa automáticamente.',
             }));

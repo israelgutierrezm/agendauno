@@ -349,7 +349,7 @@ class ReprogramarTenant
      * Una cita solo pasa a quien atiende citas (uno dado de baja ya no se encuentra) y da
      * ese servicio (ADR 0217), lo mismo que al agendarla.
      */
-    private function exigirQuienDaElServicio(SesionTenant $sesion, int $instructorId): void
+    public function exigirQuienDaElServicio(SesionTenant $sesion, int $instructorId): void
     {
         $profesional = Usuario::query()->find($instructorId);
         if (! $profesional instanceof Usuario || ! $profesional->esProfesional()) {

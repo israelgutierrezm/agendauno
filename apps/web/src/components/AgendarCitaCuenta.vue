@@ -631,9 +631,9 @@ onMounted(async () => {
         "
         v-model="cupon"
         :revisar="revisarCupon"
-        @aplicado="descuentoCupon = $event"
         :dinero="(m: number) => dinero(m, servicio?.moneda ?? 'MXN')"
         :deshabilitado="agendando"
+        @aplicado="descuentoCupon = $event"
       />
       <AvisoTono v-if="error" tono="peligro" role="alert">
         {{ error }}
