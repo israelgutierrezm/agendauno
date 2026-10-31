@@ -89,3 +89,10 @@ Las ventas del mostrador (ADR 0145) no tenían ningún vínculo con su factura.
   completo.
 - **Presupuesto con impuestos desglosados** (ADR 0127): va en un solo concepto con el
   total. La línea «Impuestos» de la orden no es un producto con IVA encima.
+
+## Ajuste (2026-10-30, ADR 0228)
+
+Cada línea de una orden es su propio concepto, con la foto fiscal de cuando se vendió y
+lo que de verdad se cobró de ella: el descuento y lo devuelto se reparten entre las
+líneas. Ya no se junta todo en un solo concepto con el total, y la línea «Impuestos» de
+un presupuesto desglosado se reparte entre lo vendido.

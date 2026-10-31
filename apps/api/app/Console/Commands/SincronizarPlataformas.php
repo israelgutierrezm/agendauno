@@ -50,6 +50,8 @@ class SincronizarPlataformas extends Command
                             return 0;
                         }
                         $reservas->cerrarTerminadas();
+                        // Lo que una plataforma no pudo cancelar al cancelar la clase (ADR 0230).
+                        $reservas->reintentarDeSesionesCanceladas();
                         // TotalPass no firma sus avisos ni dice si reintenta: se concilia.
                         $reservas->conciliarTotalPass();
 

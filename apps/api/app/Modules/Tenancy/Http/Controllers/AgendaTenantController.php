@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\PagoDeOrdenTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
@@ -246,6 +247,13 @@ class AgendaTenantController
         // La sesión y a quién se la pasa, dentro de su alcance.
         $this->exigirSesionEnAlcance($request, $sesion);
         $this->exigirAlcance($request, (int) $sesion->sucursal_id, $instructorId);
+        // Una cita, solo a quien atiende citas y da ese servicio, y con aviso (ADR 0217, 0230).
+        if ($sesion->esCita()) {
+            $actor = $request->attributes->get('usuario_tenant');
+            app(ReprogramarTenant::class)->pasarCitaA($sesion, $instructorId, $actor instanceof Usuario ? $actor : null);
+
+            return response()->json(['data' => $this->presentarUna($sesion->refresh(), $request)]);
+        }
         // Al reasignar, el nuevo instructor no puede chocar con otra clase (excluye
         // esta), revalidado bajo su candado.
         DB::connection('tenant')->transaction(function () use ($sesion, $instructorId): void {

@@ -59,18 +59,21 @@ class CreditosTenant
     }
 
     /**
-     * Confirma una retencion: asienta el consumo en el ledger y la marca consumida.
+     * Confirma una retencion: asienta el consumo en el ledger y la marca consumida. Con el
+     * derecho bloqueado y después la retencion (el orden de retener): el saldo posterior
+     * del ledger se lee bajo su candado (ADR 0230).
      */
     public function confirmar(RetencionCreditoTenant $retencion, ?ContextoMovimiento $contexto = null): void
     {
         DB::connection('tenant')->transaction(function () use ($retencion, $contexto): void {
+            $derecho = DerechoTenant::query()->whereKey($retencion->derecho_id)->lockForUpdate()->firstOrFail();
             $bloqueada = RetencionCreditoTenant::query()->whereKey($retencion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoRetencion::Activa) {
                 return;
             }
 
-            $this->libro->registrar($bloqueada->derecho, TipoMovimiento::Consumo, -$bloqueada->unidades, 'Confirmacion de retencion', $contexto);
+            $this->libro->registrar($derecho, TipoMovimiento::Consumo, -$bloqueada->unidades, 'Confirmacion de retencion', $contexto);
             $bloqueada->update(['estado' => EstadoRetencion::Consumida]);
         });
     }
@@ -107,18 +110,20 @@ class CreditosTenant
 
     /**
      * Pierde (forfeit) una retencion: las unidades se consumen sin servicio (p. ej.
-     * cancelacion tardia). Asienta el consumo y la marca perdida.
+     * cancelacion tardia). Asienta el consumo y la marca perdida, con el mismo orden de
+     * candados que {@see confirmar()}.
      */
     public function perder(RetencionCreditoTenant $retencion, ?ContextoMovimiento $contexto = null): void
     {
         DB::connection('tenant')->transaction(function () use ($retencion, $contexto): void {
+            $derecho = DerechoTenant::query()->whereKey($retencion->derecho_id)->lockForUpdate()->firstOrFail();
             $bloqueada = RetencionCreditoTenant::query()->whereKey($retencion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoRetencion::Activa) {
                 return;
             }
 
-            $this->libro->registrar($bloqueada->derecho, TipoMovimiento::Consumo, -$bloqueada->unidades, 'Retencion perdida (forfeit)', $contexto);
+            $this->libro->registrar($derecho, TipoMovimiento::Consumo, -$bloqueada->unidades, 'Retencion perdida (forfeit)', $contexto);
             $bloqueada->update(['estado' => EstadoRetencion::Perdida]);
         });
     }

@@ -59,7 +59,7 @@ class PagoTardioTenant
             IncidenciaCobroTenant::PAGO_TARDIO,
             $pago,
             $sesion instanceof SesionTenant
-                ? "Llegó el pago ({$monto}) cuando su apartado ya había vencido y el horario ya no estaba disponible. Devuélvelo o reagenda con el cliente."
+                ? "Llegó el pago ({$monto}) cuando su apartado ya había vencido y ya no se pudo confirmar: el horario se ocupó o ya tiene otra reserva. Devuélvelo o reagenda con el cliente."
                 : "Llegó el pago ({$monto}) de una compra que ya estaba cancelada. Devuélvelo o resuélvelo con el cliente.",
         );
 

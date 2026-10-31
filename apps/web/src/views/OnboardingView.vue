@@ -20,6 +20,7 @@ import {
 } from "@/lib/formato";
 import { girosDe } from "@/lib/modalidad";
 import { claveZona, ZONA_POR_OMISION, ZONAS_HORARIAS } from "@/lib/region";
+import { CambioDeZonaCancelado, guardarSede } from "@/lib/zonaDeSede";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -413,7 +414,10 @@ async function ejecutar(accion: () => Promise<void>): Promise<void> {
       indice.value += 1;
     }
   } catch (e) {
-    error.value = mensajeDeError(e);
+    // No confirmó el cambio de zona (ADR 0230): nada cambió y sigue en este paso.
+    if (!(e instanceof CambioDeZonaCancelado)) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     guardando.value = false;
   }
@@ -427,7 +431,7 @@ async function guardarNegocio(): Promise<void> {
   };
   const sede = sucursales.value[0];
   if (sede !== undefined) {
-    await api.put(`${base.value}/sucursales/${sede.id}`, datos);
+    await guardarSede(`${base.value}/sucursales/${sede.id}`, datos, t);
   } else {
     const org = await api.post<{ data: { id: string } }>(
       `${base.value}/organizaciones`,

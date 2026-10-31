@@ -88,8 +88,8 @@ class CalcularDisponibilidadTenant
         }
         // Si el servicio requiere cabina o equipo (2.4), el hueco necesita uno libre.
         $conRecurso = $servicio !== null && $this->recursos->requiere($servicio) ? $servicio : null;
-        // Día cerrado del negocio (feriado, cierre): no se ofrecen citas.
-        if (ExcepcionHorarioTenant::query()->whereDate('fecha', $fecha)->exists()) {
+        // Día cerrado de la sede o del negocio (feriado, cierre): no se ofrecen citas.
+        if (ExcepcionHorarioTenant::query()->queAplicanA((int) $sucursal->getKey())->whereDate('fecha', $fecha)->exists()) {
             return [];
         }
 
@@ -196,6 +196,7 @@ class CalcularDisponibilidadTenant
             ->map(static fn ($ventanas): string => (string) $ventanas->map(static fn (HorarioAtencionTenant $v): string => self::hora((string) $v->hora_fin))->max());
 
         $cerrados = ExcepcionHorarioTenant::query()
+            ->queAplicanA((int) $sucursal->getKey())
             ->whereDate('fecha', '>=', $inicio->toDateString())
             ->whereDate('fecha', '<=', $fin->toDateString())
             ->get(['fecha'])
@@ -254,7 +255,7 @@ class CalcularDisponibilidadTenant
         if ($desde->toDateString() !== $hasta->toDateString() && $hasta->format('H:i') !== '00:00') {
             return false;
         }
-        if (ExcepcionHorarioTenant::query()->whereDate('fecha', $desde->toDateString())->exists()) {
+        if (ExcepcionHorarioTenant::query()->queAplicanA((int) $sucursal->getKey())->whereDate('fecha', $desde->toDateString())->exists()) {
             return false;
         }
 

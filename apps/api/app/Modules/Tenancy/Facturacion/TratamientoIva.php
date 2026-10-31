@@ -27,6 +27,17 @@ enum TratamientoIva: string
     }
 
     /**
+     * El importe sin IVA de un precio con IVA, redondeado al centavo (la mitad hacia
+     * arriba), en enteros: el CFDI le suma el IVA.
+     */
+    public function sinIva(int $conIvaMinor, int $ivaGeneralBps): int
+    {
+        $base = 10000 + $this->bps($ivaGeneralBps);
+
+        return intdiv($conIvaMinor * 20000 + $base, 2 * $base);
+    }
+
+    /**
      * Los impuestos del concepto como los pide FacturAPI.
      *
      * @return list<array<string, mixed>>

@@ -33,6 +33,8 @@ class ReservaTenant extends Model
         'anticipo_minor', 'saldo_orden_id',
         // La cita se agendó con un servicio pagado por adelantado (ADR 0218).
         'linea_orden_id',
+        // La cita se agendó desde la página pública, sin cuenta (ADR 0230).
+        'sin_cuenta',
     ];
 
     /**
@@ -43,6 +45,7 @@ class ReservaTenant extends Model
         'lugar' => 'integer',
         'unidades' => 'integer',
         'sin_avisos' => 'boolean',
+        'sin_cuenta' => 'boolean',
         'costo_unidades' => 'integer',
         'anticipo_minor' => 'integer',
         'horas_limite' => 'integer',

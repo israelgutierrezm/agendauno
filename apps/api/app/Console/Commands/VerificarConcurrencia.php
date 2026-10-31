@@ -129,6 +129,8 @@ class VerificarConcurrencia extends Command
             $this->caso('Cancelar y reprogramar la misma reserva a la vez', fn () => $this->cancelarYReprogramar($escenarios, $rondas));
             $this->caso('Reprogramaciones y reservas por el último lugar', fn () => $this->reprogramarAlUltimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
+            $this->caso('Cancelar una reserva mientras el negocio cancela la clase', fn () => $this->cancelarContraCancelarSesion($escenarios, $rondas));
+            $this->caso('Un invitado y una reserva por el último lugar', fn () => $this->invitadoContraReserva($escenarios, $rondas));
             $this->caso('Cambios de grupo a la vez en sentidos opuestos', fn () => $this->cambiosDeGrupoOpuestos($escenarios, $rondas));
             $this->caso('Ajustes de inventario y una venta a la vez con poco stock', fn () => $this->inventarioSinNegativos($escenarios, $rondas));
             $this->caso('Ventas del mostrador a la vez por la última pieza', fn () => $this->ultimaPieza($escenarios, $rondas, $procesos));
@@ -545,6 +547,71 @@ class VerificarConcurrencia extends Command
             }
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).": cancelación + 4 por el lugar → {$ocupadas} de 2", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Una alumna cancela su reserva mientras el negocio cancela la clase (ADR 0230): las dos
+     * toman la sesión y luego la reserva, así que ninguna espera a la otra para siempre. Las
+     * dos operaciones terminan, la reserva y la clase quedan canceladas y su crédito vuelve
+     * una sola vez.
+     *
+     * @return list<string>
+     */
+    private function cancelarContraCancelarSesion(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        $reservas = app(ReservasTenant::class);
+        for ($r = 0; $r < $rondas * 2; $r++) {
+            $sesion = $e->sesion($this->base['clase'], $this->base['sucursal'], 10, 75 + $r, 17);
+            $alumno = $e->alumno(10);
+            $reserva = $reservas->crear($sesion, $alumno);
+            $res = $this->competir([
+                ['accion' => 'cancelar', 'reserva' => $reserva->getKey()],
+                ['accion' => 'cancelar-sesion', 'sesion' => $sesion->getKey()],
+            ]);
+
+            $final = $reserva->refresh();
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $hechos === 2, "{$hechos} de 2 cancelaciones terminaron");
+            $this->comprobar($fallas, $final->estado === EstadoReserva::Cancelada, "la reserva quedó {$final->estado->value}");
+            $this->comprobar($fallas, $e->sesionCancelada((int) $sesion->getKey()), 'la clase no quedó cancelada');
+            foreach ($e->creditosCuadran($alumno) as $f) {
+                $fallas[] = $f;
+            }
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": cancelar y cancelar la clase a la vez → {$hechos} terminaron", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Queda un lugar: una alumna aparta el suyo mientras otra invita a alguien con su pase
+     * (ADR 0182, 0230). Las dos toman la sesión primero, así que solo una se queda con el
+     * lugar y la clase nunca se pasa de su cupo.
+     *
+     * @return list<string>
+     */
+    private function invitadoContraReserva(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas * 2; $r++) {
+            $sesion = $e->sesion($this->base['clase'], $this->base['sucursal'], 1, 1 + $r % 3, 8 + $r);
+            $res = $this->competir([
+                ['accion' => 'invitar', 'sesion' => $sesion->getKey(), 'persona' => $e->alumnoConPases()->getKey()],
+                ['accion' => 'reservar', 'sesion' => $sesion->getKey(), 'persona' => $e->alumno(10)->getKey()],
+            ]);
+
+            $ocupados = $e->lugaresOcupados((int) $sesion->getKey());
+            $hechos = $this->hechos($res);
+            $this->comprobar($fallas, $ocupados === 1, "{$ocupados} con lugar en una clase de 1");
+            $this->comprobar($fallas, $hechos === 1, "{$hechos} se quedaron con el único lugar");
+            $this->inesperados($fallas, $res);
+            $quien = $res[0]['hecho'] ? 'el invitado' : ($res[1]['hecho'] ? 'la reserva' : 'nadie');
+            $this->detalle('ronda '.($r + 1).": se quedó con el lugar {$quien}", $res);
         }
 
         return $fallas;

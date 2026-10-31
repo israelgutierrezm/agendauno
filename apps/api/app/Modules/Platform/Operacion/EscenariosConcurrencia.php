@@ -12,10 +12,12 @@ use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CobroDeCitaTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\DevolverVentaPosTenant;
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\InscribirEnGrupoTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
+use App\Modules\Tenancy\Application\InvitadosTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
@@ -88,6 +90,8 @@ class EscenariosConcurrencia
 
     /** @var array<int, ProductoTenant> paquete por número de clases */
     private array $paquetes = [];
+
+    private ?ProductoTenant $planConPases = null;
 
     public function __construct(
         private readonly MembresiasTenant $membresias,
@@ -423,6 +427,8 @@ class EscenariosConcurrencia
             'facturar-venta' => $this->prepararFacturarVenta((int) $paso['venta']),
             'anular-venta' => $this->prepararAnularVenta((int) $paso['venta']),
             'cancelar' => $this->prepararCancelar((int) $paso['reserva']),
+            'cancelar-sesion' => $this->prepararCancelarSesion((int) $paso['sesion']),
+            'invitar' => $this->prepararInvitar((int) $paso['sesion'], (int) $paso['persona']),
             'mover-clase' => $this->prepararMoverClase((int) $paso['reserva'], (int) $paso['sesion']),
             'mover-cita' => $this->prepararMoverCita((int) $paso['reserva'], (string) $paso['inicia']),
             'ajustar-inventario' => $this->prepararAjustarInventario((int) $paso['articulo'], (int) $paso['sucursal'], (int) $paso['delta']),
@@ -738,6 +744,53 @@ class EscenariosConcurrencia
         $reserva = ReservaTenant::query()->findOrFail($reservaId);
 
         return fn (): string => $this->reservas->cancelar($reserva)->estado->value;
+    }
+
+    /** El negocio cancela la clase completa (ADR 0230): sus reservas, sus invitados y sus lugares. */
+    private function prepararCancelarSesion(int $sesionId): callable
+    {
+        $sesion = SesionTenant::query()->findOrFail($sesionId);
+
+        return function () use ($sesion): string {
+            $this->reservas->cancelarSesion($sesion);
+
+            return (string) $sesion->refresh()->estado->value;
+        };
+    }
+
+    /** Un alumno aparta un lugar para su invitado (ADR 0182). */
+    private function prepararInvitar(int $sesionId, int $personaId): callable
+    {
+        $sesion = SesionTenant::query()->findOrFail($sesionId);
+        $persona = PersonaTenant::query()->findOrFail($personaId);
+        $invitados = app(InvitadosTenant::class);
+
+        return fn (): string => $invitados->invitar($sesion, $persona, 'Invitado')->estado;
+    }
+
+    /** Un alumno con un plan que trae pases de invitado (ADR 0182). */
+    public function alumnoConPases(): PersonaTenant
+    {
+        $persona = $this->alumno(0);
+        if ($this->planConPases === null) {
+            $this->planConPases = $this->membresias->crearProducto('Plan con invitados', TipoProducto::Paquete, 10000, 'MXN', false, 10000);
+            $this->planConPases->update(['invitados_por_mes' => 5]);
+        }
+        $this->membresias->venderProducto($persona, $this->planConPases);
+
+        return $persona;
+    }
+
+    /** Los lugares ocupados de una clase: reservas, plataformas e invitados. */
+    public function lugaresOcupados(int $sesionId): int
+    {
+        return app(CupoDeSesionTenant::class)->ocupadas(SesionTenant::query()->findOrFail($sesionId));
+    }
+
+    /** Si la clase quedó cancelada. */
+    public function sesionCancelada(int $sesionId): bool
+    {
+        return SesionTenant::query()->findOrFail($sesionId)->estado === EstadoSesionTenant::Cancelada;
     }
 
     private function prepararMoverClase(int $reservaId, int $sesionId): callable

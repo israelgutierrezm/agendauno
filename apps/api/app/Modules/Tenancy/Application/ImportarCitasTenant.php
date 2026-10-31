@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
+use App\Modules\Tenancy\Support\RevisionSinCandados;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -25,8 +26,15 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Importa las citas futuras de otro sistema (H, ADR 0160): cliente, servicio,
- * profesional, sede, fecha y hora. Atómico: si una fila no se puede, no se importa
- * ninguna. La vista previa ejecuta las mismas reglas y revierte.
+ * profesional, sede, fecha y hora. Si una fila no se puede, no se importa ninguna. La
+ * vista previa ejecuta las mismas reglas y revierte.
+ *
+ * - **Sin detener la agenda (ADR 0230):** la revisión de todo el archivo (la vista previa
+ *   y el primer paso de importar) corre sin candados ({@see RevisionSinCandados}) y lo que
+ *   pasa la revisión se guarda en lotes chicos, cada uno con sus candados y su transacción:
+ *   las citas en línea no esperan a un archivo de mil filas. Si entre la revisión y un
+ *   lote otra cita ocupa un horario, ese lote no entra y se dice cuántas ya entraron;
+ *   volver a subir el archivo no las duplica.
  *
  * - **Correspondencias:** un servicio, profesional o sede con otro nombre en el archivo
  *   se elige una vez (`correspondencias[campo][valor] = ulid`) y vale para todas sus
@@ -63,6 +71,9 @@ class ImportarCitasTenant
     /** Lo que se elige por correspondencia. */
     public const CAMPOS = ['servicio', 'profesional', 'sucursal'];
 
+    /** Filas por transacción al guardar: lo que un profesional espera a lo más. */
+    public const FILAS_POR_LOTE = 20;
+
     public function __construct(
         private readonly AgendarCitaTenant $agendar,
         private readonly AltaDeMiembroTenant $altas,
@@ -83,116 +94,193 @@ class ImportarCitasTenant
         if (count($filas) > $max) {
             throw ValidationException::withMessages(['archivo' => ["Se importan hasta {$max} citas a la vez."]]);
         }
+
+        // La revisión de todo el archivo: las mismas reglas, sin candados y sin que se quede nada.
+        $revisado = self::recorridoNuevo();
+        RevisionSinCandados::correr(function () use ($filas, $actor, $correspondencias, $recordar, &$revisado): void {
+            $this->recorrer($filas, $actor, $correspondencias, $recordar, $revisado);
+        });
+        $resumen = $this->resumen($revisado);
+        $faltantes = array_map(static fn (array $v): array => array_values(array_unique($v)), $revisado['faltantes']);
+        $ok = $resumen['invalidas'] === 0;
+
+        if (! $guardar || ! $ok) {
+            return ['ok' => $ok, 'creados' => 0, 'lote' => null, 'resumen' => $resumen, 'faltantes' => $faltantes, 'filas' => $revisado['salida']];
+        }
+        if ($revision !== null && $revision !== self::revision($revisado['salida'])) {
+            throw ValidationException::withMessages(['archivo' => ['Algo cambió desde la vista previa (otra cita ocupó un horario): vuelve a revisar el archivo.']]);
+        }
+
+        $lote = (string) Str::ulid();
+        $guardado = $this->guardarPorLotes($filas, $actor, $correspondencias, $recordar, $lote);
+        $resumen = $this->resumen($guardado);
+
+        return ['ok' => true, 'creados' => $resumen['total'] - $resumen['omitidas'], 'lote' => $lote, 'resumen' => $resumen, 'faltantes' => $faltantes, 'filas' => $guardado['salida']];
+    }
+
+    /**
+     * Guarda el archivo ya revisado, un lote chico por transacción. Si una fila que pasó la
+     * revisión ya no se puede (otra cita ocupó su horario justo ahora), su lote no entra y
+     * se responde cuántas citas ya quedaron: volver a subirlo no las duplica.
+     *
+     * @param  list<array<string, string|int|null>>  $filas
+     * @param  array<string, array<string, string>>  $correspondencias
+     * @return array{salida: list<array<string, mixed>>, faltantes: array<string, list<string>>, vistas: array<string, true>, referencias: array<string, true>, nuevos: int, por_cobrar: array{citas: int, minor: int, pagadas_antes: int}}
+     */
+    private function guardarPorLotes(array $filas, Usuario $actor, array $correspondencias, bool $recordar, string $lote): array
+    {
         $db = DB::connection('tenant');
-        $db->beginTransaction();
+        $nivel = $db->transactionLevel();
+        $recorrido = self::recorridoNuevo();
+        $confirmado = $recorrido;
         try {
-            $salida = [];
-            $faltantes = array_fill_keys(self::CAMPOS, []);
-            $vistas = [];
-            $referencias = [];
-            $nuevos = 0;
-            $porCobrar = ['citas' => 0, 'minor' => 0, 'pagadas_antes' => 0];
-            $moneda = $this->parametros->moneda();
-            $lote = (string) Str::ulid();
-            foreach ($filas as $indice => $cruda) {
-                $numero = (int) ($cruda['_fila'] ?? $indice + 2);
-                unset($cruda['_fila']);
-                $datos = array_map(static fn ($v): string => trim((string) $v), $cruda) + array_fill_keys(self::COLUMNAS, '');
-                $resultado = ['fila' => $numero, 'datos' => $datos, 'errores' => [], 'avisos' => [], 'omitida' => false, 'cliente' => null, 'inicia_en' => null];
-                $db->beginTransaction();
-                try {
-                    $this->validar($datos);
-                    $oferta = $this->resolver(OfertaTenant::query()->vigentes(), 'servicio', $datos['servicio'], 'nombre', $correspondencias, $faltantes);
-                    $sucursal = $this->resolver(SucursalTenant::query(), 'sucursal', $datos['sucursal'], 'nombre', $correspondencias, $faltantes);
-                    $profesional = $this->resolver(Usuario::query()->profesionales()->where('activo', true), 'profesional', $datos['profesional'], 'name', $correspondencias, $faltantes);
-                    if (! $this->acceso->permiteSucursal($actor, (int) $sucursal->getKey())) {
-                        $this->error('sucursal', 'No tienes acceso a esta sucursal.');
-                    }
-                    if (! $this->acceso->permiteSucursal($profesional, (int) $sucursal->getKey())) {
-                        $this->error('profesional', "{$profesional->name} no atiende en {$sucursal->nombre}.");
-                    }
-                    $zona = $sucursal->zona_horaria !== '' ? $sucursal->zona_horaria : 'America/Mexico_City';
-                    $inicia = CarbonImmutable::parse("{$datos['fecha']} {$datos['hora']}", $zona)->utc();
-                    if (! $inicia->isFuture()) {
-                        $this->error('fecha', 'Ya pasó: solo se importan citas futuras.');
-                    }
-                    $clave = mb_strtolower(($datos['cliente_ref'] ?: $datos['email'] ?: $datos['celular']).'|'.$inicia->toIso8601String());
-                    if (isset($vistas[$clave])) {
-                        $this->error('fecha', 'Esta cita está repetida en el archivo.');
-                    }
-                    $vistas[$clave] = true;
-                    if ($datos['referencia'] !== '') {
-                        if (isset($referencias[$datos['referencia']])) {
-                            $this->error('referencia', 'Esa referencia está repetida en el archivo.');
-                        }
-                        $referencias[$datos['referencia']] = true;
-                    }
-                    $pagado = $this->pagado($datos['pagado']);
-
-                    [$persona, $esNueva] = $this->cliente($datos, $actor, (int) $sucursal->getKey());
-                    if ($datos['referencia'] === '') {
-                        $this->movidaElMismoDia($persona, $oferta, $sucursal, $inicia);
-                    }
-                    $resultado['cliente'] = ['nombre' => $persona->nombreCompleto(), 'nueva' => $esNueva];
-                    $resultado['inicia_en'] = $inicia->toIso8601String();
-                    if ($this->yaImportada($datos['referencia'], $persona, $oferta, $sucursal, $profesional, $inicia)) {
-                        $resultado['omitida'] = true;
-                        $resultado['avisos'][] = 'Ya estaba agendada: no se duplica.';
-                    } else {
-                        $reserva = $this->agendar->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, 0, true);
-                        if ($datos['referencia'] !== '') {
-                            $reserva->forceFill(['referencia_externa' => $datos['referencia']])->save();
-                        }
-                        $this->sinAvisos($reserva, $recordar);
-                        $resultado['avisos'] = [...$resultado['avisos'], ...$this->saldoInicial($reserva, $pagado, $porCobrar, $moneda)];
-                        $nuevos += $esNueva ? 1 : 0;
-                        if ($esNueva) {
-                            $resultado['avisos'][] = 'Se crea su ficha.';
+            foreach (array_chunk($filas, self::FILAS_POR_LOTE, true) as $filasDelLote) {
+                $db->transaction(function () use ($filasDelLote, $actor, $correspondencias, $recordar, &$recorrido): void {
+                    $yaVistas = count($recorrido['salida']);
+                    $this->recorrer($filasDelLote, $actor, $correspondencias, $recordar, $recorrido);
+                    foreach (array_slice($recorrido['salida'], $yaVistas) as $fila) {
+                        if ($fila['errores'] !== []) {
+                            throw new FilaYaNoSePuede((int) $fila['fila'], (string) $fila['errores'][0]);
                         }
                     }
-                    $db->commit();
-                } catch (ValidationException $e) {
-                    $db->rollBack();
-                    $resultado['errores'] = array_values(array_merge(...array_values($e->errors())));
-                } catch (ReservaException $e) {
-                    $db->rollBack();
-                    $resultado['errores'][] = $e->getMessage();
-                }
-                $salida[] = $resultado;
+                });
+                $confirmado = $recorrido;
             }
+        } catch (FilaYaNoSePuede $e) {
+            $entraron = count($confirmado['salida']) - count(array_filter($confirmado['salida'], static fn (array $f): bool => $f['omitida']));
+            $this->anotarImportacion($actor, $lote, $confirmado, $recordar);
 
-            $invalidas = count(array_filter($salida, static fn (array $f): bool => $f['errores'] !== []));
-            $omitidas = count(array_filter($salida, static fn (array $f): bool => $f['omitida']));
-            $ok = $invalidas === 0;
-            $creados = count($salida) - $invalidas - $omitidas;
-            $resumen = [
-                'total' => count($salida), 'validas' => count($salida) - $invalidas, 'invalidas' => $invalidas, 'omitidas' => $omitidas, 'clientes_nuevos' => $nuevos,
-                // Lo que quedará por cobrar en caja (R14) y lo ya pagado en el otro sistema.
-                'por_cobrar' => $porCobrar['citas'], 'por_cobrar_minor' => $porCobrar['minor'], 'pagadas_antes' => $porCobrar['pagadas_antes'], 'moneda' => $moneda,
-            ];
-            $faltantes = array_map(static fn (array $v): array => array_values(array_unique($v)), $faltantes);
-
-            if (! $guardar || ! $ok || ($revision !== null && $revision !== self::revision($salida))) {
-                $db->rollBack();
-                if ($guardar && $ok) {
-                    throw ValidationException::withMessages(['archivo' => ['Algo cambió desde la vista previa (otra cita ocupó un horario): vuelve a revisar el archivo.']]);
-                }
-
-                return ['ok' => $ok, 'creados' => 0, 'lote' => null, 'resumen' => $resumen, 'faltantes' => $faltantes, 'filas' => $salida];
-            }
-
-            $this->auditoria->registrar($actor, 'importacion.citas', 'importacion', $lote, null, [
-                'citas' => $creados, 'omitidas' => $omitidas, 'clientes_nuevos' => $nuevos, 'recordatorios' => $recordar,
-            ]);
-            $db->commit();
-
-            return ['ok' => true, 'creados' => $creados, 'lote' => $lote, 'resumen' => $resumen, 'faltantes' => $faltantes, 'filas' => $salida];
+            throw ValidationException::withMessages(['archivo' => [
+                "Algo cambió mientras se importaba (fila {$e->fila}: {$e->getMessage()}). Ya entraron {$entraron} citas: vuelve a revisar el archivo; las que ya entraron no se duplican.",
+            ]]);
         } catch (\Throwable $e) {
-            if ($db->transactionLevel() > 0) {
+            // Nada del lote queda abierto (una fila pudo cortarse a la mitad).
+            while ($db->transactionLevel() > $nivel) {
                 $db->rollBack();
             }
 
             throw $e;
+        }
+        $this->anotarImportacion($actor, $lote, $recorrido, $recordar);
+
+        return $recorrido;
+    }
+
+    /**
+     * @param  array{salida: list<array<string, mixed>>, faltantes: array<string, list<string>>, vistas: array<string, true>, referencias: array<string, true>, nuevos: int, por_cobrar: array{citas: int, minor: int, pagadas_antes: int}}  $recorrido
+     */
+    private function anotarImportacion(Usuario $actor, string $lote, array $recorrido, bool $recordar): void
+    {
+        $omitidas = count(array_filter($recorrido['salida'], static fn (array $f): bool => $f['omitida']));
+        $this->auditoria->registrar($actor, 'importacion.citas', 'importacion', $lote, null, [
+            'citas' => count($recorrido['salida']) - $omitidas, 'omitidas' => $omitidas, 'clientes_nuevos' => $recorrido['nuevos'], 'recordatorios' => $recordar,
+        ]);
+    }
+
+    /**
+     * Lo que se lleva de una fila a la siguiente al recorrer un archivo.
+     *
+     * @return array{salida: list<array<string, mixed>>, faltantes: array<string, list<string>>, vistas: array<string, true>, referencias: array<string, true>, nuevos: int, por_cobrar: array{citas: int, minor: int, pagadas_antes: int}}
+     */
+    private static function recorridoNuevo(): array
+    {
+        return ['salida' => [], 'faltantes' => array_fill_keys(self::CAMPOS, []), 'vistas' => [], 'referencias' => [], 'nuevos' => 0, 'por_cobrar' => ['citas' => 0, 'minor' => 0, 'pagadas_antes' => 0]];
+    }
+
+    /**
+     * @param  array{salida: list<array<string, mixed>>, faltantes: array<string, list<string>>, vistas: array<string, true>, referencias: array<string, true>, nuevos: int, por_cobrar: array{citas: int, minor: int, pagadas_antes: int}}  $recorrido
+     * @return array{total: int, validas: int, invalidas: int, omitidas: int, clientes_nuevos: int, por_cobrar: int, por_cobrar_minor: int, pagadas_antes: int, moneda: string}
+     */
+    private function resumen(array $recorrido): array
+    {
+        $salida = $recorrido['salida'];
+        $invalidas = count(array_filter($salida, static fn (array $f): bool => $f['errores'] !== []));
+
+        return [
+            'total' => count($salida), 'validas' => count($salida) - $invalidas, 'invalidas' => $invalidas,
+            'omitidas' => count(array_filter($salida, static fn (array $f): bool => $f['omitida'])), 'clientes_nuevos' => $recorrido['nuevos'],
+            // Lo que quedará por cobrar en caja (R14) y lo ya pagado en el otro sistema.
+            'por_cobrar' => $recorrido['por_cobrar']['citas'], 'por_cobrar_minor' => $recorrido['por_cobrar']['minor'], 'pagadas_antes' => $recorrido['por_cobrar']['pagadas_antes'], 'moneda' => $this->parametros->moneda(),
+        ];
+    }
+
+    /**
+     * Aplica cada fila con las reglas de agendar, cada una con su punto de regreso: la que
+     * no se puede se deshace y dice por qué. Debe correr dentro de una transacción.
+     *
+     * @param  array<int, array<string, string|int|null>>  $filas
+     * @param  array<string, array<string, string>>  $correspondencias
+     * @param  array{salida: list<array<string, mixed>>, faltantes: array<string, list<string>>, vistas: array<string, true>, referencias: array<string, true>, nuevos: int, por_cobrar: array{citas: int, minor: int, pagadas_antes: int}}  $recorrido
+     */
+    private function recorrer(array $filas, Usuario $actor, array $correspondencias, bool $recordar, array &$recorrido): void
+    {
+        $db = DB::connection('tenant');
+        $moneda = $this->parametros->moneda();
+        foreach ($filas as $indice => $cruda) {
+            $numero = (int) ($cruda['_fila'] ?? $indice + 2);
+            unset($cruda['_fila']);
+            $datos = array_map(static fn ($v): string => trim((string) $v), $cruda) + array_fill_keys(self::COLUMNAS, '');
+            $resultado = ['fila' => $numero, 'datos' => $datos, 'errores' => [], 'avisos' => [], 'omitida' => false, 'cliente' => null, 'inicia_en' => null];
+            $db->beginTransaction();
+            try {
+                $this->validar($datos);
+                $oferta = $this->resolver(OfertaTenant::query()->vigentes(), 'servicio', $datos['servicio'], 'nombre', $correspondencias, $recorrido['faltantes']);
+                $sucursal = $this->resolver(SucursalTenant::query(), 'sucursal', $datos['sucursal'], 'nombre', $correspondencias, $recorrido['faltantes']);
+                $profesional = $this->resolver(Usuario::query()->profesionales()->where('activo', true), 'profesional', $datos['profesional'], 'name', $correspondencias, $recorrido['faltantes']);
+                if (! $this->acceso->permiteSucursal($actor, (int) $sucursal->getKey())) {
+                    $this->error('sucursal', 'No tienes acceso a esta sucursal.');
+                }
+                if (! $this->acceso->permiteSucursal($profesional, (int) $sucursal->getKey())) {
+                    $this->error('profesional', "{$profesional->name} no atiende en {$sucursal->nombre}.");
+                }
+                $zona = $sucursal->zona_horaria !== '' ? $sucursal->zona_horaria : 'America/Mexico_City';
+                $inicia = CarbonImmutable::parse("{$datos['fecha']} {$datos['hora']}", $zona)->utc();
+                if (! $inicia->isFuture()) {
+                    $this->error('fecha', 'Ya pasó: solo se importan citas futuras.');
+                }
+                $clave = mb_strtolower(($datos['cliente_ref'] ?: $datos['email'] ?: $datos['celular']).'|'.$inicia->toIso8601String());
+                if (isset($recorrido['vistas'][$clave])) {
+                    $this->error('fecha', 'Esta cita está repetida en el archivo.');
+                }
+                $recorrido['vistas'][$clave] = true;
+                if ($datos['referencia'] !== '') {
+                    if (isset($recorrido['referencias'][$datos['referencia']])) {
+                        $this->error('referencia', 'Esa referencia está repetida en el archivo.');
+                    }
+                    $recorrido['referencias'][$datos['referencia']] = true;
+                }
+                $pagado = $this->pagado($datos['pagado']);
+
+                [$persona, $esNueva] = $this->cliente($datos, $actor, (int) $sucursal->getKey());
+                if ($datos['referencia'] === '') {
+                    $this->movidaElMismoDia($persona, $oferta, $sucursal, $inicia);
+                }
+                $resultado['cliente'] = ['nombre' => $persona->nombreCompleto(), 'nueva' => $esNueva];
+                $resultado['inicia_en'] = $inicia->toIso8601String();
+                if ($this->yaImportada($datos['referencia'], $persona, $oferta, $sucursal, $profesional, $inicia)) {
+                    $resultado['omitida'] = true;
+                    $resultado['avisos'][] = 'Ya estaba agendada: no se duplica.';
+                } else {
+                    $reserva = $this->agendar->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, 0, true);
+                    if ($datos['referencia'] !== '') {
+                        $reserva->forceFill(['referencia_externa' => $datos['referencia']])->save();
+                    }
+                    $this->sinAvisos($reserva, $recordar);
+                    $resultado['avisos'] = [...$resultado['avisos'], ...$this->saldoInicial($reserva, $pagado, $recorrido['por_cobrar'], $moneda)];
+                    $recorrido['nuevos'] += $esNueva ? 1 : 0;
+                    if ($esNueva) {
+                        $resultado['avisos'][] = 'Se crea su ficha.';
+                    }
+                }
+                $db->commit();
+            } catch (ValidationException $e) {
+                $db->rollBack();
+                $resultado['errores'] = array_values(array_merge(...array_values($e->errors())));
+            } catch (ReservaException $e) {
+                $db->rollBack();
+                $resultado['errores'][] = $e->getMessage();
+            }
+            $recorrido['salida'][] = $resultado;
         }
     }
 

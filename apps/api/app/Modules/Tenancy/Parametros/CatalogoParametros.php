@@ -93,6 +93,9 @@ final class CatalogoParametros
                 'Minutos antes de que empiece la clase. Antes no se registra la asistencia.', $e, 30, 0, 240, 'min'),
             new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
                 'Si nadie registró la asistencia de alguien, al terminar la clase queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
+            // Tras una caída del programador o la cola, hasta dónde se retoma (ADR 0230).
+            new DefinicionParametro('asistencia.dias_retomar_inasistencias', 'Asistencia', 'Días hacia atrás al retomar las inasistencias automáticas',
+                'Si el proceso estuvo detenido, marca lo que terminó en estos días. Lo anterior ya no se toca.', $e, 7, 1, 30, 'días', porNegocio: false),
 
             // Familias y responsables (ADR 0123).
             new DefinicionParametro('familias.max_participantes', 'Familias', 'Participantes por responsable',

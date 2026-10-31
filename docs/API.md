@@ -516,6 +516,42 @@ Todo con `estudio.gestionar` y la función `comisiones`, y en la bitácora (Equi
 - API de integración: `GET /integracion/reservas` (`reservas.ver`), `/integracion/derechos`
   (`derechos.ver`) y `/integracion/ordenes` (`ordenes.ver`), 200 registros como máximo.
 
+## Revisión de la agenda para producción (ADR 0230)
+
+- **Días cerrados por sede.** `GET /excepciones-horario` agrega `sucursal_id`, `sucursal`
+  (null = todo el negocio) y `editable`; quien está acotado ve los de sus sedes y los del
+  negocio. `GET /excepciones-horario/afectadas?fecha=&sucursal_id=` y `POST
+  /excepciones-horario` aceptan `sucursal_id` (sin él, todo el negocio); idempotente por fecha
+  y sede. Crear o quitar uno de todo el negocio es de quien ve todas las sedes y uno de una
+  sede, de quien puede operarla: si no, 403.
+- **Cambiar la zona de una sede.** `PUT /sucursales/{sucursal}` con otra `zona_horaria` y fechas
+  por venir: sin `confirmar_zona: true` no cambia nada y responde 409
+  `TIMEZONE_CHANGE_UNCONFIRMED` con `meta: {zona_actual, zona_nueva, sesiones, reservas}`.
+  Confirmado (o sin fechas por venir), responde `meta.reanclaje: {sesiones, reservas, en_cola}`;
+  esas fechas conservan su hora de reloj y quien tiene reserva recibe `reserva.reprogramada`,
+  con la zona en `hora` y `antes_hora`.
+- `inicia_en_local` de `POST /reservas/{r}/reprogramar` y `POST /sesiones/{s}/reprogramar` se lee
+  en la zona de la sede.
+- **Cancelar una clase.** `POST /sesiones/{s}/cancelar` también cancela sus invitados y sus
+  reservas de plataforma; `GET /sesiones/{s}/cancelacion` agrega `invitados` y
+  `lugares_plataforma`. `GET /integraciones/fitpass/por-cancelar` (`checkins.registrar`): lo que
+  el negocio canceló aquí y falta cancelar en Fitpass Admin (`id`, `reservacion`, `nombre`,
+  `clase`, `inicia_en`, `zona_horaria`); se quita con `POST /lugares-plataforma/{lugar}/marcado`.
+- **Lista de espera.** `PUT /sesiones/{s}/cupo` y `POST /plantillas-horario/{p}/cambiar` ofrecen
+  a la lista lo que se libere al subir el cupo. `POST /sesiones/{s}/reservas` y `POST /mi/reservas`
+  ofrecen primero a la lista lo que esté libre: pueden responder 409 `CAPACITY_FULL` aunque hubiera
+  un lugar.
+- **Citas.** `POST /citas` (sin cuenta) siempre paga y su límite cuenta solo lo agendado sin cuenta.
+  `POST /reservas/{r}/reprogramar`, `POST /sesiones/{s}/reprogramar` y `PUT /sesiones/{s}/instructor`
+  responden 422 `SESSION_NOT_BOOKABLE` si la persona no atiende citas o no da ese servicio;
+  `PUT /sesiones/{s}/instructor` sobre una cita no acepta quedarse sin profesional.
+  `POST /reservas/{r}/transferir` sobre una cita responde 422 `TRANSFER_INVALID`.
+- **Importar citas y reservas.** La vista previa no toma candados. Al importar, si en plena carga
+  una fila que pasó la revisión ya no se puede, responde 422 `meta.errors.archivo` con cuántas ya
+  entraron; volver a subir el archivo no las duplica.
+- **Carreras.** Lo que agota sus reintentos por un deadlock o un candado vencido responde 409
+  `CONCURRENT_CONFLICT` («Inténtalo de nuevo»); no queda nada a medias.
+
 ## Cita sin cuenta: cancelar o cambiar desde el enlace (ADR 0221)
 
 - Los avisos de una cita traen `{{enlace_cita}}`: `{web}/cita/{slug}/{reserva}?f={firma}`.
@@ -821,7 +857,9 @@ Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, tam
   - `etiqueta`, `total_minor` y `moneda`;
   - `receptor` (`nombre`, `email`, `rfc`, `codigo_postal`, `uso_cfdi`): la persona y,
     si ya se le facturó, los datos de su última factura;
-  - `conceptos` (precio sin IVA, con `clave_prod_serv` y `clave_unidad`);
+  - `conceptos` (precio sin IVA, con `clave_prod_serv`, `clave_unidad` e `iva`; ver
+    ADR 0228 abajo);
+  - `descuento_minor`, `devuelto_minor` y `fiscal_del_catalogo` (ADR 0228);
   - `forma_pago` del SAT.
   - 422 en `orden_id` o `venta_id` si no está pagada, está anulada o ya está facturada;
     403 si es de otra sede.
@@ -866,6 +904,52 @@ Solo negocios de clases, con `reservas.gestionar`. Con `ya_descontadas` = 1, tam
     `cancelada_en`;
   - `cancelable` y `acreditable_minor`.
 - `GET /facturas` cuenta también `conteos.cancelada` y filtra `estado=cancelada`.
+
+## Facturas: emisor de cada factura, RFC del sello y foto fiscal (ADR 0228)
+
+- **El emisor de cada factura.** Cada factura trae `emisor_rfc` (con qué RFC se timbró;
+  `null` si es de antes de guardarlo y el negocio no ha cambiado de RFC) y `de_otro_rfc`
+  (ya no es el RFC de hoy).
+  - `GET /facturas/{factura}/{pdf|xml}`, `GET /mi/facturas/{factura}/{pdf|xml}`,
+    `POST /facturas/{factura}/enviar`, `POST /facturas/{factura}/cancelar` y
+    `agendauno:conciliar-cancelaciones-cfdi` usan la llave del emisor que la timbró. Si
+    FacturAPI ya no la reconoce (401), se crea otra y se intenta una vez más.
+  - Con `de_otro_rfc`: `acreditable_minor` es 0; `POST /facturas/{factura}/notas-credito`
+    responde 422 en `factura`; `GET /facturas/borrador?sustituye=` y `POST /facturas` con
+    `sustituye`, 422 en `sustituye`. Un anticipo de otro RFC no sale en
+    `GET /facturas?anticipos_de=` y aplicarlo responde 422 en `anticipos`.
+- **Datos fiscales.** `GET` y `PUT /datos-fiscales`, `POST /datos-fiscales/sello` y
+  `POST /datos-fiscales/revisar` responden además `rfc_del_sello` (el que FacturAPI dice
+  que trae el sello) y `sello_de_otro_rfc`.
+  - `PUT` con otro `rfc`: el emisor de hoy queda reemplazado y el alta empieza de nuevo.
+  - `POST /datos-fiscales/sello`: 422 en `sello` si el certificado es de otro RFC, leído
+    del archivo (no se toca FacturAPI) o el que responde FacturAPI (`legal.tax_id`).
+  - `POST /datos-fiscales/revisar`: compara lo mismo; responde 200 con
+    `sello_de_otro_rfc` y el motivo en `error`.
+  - Con `sello_de_otro_rfc`: `facturacion_lista` y `sellos_cargados` son `false` y timbrar
+    responde 422 en `facturacion`. Se corrige subiendo el sello del RFC capturado.
+- **Foto fiscal.** Cada línea guarda al venderse su IVA y sus claves del SAT.
+  `GET /facturas/borrador?orden=` o `?venta=` trae un concepto por línea, con su foto y lo
+  que se cobró de ella:
+  - `iva` de cada concepto: `general`, `exento` o `cero`;
+  - `descuento_minor` y `devuelto_minor`: lo que ya no se factura. El descuento y lo
+    devuelto se reparten entre las líneas, y la promoción no toca las cuotas;
+  - `fiscal_del_catalogo`: `true` en una venta de antes de guardar la foto, que sale del
+    catálogo de hoy.
+  - Si el importe no se divide exacto entre las piezas, el concepto es una sola partida
+    («3 × Producto»).
+- **`POST /facturas` con `orden_id` o `venta_id`** lleva el IVA de la foto en `items.*.iva`:
+  - toda la venta con el mismo IVA: el concepto que no lo diga lo toma;
+  - venta mixta: cada concepto lo dice y lo de cada IVA es lo de la venta, a unos centavos;
+  - si no, 422 en `items`. Con `fiscal_del_catalogo` vale el IVA que se mande.
+- **Nota de crédito de una factura mixta**: un concepto por cada IVA, con el monto en
+  proporción a lo que la factura llevó de cada uno.
+- **`GET /mi/facturas`** (`?page&per_page&desde&hasta`; `per_page` de 1 a 100, 20 por
+  omisión): de la más reciente a la más antigua, por el día del negocio en que se timbró.
+  - `meta`: `total`, `page`, `per_page`, `ultima_pagina` y `disponible` (si el negocio
+    factura).
+  - 422 en `hasta` si es antes de `desde`.
+  - Quien no tiene ficha en el negocio recibe la lista vacía, con `disponible: false`.
 
 ## Citas: anticipo para apartar (ADR 0161)
 

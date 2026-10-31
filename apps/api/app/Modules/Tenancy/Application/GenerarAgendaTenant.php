@@ -68,7 +68,9 @@ class GenerarAgendaTenant
             }
         }
 
+        // Los días cerrados de su sede o de todo el negocio (ADR 0230).
         $excepciones = ExcepcionHorarioTenant::query()
+            ->queAplicanA((int) $plantilla->sucursal_id)
             ->whereBetween('fecha', [$inicio->toDateString(), $fin->toDateString()])
             ->pluck('fecha')
             ->map(fn ($fecha): string => $fecha->toDateString())

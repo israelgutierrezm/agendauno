@@ -22,7 +22,13 @@ const mocks = await vi.hoisted(async () => {
     ruta: reactive({ hash: "", query: {} as Record<string, string> }),
     // La pestaña es el ancla: cambiarla reemplaza la dirección (sin sumar historial).
     replace: vi.fn(),
-    sesion: { esCitas: false },
+    sesion: {
+      esCitas: false,
+      usuario: null as null | {
+        sucursales: { id: string; nombre: string }[];
+        todo_el_negocio: boolean;
+      },
+    },
     confirmar: vi.fn(async () => true),
   };
 });
@@ -41,6 +47,9 @@ vi.mock("@/stores/sesionTenant", () => ({
     puede: () => true,
     get esCitas() {
       return mocks.sesion.esCitas;
+    },
+    get usuario() {
+      return mocks.sesion.usuario;
     },
     get capacidades() {
       return { clases: !mocks.sesion.esCitas, citas: mocks.sesion.esCitas };
@@ -109,6 +118,7 @@ beforeEach(() => {
     return Promise.resolve();
   });
   mocks.sesion.esCitas = false;
+  mocks.sesion.usuario = null;
   // Las vigentes, para la semana; las que ya no se repiten, por páginas.
   mocks.get.mockImplementation(
     (url: string, opciones?: { params?: { estado?: string } }) => {
@@ -232,6 +242,96 @@ describe("reglas de la agenda", () => {
       "/api/v1/app/demo/excepciones-horario",
       expect.objectContaining({ fecha: "2099-12-24", cancelar_sesiones: true }),
     );
+  });
+
+  it("un cierre puede ser de una sede o de todo el negocio y la lista dice de cuál (ADR 0230)", async () => {
+    mocks.ruta.hash = "#cierres";
+    mocks.sesion.usuario = {
+      sucursales: [
+        { id: "s1", nombre: "Roma" },
+        { id: "s2", nombre: "Condesa" },
+      ],
+      todo_el_negocio: true,
+    };
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/excepciones-horario")
+            ? [
+                { id: "d1", fecha: "2099-12-24", motivo: null, sucursal: null },
+                {
+                  id: "d2",
+                  fecha: "2099-12-25",
+                  motivo: null,
+                  sucursal: "Condesa",
+                  sucursal_id: "s2",
+                },
+              ]
+            : url.endsWith("/afectadas")
+              ? { sesiones: 0, reservas: 0 }
+              : [],
+        },
+      }),
+    );
+    mocks.post.mockResolvedValue({ data: {} });
+    const w = montar();
+    await flushPromises();
+
+    expect(
+      w.findAll('[data-prueba="sede-de-dia-cerrado"]').map((p) => p.text()),
+    ).toEqual(["Todo el negocio", "Condesa"]);
+    const opciones = w.get('[data-prueba="sede-del-dia"]').findAll("option");
+    expect(opciones.map((o) => o.text())).toEqual([
+      "Todo el negocio",
+      "Roma",
+      "Condesa",
+    ]);
+
+    await w.get("#ra-fecha").setValue("2099-12-26");
+    await w.get('[data-prueba="sede-del-dia"]').setValue("s1");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/excepciones-horario/afectadas",
+      { params: { fecha: "2099-12-26", sucursal_id: "s1" } },
+    );
+    await w.get("#ra-fecha").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/excepciones-horario",
+      expect.objectContaining({ fecha: "2099-12-26", sucursal_id: "s1" }),
+    );
+  });
+
+  it("quien solo ve algunas sedes no ofrece todo el negocio ni quita lo que no es suyo (ADR 0230)", async () => {
+    mocks.ruta.hash = "#cierres";
+    mocks.sesion.usuario = {
+      sucursales: [{ id: "s1", nombre: "Roma" }],
+      todo_el_negocio: false,
+    };
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/excepciones-horario")
+            ? [
+                {
+                  id: "d1",
+                  fecha: "2099-12-24",
+                  motivo: null,
+                  sucursal: null,
+                  editable: false,
+                },
+              ]
+            : [],
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const sede = w.get('[data-prueba="sede-del-dia"]');
+    expect(sede.findAll("option").map((o) => o.text())).toEqual(["Roma"]);
+    expect((sede.element as HTMLSelectElement).value).toBe("s1");
+    expect(w.find('[data-prueba="quitar-dia"]').exists()).toBe(false);
   });
 
   it("en citas no ofrece la programación recurrente ni la pide (ADR 0104)", async () => {

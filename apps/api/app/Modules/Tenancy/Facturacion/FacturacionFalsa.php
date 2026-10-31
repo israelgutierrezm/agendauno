@@ -43,12 +43,17 @@ class FacturacionFalsa implements CancelacionCfdi, ClienteFacturacion, Organizac
 
     public function actualizarDatosLegales(string $llaveUsuario, string $organizacion, array $datos): void {}
 
-    /** Un sello vacío o sin contraseña se rechaza, como lo haría FacturAPI. */
-    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): void
+    /**
+     * Un sello vacío o sin contraseña se rechaza, como lo haría FacturAPI. No dice el RFC
+     * del certificado (no lo lee).
+     */
+    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): ?string
     {
         if ($certificado === '' || $llave === '' || $contrasena === '') {
             throw new TimbradoFallido('El certificado, la llave o la contraseña del CSD no son válidos.');
         }
+
+        return null;
     }
 
     public function crearLlaveEnVivo(string $llaveUsuario, string $organizacion): string
@@ -58,7 +63,7 @@ class FacturacionFalsa implements CancelacionCfdi, ClienteFacturacion, Organizac
 
     public function estadoOrganizacion(string $llaveUsuario, string $organizacion): array
     {
-        return ['lista' => true, 'pendientes' => []];
+        return ['lista' => true, 'pendientes' => [], 'rfc' => null];
     }
 
     public function enviarPorCorreo(string $llaveOrganizacion, string $facturaId, string $correo): void {}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -21,7 +22,10 @@ use App\Modules\Tenancy\Pagos\ProveedorPasarela;
  */
 class AnticipoDeCitaTenant
 {
-    public function __construct(private readonly ReembolsarPagoTenant $reembolsar) {}
+    public function __construct(
+        private readonly ReembolsarPagoTenant $reembolsar,
+        private readonly IncidenciasCobroTenant $incidencias,
+    ) {}
 
     /**
      * Lo pagado de más sobre el anticipo: cuánto, y de eso cuánto se pagó en línea.
@@ -64,6 +68,44 @@ class AnticipoDeCitaTenant
                 // Ya devuelto, o la pasarela no devuelve en línea: lo resuelve el negocio.
             }
         }
+    }
+
+    /**
+     * El sistema la marcó «no asistió» porque nadie registró nada: eso no prueba que no
+     * vino (pudo atenderse sin que nadie tocara «llegó»), así que no se mueve dinero. Lo
+     * revisa el negocio en Por conciliar (ADR 0231).
+     */
+    public function pedirRevisarSiVino(ReservaTenant $reserva): void
+    {
+        if ($reserva->anticipo_minor === null) {
+            return;
+        }
+        $deMas = $this->pagadoDeMas($reserva)['de_mas_minor'];
+        foreach ($this->porDevolverEnLinea($reserva, $deMas) as ['pago' => $pago, 'monto' => $monto]) {
+            IncidenciaCobroTenant::query()->firstOrCreate(
+                ['tipo' => IncidenciaCobroTenant::REVISAR_SI_VINO, 'pago_id' => $pago->getKey(), 'estado' => IncidenciaCobroTenant::ABIERTA],
+                [
+                    'orden_id' => $pago->orden_id,
+                    'detalle' => 'Nadie registró si llegó a su cita y pagó de más. Revisa si vino: si no vino, márcalo en la agenda y se le devuelve.',
+                    'datos' => ['reserva_id' => $reserva->ulid, 'excedente_minor' => $monto],
+                ],
+            );
+        }
+    }
+
+    /** Ya se registró si vino o no: la revisión pendiente queda cerrada. */
+    public function cerrarRevisionSiVino(ReservaTenant $reserva, string $resolucion): void
+    {
+        $ordenes = array_values(array_filter([$reserva->orden_id, $reserva->saldo_orden_id]));
+        if ($ordenes === []) {
+            return;
+        }
+        IncidenciaCobroTenant::query()
+            ->where('tipo', IncidenciaCobroTenant::REVISAR_SI_VINO)
+            ->where('estado', IncidenciaCobroTenant::ABIERTA)
+            ->whereIn('orden_id', $ordenes)
+            ->get()
+            ->each(fn (IncidenciaCobroTenant $incidencia) => $this->incidencias->cerrar($incidencia, $resolucion));
     }
 
     /**

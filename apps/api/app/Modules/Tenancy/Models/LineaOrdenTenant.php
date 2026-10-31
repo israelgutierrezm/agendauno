@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Cuotas\ConceptoCuota;
+use App\Modules\Tenancy\Facturacion\FotoFiscal;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $referencia
  * @property array<string, mixed>|null $condiciones las que aceptó el cliente (plan con permanencia; B04)
  * @property array{atributos?: array<string, mixed>, ofertas?: list<int>}|null $plan el plan como se vendió (ADR 0166)
+ * @property string|null $iva el IVA de lo vendido al venderse (ADR 0228)
+ * @property string|null $clave_prod_serv su clave de producto o servicio del SAT al venderse
+ * @property string|null $clave_unidad su clave de unidad del SAT al venderse
  */
 class LineaOrdenTenant extends Model
 {
@@ -53,6 +57,55 @@ class LineaOrdenTenant extends Model
         'condiciones' => 'array',
         'plan' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        // La foto fiscal de lo vendido, al venderse (ADR 0228): la factura usa esta y no
+        // el catálogo de hoy, que puede cambiar después.
+        static::creating(function (self $linea): void {
+            if ($linea->getAttribute('iva') === null) {
+                $linea->forceFill($linea->fotoDelCatalogo()->columnas());
+            }
+        });
+    }
+
+    /**
+     * Con qué se factura: la foto guardada al venderse o, en una venta de antes de
+     * guardarla, lo que dice hoy el catálogo.
+     */
+    public function fotoFiscal(): FotoFiscal
+    {
+        return FotoFiscal::guardada($this->getAttributes()) ?? $this->fotoDelCatalogo();
+    }
+
+    /** ¿Se guardó su foto fiscal al venderse? Si no, se factura con el catálogo de hoy. */
+    public function tieneFotoFiscal(): bool
+    {
+        return FotoFiscal::guardada($this->getAttributes()) !== null;
+    }
+
+    /**
+     * Lo que dice hoy el catálogo de lo vendido: su plan, su artículo o su servicio. Una
+     * cuota o un concepto escrito, el IVA del negocio (o el del servicio de la cita de su
+     * orden, si es de una).
+     */
+    public function fotoDelCatalogo(): FotoFiscal
+    {
+        if ($this->producto_comercial_id !== null) {
+            $producto = $this->producto;
+
+            return FotoFiscal::deServicio($producto?->iva, $producto?->clave_sat);
+        }
+        $articulo = $this->getAttribute('articulo_id');
+        if ($articulo !== null) {
+            $articulo = ArticuloTenant::query()->find($articulo);
+
+            return FotoFiscal::deArticulo($articulo?->iva, $articulo?->clave_sat);
+        }
+        $oferta = $this->oferta_id !== null ? OfertaTenant::query()->find($this->oferta_id) : $this->orden?->sesion?->oferta;
+
+        return FotoFiscal::deServicio($oferta?->iva, $oferta?->clave_sat);
+    }
 
     /**
      * Si es una cuota, lo que se necesita para exentarla por separado (B04); si no, null.

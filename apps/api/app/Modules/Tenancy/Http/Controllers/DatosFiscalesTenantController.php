@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AltaFacturacionNegocioTenant;
+use App\Modules\Tenancy\Application\EmisoresFiscalesTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -19,7 +21,10 @@ use Illuminate\Validation\ValidationException;
  */
 class DatosFiscalesTenantController
 {
-    public function __construct(private readonly AltaFacturacionNegocioTenant $alta) {}
+    public function __construct(
+        private readonly AltaFacturacionNegocioTenant $alta,
+        private readonly EmisoresFiscalesTenant $emisores,
+    ) {}
 
     public function show(): JsonResponse
     {
@@ -60,20 +65,29 @@ class DatosFiscalesTenantController
 
         $datos = DatosFiscalesTenant::query()->firstOrNew([]);
         $rfcAntes = $datos->exists ? $datos->rfc : null;
-        $datos->fill([
-            'razon_social' => $validado['razon_social'],
-            'rfc' => mb_strtoupper((string) $validado['rfc']),
-            'regimen_fiscal' => $validado['regimen_fiscal'],
-            'codigo_postal' => $validado['codigo_postal'],
-        ]);
-        // Otro RFC es otro emisor: su sello y su alta en FacturAPI empiezan de nuevo.
-        if (is_string($rfcAntes) && $rfcAntes !== $datos->rfc) {
+        $otroRfc = is_string($rfcAntes) && $rfcAntes !== mb_strtoupper((string) $validado['rfc']);
+        DB::connection('tenant')->transaction(function () use ($datos, $validado, $otroRfc): void {
+            // Otro RFC es otro emisor (ADR 0228): el de hoy queda reemplazado con su llave, y
+            // las facturas que timbró se siguen descargando, reenviando y cancelando con ella.
+            if ($otroRfc) {
+                $this->emisores->retirar($datos);
+            }
             $datos->fill([
-                'facturapi_organizacion_id' => null, 'facturapi_llave' => null, 'facturapi_lista' => false,
-                'facturapi_pendientes' => null, 'sello_cer' => null, 'sello_key' => null, 'sello_password' => null,
+                'razon_social' => $validado['razon_social'],
+                'rfc' => mb_strtoupper((string) $validado['rfc']),
+                'regimen_fiscal' => $validado['regimen_fiscal'],
+                'codigo_postal' => $validado['codigo_postal'],
             ]);
-        }
-        $datos->save();
+            // Su sello y su alta en FacturAPI empiezan de nuevo.
+            if ($otroRfc) {
+                $datos->fill([
+                    'facturapi_organizacion_id' => null, 'facturapi_llave' => null, 'facturapi_lista' => false,
+                    'facturapi_pendientes' => null, 'sello_cer' => null, 'sello_key' => null, 'sello_password' => null,
+                    'facturapi_error' => null, 'rfc_del_sello' => null,
+                ]);
+            }
+            $datos->save();
+        });
         // Con su organización ya creada, sus datos se actualizan allá también (ADR 0212).
         if (($datos->facturapi_organizacion_id ?? '') !== '') {
             $this->alta->datosLegales($datos, $this->estudio($request));
@@ -146,12 +160,16 @@ class DatosFiscalesTenantController
             'regimen_fiscal' => $datos->regimen_fiscal,
             'codigo_postal' => $datos->codigo_postal,
             // Estado del propio sello del tenant (no se expone nada del proveedor).
-            'sellos_cargados' => $datos->sellosCargados(),
+            'sellos_cargados' => $datos->sellosCargados() && ! $datos->selloDeOtroRfc(),
             // Su alta en FacturAPI (ADR 0212): si ya factura, lo que le falta y dónde
             // firmar la carta manifiesto. Nunca la llave.
-            'facturacion_lista' => (bool) $datos->facturapi_lista,
+            'facturacion_lista' => (bool) $datos->facturapi_lista && ! $datos->selloDeOtroRfc(),
             'pendientes' => $datos->facturapi_pendientes ?? [],
             'error' => $datos->facturapi_error,
+            // El RFC que FacturAPI dice que trae el sello (ADR 0228): si no es el
+            // capturado, no se timbra.
+            'rfc_del_sello' => $datos->rfc_del_sello,
+            'sello_de_otro_rfc' => $datos->selloDeOtroRfc(),
             'portal_manifiesto' => AltaFacturacionNegocioTenant::PORTAL_MANIFIESTO,
         ];
     }

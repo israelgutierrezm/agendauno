@@ -32,6 +32,8 @@ class EvaluarAccesoTenant
 
     public function evaluar(PersonaTenant $persona, ?int $sucursalId, CarbonInterface $momento): DecisionAcceso
     {
+        // Con clases seguidas, primero la que está en curso y luego la que empieza antes: a
+        // las 9:35 cuenta la de las 9:00, no la de las 10:00 (la otra quedaría como falta).
         $reserva = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
             ->where('estado', EstadoReserva::Confirmada->value)
@@ -41,6 +43,12 @@ class EvaluarAccesoTenant
                     ->where('termina_en', '>=', $momento)
                     ->when($sucursalId !== null, fn ($q2) => $q2->where('sucursal_id', $sucursalId));
             })
+            ->with('sesion')
+            ->get()
+            ->sortBy(static fn (ReservaTenant $r): array => [
+                $r->sesion?->inicia_en->lessThanOrEqualTo($momento) ? 0 : 1,
+                $r->sesion?->inicia_en->getTimestamp(),
+            ])
             ->first();
 
         if ($reserva instanceof ReservaTenant) {

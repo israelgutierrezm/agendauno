@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
+use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -53,7 +54,7 @@ class ReprogramarTenantController
                 'inicia_en_local.required' => 'Elige el nuevo horario.',
                 'sesion_id.prohibited' => 'Una cita se cambia de horario, no a otra sesión.',
             ]);
-            $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sesion->zona_horaria)->utc();
+            $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], $this->zonaDeLaSede($sesion))->utc();
             $instructor = $this->instructor($validado['instructor_id'] ?? null);
             $this->exigirProfesional($request, $sesion, $instructor);
             $movida = $this->reprogramar->moverCita($reserva, $inicia, $instructor, $actor);
@@ -98,7 +99,7 @@ class ReprogramarTenantController
             'instructor_id' => ['nullable', 'string'],
         ]);
         $antes = $sesion->inicia_en->toIso8601String();
-        $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sesion->zona_horaria)->utc();
+        $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], $this->zonaDeLaSede($sesion))->utc();
 
         $instructor = $this->instructor($validado['instructor_id'] ?? null);
         $this->exigirProfesional($request, $sesion, $instructor);
@@ -119,6 +120,15 @@ class ReprogramarTenantController
         }
 
         return (int) Usuario::query()->where('ulid', $ulid)->firstOrFail()->getKey();
+    }
+
+    /**
+     * La hora que llega es la de la sede, como al agendar y desde la cuenta del cliente
+     * (ADR 0230): la zona copiada en la sesión puede ir atrás mientras se re-ancla.
+     */
+    private function zonaDeLaSede(SesionTenant $sesion): string
+    {
+        return (string) ($sesion->sucursal->zona_horaria ?? $sesion->zona_horaria);
     }
 
     /** Solo sesiones de sus sedes (R19) y, si imparte, las suyas. */
@@ -171,9 +181,11 @@ class ReprogramarTenantController
             $bloqueada->save();
             $auditoria->registrar($this->actor($request), 'sesion.cupo_cambiado', 'sesion', (string) $bloqueada->ulid, $antes,
                 ['capacidad' => $bloqueada->capacidad, 'recurso_id' => $bloqueada->recurso_id]);
+            // Si subió el cupo, los lugares nuevos se ofrecen primero a la lista (ADR 0230).
+            app(ReservasTenant::class)->ofrecerLugaresLibres($bloqueada);
 
             return $bloqueada;
-        });
+        }, 3);
 
         return response()->json(['data' => [
             'id' => $actualizada->ulid,

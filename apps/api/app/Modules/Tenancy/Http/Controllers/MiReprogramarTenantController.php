@@ -142,7 +142,7 @@ class MiReprogramarTenantController
             }
 
             return $movida->refresh();
-        });
+        }, 3);
         $movida->load('sesion');
 
         return response()->json(['data' => [

@@ -30,41 +30,47 @@ const CLASE = {
   disciplina: null,
 };
 
+// Lo que el negocio canceló aquí y falta cancelar en Fitpass Admin.
+const porCancelar = vi.hoisted(() => ({ lista: [] as object[] }));
+
 beforeEach(() => {
   vi.clearAllMocks();
   permisos.clear();
   permisos.add("*");
+  porCancelar.lista = [];
   api.get.mockImplementation((ruta: string) =>
     Promise.resolve({
       data: {
         data: ruta.endsWith("/clases")
           ? [CLASE]
-          : ruta.endsWith("/horarios")
-            ? [
-                {
-                  id: "s1",
-                  fecha: "2030-01-09",
-                  hora: "08:00",
-                  duracion_minutos: 60,
-                  clase: "Pole Nivel 1",
-                  disciplina: "Pole Dance",
-                  instructor: "Caro",
-                  sucursal: "Roma",
-                  estado: "programada",
-                  lugares: 4,
-                },
-              ]
-            : [
-                {
-                  id: "l1",
-                  reservacion: "R-1",
-                  nombre: "Ana Ruiz",
-                  clase: "Pole Nivel 1",
-                  inicia_en: "2030-01-08T14:00:00Z",
-                  asistio: false,
-                  marcar_antes_de: "2030-01-10T14:00:00Z",
-                },
-              ],
+          : ruta.endsWith("/por-cancelar")
+            ? porCancelar.lista
+            : ruta.endsWith("/horarios")
+              ? [
+                  {
+                    id: "s1",
+                    fecha: "2030-01-09",
+                    hora: "08:00",
+                    duracion_minutos: 60,
+                    clase: "Pole Nivel 1",
+                    disciplina: "Pole Dance",
+                    instructor: "Caro",
+                    sucursal: "Roma",
+                    estado: "programada",
+                    lugares: 4,
+                  },
+                ]
+              : [
+                  {
+                    id: "l1",
+                    reservacion: "R-1",
+                    nombre: "Ana Ruiz",
+                    clase: "Pole Nivel 1",
+                    inicia_en: "2030-01-08T14:00:00Z",
+                    asistio: false,
+                    marcar_antes_de: "2030-01-10T14:00:00Z",
+                  },
+                ],
       },
     }),
   );
@@ -121,10 +127,36 @@ describe("Fitpass en Integraciones", () => {
     expect(rutas).toEqual([
       "/api/v1/app/demo/integraciones/fitpass/horarios",
       "/api/v1/app/demo/integraciones/fitpass/por-marcar",
+      "/api/v1/app/demo/integraciones/fitpass/por-cancelar",
     ]);
     expect(w.text()).not.toContain("Clases que ofreces en Fitpass");
     expect(w.text()).toContain("Horarios para capturar");
     expect(w.findAll('[data-prueba="por-marcar-fitpass"]')).toHaveLength(1);
+  });
+
+  it("dice qué reservas canceladas aquí faltan cancelar en Fitpass Admin y las quita al marcarlas (ADR 0230)", async () => {
+    porCancelar.lista = [
+      {
+        id: "l9",
+        reservacion: "R-9",
+        nombre: "Luz Paz",
+        clase: "Pole Nivel 1",
+        inicia_en: "2030-01-08T14:00:00Z",
+      },
+    ];
+    api.post.mockResolvedValue({ data: {} });
+    const w = mount(FitpassOperacion, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    const fila = w.get('[data-prueba="por-cancelar-fitpass"]');
+    expect(fila.text()).toContain("Luz Paz");
+    await fila.get("button").trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/lugares-plataforma/l9/marcado",
+      {},
+    );
+    expect(w.findAll('[data-prueba="por-cancelar-fitpass"]')).toHaveLength(0);
   });
 
   it("sin permiso de check-in no pide ni muestra lo que falta marcar", async () => {

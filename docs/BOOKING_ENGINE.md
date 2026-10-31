@@ -65,6 +65,22 @@ without transactional protection.
 
 Use idempotency keys for booking creation.
 
+One lock order for the whole engine (ADR 0230): orders → payment → session → reservation →
+professional → resource → entitlement → hold. Read the `sesion_id` without a lock, lock the
+session, lock the reservation and revalidate (`ReservasTenant::bloquearConSesion`). Paths that
+take several of these give 3 attempts to the transaction; a concurrency error that runs out of
+attempts (SQLSTATE 40001, MySQL 1213, a lock wait timeout) answers **409
+`CONCURRENT_CONFLICT`**, never 500. `CreditosTenant::confirmar` and `perder` lock the entitlement
+and then the hold, like `retener`: `saldo_posterior` in the ledger is read under that lock.
+
+If the entitlement chosen without a lock no longer has balance when the hold is taken, `crear`
+resolves again without it (and re-checks its booking cap); with none left, the insufficient
+balance is answered as is.
+
+Importing bookings or appointments does not hold locks across the file: the review (preview and
+the first step of importing) runs without locks in a transaction that always rolls back
+(`RevisionSinCandados`) and what passes is saved in batches of 20. See ADR 0230.
+
 ## Spots (one rule, ADR 0116)
 
 `CupoDeSesionTenant` is the only place that decides how many spots a class has left:
@@ -94,6 +110,15 @@ Example:
 >= 6 hours: release entitlement
 < 6 hours: forfeit entitlement
 
+Cancelling a session (the business cancels the class): every active booking, its guests
+(`reservado`, the monthly pass comes back) and, once committed, its platform spots: Wellhub and
+TotalPass through `cancelarPorElNegocio` (retried by `agendauno:sincronizar-plataformas` if the
+platform did not answer; after the class starts they are only closed here); Fitpass, which has
+no API, goes to a «to cancel in its panel» list (`GET /integraciones/fitpass/por-cancelar`).
+Cancelled sessions never turn a platform spot into `no_asistio`. Cancelling a booking still to
+be paid, or its whole session, closes the open payment attempt at the gateway after commit. See
+ADR 0230.
+
 ## Waitlist
 
 Support:
@@ -101,6 +126,34 @@ Support:
 - optional priority tiers
 - auto-book or timed offer
 - expiration and next-candidate promotion
+
+The waitlist always comes first (ADR 0230). Every released spot is offered to it: a cancellation,
+a higher capacity on one date or on the series, removing the capacity altogether, and a channel
+rule reaching its release time. `agendauno:expirar-ofertas` sweeps future classes with people
+waiting and free spots, which catches what nothing announces. Under the session lock, a new
+booking (`crear`, `reservarConOrden`, `moverA`, guests and platform bookings) first offers what is
+free to the waitlist and only then evaluates: it never takes a spot someone is waiting for and
+was not offered. `promover` skips a candidate whose channel has no spot left: spots set aside for
+another channel are not given away (R20).
+
+## Closed days (ADR 0230)
+
+A closed day (`excepciones_horario`) belongs to one branch or to the whole business
+(`sucursal_id` null), one per date and branch. A branch is closed by its own days and by the
+business's (`ExcepcionHorarioTenant::queAplicanA`): appointment availability, `cabeEnHorario`,
+series generation, class imports and agenda occupancy all use it. Whole-business days are created
+or removed only by someone who sees every branch; a branch's, by someone who can operate it.
+Cancelling what a closed day affects touches only that branch.
+
+## Branch time zone (ADR 0230)
+
+A session stores its instant in UTC and a copy of the zone. Changing the zone of a branch with
+future sessions requires confirmation (`confirmar_zona`; without it, 409 with counts and nothing
+changes) and re-anchors them: same wall clock, so 07:00 stays 07:00 in the new zone. The copied
+zone says whether a session was already re-anchored, so it is idempotent. Reminders are redone and
+whoever holds a spot gets `reserva.reprogramada`. Working hours and series store local time and do
+not move; blocks of the branch and its rooms store instants and are re-anchored too. Times sent as
+`inicia_en_local` are always read in the zone of the branch.
 
 ## Appointments (citas)
 
@@ -151,3 +204,14 @@ Whether a client-booked paid appointment is held until paid online depends on th
 business setting `citas.pago_en_linea_obligatorio` and on having an active online
 gateway. Otherwise it is confirmed on booking with its order left to collect
 (online later or at the branch). See ADR 0065.
+
+Booking from the public page without an account (`reservas.sin_cuenta`): typing an email does not
+prove it is yours, so that path always pays (it never uses what that person prepaid) and its
+`citas.maximo_por_pagar` counts only appointments booked without an account. See ADR 0230.
+
+An appointment only moves to someone who attends appointments and gives that service (ADR 0217),
+through any path: rescheduling or `PUT /sesiones/{s}/instructor`, which takes the session lock,
+refuses to leave it without a professional and notifies with the new one. It cannot be transferred
+to another person. A late payment does not reconfirm a booking if that person already has another
+live booking in that class or an overlapping appointment: it stays `PAGO_TARDIO` to reconcile.
+See ADR 0230.

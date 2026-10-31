@@ -165,6 +165,31 @@ it('si el egreso no se timbra, el reintento aplica el anticipo después', functi
         ->and(facturasDeLaBarberia()->first()->anticipo_aplicado_en)->not->toBeNull();
 });
 
+it('si el negocio cambió de RFC después del anticipo, el resto va como cualquier venta y no se insiste con el anticipo (ADR 0228)', function (): void {
+    $enviadas = new ArrayObject;
+    timbradoDeFacturasAutomaticas($enviadas, new ArrayObject);
+    ['e' => $e, 'cita' => $cita] = barberiaQueFacturaSola();
+    betoPagaSuAnticipo($e['slug'], (string) $cita['orden_id']);
+    expect($enviadas)->toHaveCount(1);
+
+    $this->putJson("/api/v1/app/{$e['slug']}/datos-fiscales", [
+        'razon_social' => 'Nueva Razón SA de CV', 'rfc' => 'XYZ010101AB1', 'regimen_fiscal' => '601', 'codigo_postal' => '06700',
+    ], conBearer($e['bearer']))->assertOk();
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/cobro", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    // Los $150 del resto, sin relacionarlos con el anticipo del otro RFC y sin egreso.
+    expect($enviadas)->toHaveCount(2)
+        ->and($enviadas[1])->not->toHaveKey('related_documents')
+        ->and($enviadas[1]['items'][0]['product']['price'])->toBe(129.31);
+    $facturas = facturasDeLaBarberia();
+    expect($facturas->pluck('emisor_rfc')->all())->toBe(['ABC010101AB9', 'XYZ010101AB1'])
+        ->and($facturas[0]->anticipo_aplicado_en)->toBeNull();
+
+    $this->artisan('agendauno:facturar-citas')->assertSuccessful();
+    expect($enviadas)->toHaveCount(2);
+});
+
 it('sin pedir la factura automática, o con el negocio que no la encendió, no factura nada', function (): void {
     $enviadas = new ArrayObject;
     timbradoDeFacturasAutomaticas($enviadas, new ArrayObject);

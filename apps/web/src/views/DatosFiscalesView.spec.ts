@@ -238,4 +238,33 @@ describe("alta en FacturAPI (ADR 0212)", () => {
     );
     w.unmount();
   });
+
+  it("dice si el sello es de otro RFC y avisa al capturar otro RFC (ADR 0228)", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/timbres")
+          ? { data: { disponibles: 0 } }
+          : {
+              data: {
+                ...guardados,
+                sello_de_otro_rfc: true,
+                rfc_del_sello: "OTR010101AB1",
+              },
+              meta: { disponible: true },
+            },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+    const aviso = w.get('[data-prueba="sello-de-otro-rfc"]');
+    expect(aviso.text()).toContain("OTR010101AB1");
+    expect(aviso.text()).toContain("EKU9003173C9");
+    expect(w.find('[data-prueba="cambio-de-rfc"]').exists()).toBe(false);
+
+    await w.get("#rfc").setValue("xyz010101ab1");
+    expect(w.find('[data-prueba="cambio-de-rfc"]').exists()).toBe(true);
+    await w.get("#rfc").setValue("eku9003173c9");
+    expect(w.find('[data-prueba="cambio-de-rfc"]').exists()).toBe(false);
+    w.unmount();
+  });
 });

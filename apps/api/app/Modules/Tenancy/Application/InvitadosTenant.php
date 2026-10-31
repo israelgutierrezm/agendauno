@@ -91,6 +91,8 @@ class InvitadosTenant
             if ($this->usadosEnElMes($derecho, $mes, $bloqueada) >= (int) $derecho->invitados_por_mes) {
                 throw new PaseDeInvitadoNoDisponible('Tu plan no tiene pases de invitado disponibles para ese mes.');
             }
+            // Lo libre, primero para la lista de espera (ADR 0230).
+            app(ReservasTenant::class)->ofrecerLugaresLibres($bloqueada);
             if ($bloqueada->capacidad !== null && (int) $this->cupos->disponibles($bloqueada) <= 0) {
                 throw new CupoLleno('La clase está llena.');
             }
@@ -116,11 +118,12 @@ class InvitadosTenant
     public function cancelar(InvitadoSesionTenant $invitado): InvitadoSesionTenant
     {
         return DB::connection('tenant')->transaction(function () use ($invitado): InvitadoSesionTenant {
+            // La sesión y luego el invitado: como al cancelar la clase completa (ADR 0230).
+            $sesion = SesionTenant::query()->whereKey($invitado->sesion_id)->lockForUpdate()->firstOrFail();
             $bloqueado = InvitadoSesionTenant::query()->whereKey($invitado->getKey())->lockForUpdate()->firstOrFail();
             if ($bloqueado->estado !== InvitadoSesionTenant::RESERVADO) {
                 return $bloqueado;
             }
-            $sesion = SesionTenant::query()->whereKey($bloqueado->sesion_id)->lockForUpdate()->firstOrFail();
             if ($sesion->inicia_en->isPast()) {
                 throw new FueraDeVentana('La clase ya empezó: la invitación ya no se cancela.');
             }
@@ -129,7 +132,7 @@ class InvitadosTenant
             app(ReservasTenant::class)->promoverCupos($sesion);
 
             return $bloqueado;
-        });
+        }, 3);
     }
 
     /** El negocio marca si el invitado llegó. */
@@ -150,7 +153,7 @@ class InvitadosTenant
 
     /**
      * Los pases que ese plan ya gastó en el mes de `$mes` (por la fecha de la clase, en
-     * la zona de la sede).
+     * la zona de la sede). Una clase que canceló el negocio no gasta pase (ADR 0230).
      */
     private function usadosEnElMes(DerechoTenant $derecho, CarbonImmutable $mes, ?SesionTenant $sesion = null): int
     {
@@ -160,7 +163,10 @@ class InvitadosTenant
         return InvitadoSesionTenant::query()
             ->where('derecho_id', $derecho->getKey())
             ->whereIn('estado', InvitadoSesionTenant::GASTAN_PASE)
-            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', $inicio->utc())->where('inicia_en', '<', $inicio->addMonthNoOverflow()->utc()))
+            ->whereHas('sesion', fn ($q) => $q
+                ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
+                ->where('inicia_en', '>=', $inicio->utc())
+                ->where('inicia_en', '<', $inicio->addMonthNoOverflow()->utc()))
             ->count();
     }
 }

@@ -48,6 +48,12 @@ class IncidenciaCobroTenant extends Model
      */
     public const DEVOLUCION_EXTERNA = 'devolucion_externa';
 
+    /**
+     * Nadie registró si llegó a su cita y pagó de más: el sistema la marcó «no asistió»,
+     * pero eso no prueba que no vino, así que no devuelve solo (ADR 0231).
+     */
+    public const REVISAR_SI_VINO = 'revisar_si_vino';
+
     protected $connection = 'tenant';
 
     protected $table = 'incidencias_cobro';

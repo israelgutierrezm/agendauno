@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Facturacion;
 
-use App\Modules\Tenancy\Application\EmitirFacturaTenant;
+use App\Modules\Tenancy\Application\EmisoresFiscalesTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -32,21 +32,21 @@ class EnviarFacturaPorCorreo implements ShouldQueue
         public readonly ?string $correo = null,
     ) {}
 
-    public function handle(GestorDeConexionTenant $gestor, OrganizacionesCfdi $organizaciones): void
+    public function handle(GestorDeConexionTenant $gestor, OrganizacionesCfdi $organizaciones, EmisoresFiscalesTenant $emisores): void
     {
         $estudio = Estudio::query()->find($this->estudioId);
         if (! $estudio instanceof Estudio) {
             return;
         }
-        $enviar = function () use ($organizaciones): void {
+        $enviar = function () use ($organizaciones, $emisores): void {
             $factura = FacturaTenant::query()->where('ulid', $this->facturaUlid)->first();
-            $emisor = DatosFiscalesTenant::query()->first();
             $correo = $this->correo ?? $factura?->receptor_email;
-            if (! $factura instanceof FacturaTenant || ! $emisor instanceof DatosFiscalesTenant
+            if (! $factura instanceof FacturaTenant || ! DatosFiscalesTenant::query()->exists()
                 || $factura->facturapi_id === null || $correo === null || $correo === '') {
                 return;
             }
-            $organizaciones->enviarPorCorreo(EmitirFacturaTenant::llaveDe($emisor), (string) $factura->facturapi_id, $correo);
+            // Con la llave del emisor que la timbró, aunque hoy se timbre con otro RFC (ADR 0228).
+            $emisores->conLlaveDe($factura, static fn (string $llave) => $organizaciones->enviarPorCorreo($llave, (string) $factura->facturapi_id, $correo));
         };
         // Con la cola síncrona corre dentro del despacho de ese mismo negocio: sin cambiar
         // de conexión (cambiarla cortaría lo que el despacho tiene abierto).

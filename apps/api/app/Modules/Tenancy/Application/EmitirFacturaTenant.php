@@ -8,6 +8,8 @@ use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\CatalogosSat;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
+use App\Modules\Tenancy\Facturacion\LlaveCfdiRechazada;
+use App\Modules\Tenancy\Facturacion\ResultadoTimbre;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
 use App\Modules\Tenancy\Facturacion\TratamientoIva;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
@@ -41,6 +43,10 @@ use Illuminate\Validation\ValidationException;
  * sustituye (`04`) y toma su venta; la nota de crédito (egreso) se relaciona con la
  * factura que corrige (`01`) y no pasa de lo que queda por acreditar. Se guardan el
  * régimen del receptor, la forma de pago y los conceptos con que se timbró.
+ *
+ * Cada factura guarda con qué emisor (organización de FacturAPI) y con qué RFC se timbró
+ * (ADR 0228). Con un sello de otro RFC no se timbra; una nota de crédito, una sustituta o
+ * la aplicación de un anticipo de una factura que timbró otro RFC, tampoco.
  */
 class EmitirFacturaTenant
 {
@@ -51,6 +57,8 @@ class EmitirFacturaTenant
         private readonly ParametrosTenant $parametros,
         // Cada factura timbrada gasta un timbre del negocio (ADR 0107).
         private readonly TimbresTenant $timbres,
+        // Con qué emisor y con qué RFC se timbra cada factura (ADR 0228).
+        private readonly EmisoresFiscalesTenant $emisores,
     ) {}
 
     /**
@@ -94,16 +102,18 @@ class EmitirFacturaTenant
         $impuesto = self::ivaDe($items, $ivaBps);
         $total = $subtotal + $impuesto;
 
-        $llave = self::llaveDe($emisor);
+        $llave = self::llaveParaTimbrar($emisor);
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
-            $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $formaPago, $items, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId, $sustituye, $conEgreso
+            $emisor, $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $formaPago, $items, $llave, $cuerpo, $anticipo, $anticipos, $ordenId, $ventaPosId, $sustituye, $conEgreso
         ): FacturaTenant {
             $relacionados = [];
             // La que sustituye, bloqueada y revisada: la nueva toma su venta.
             if ($sustituye instanceof FacturaTenant) {
                 $sustituye = $this->exigirSustituible($sustituye, $anticipo, $anticipos);
+                // La sustituta la timbra el mismo RFC (ADR 0228).
+                $this->emisores->exigirMismoRfc($sustituye, $emisor, 'sustituye');
                 if (($ordenId !== null && $ordenId !== $sustituye->orden_id) || ($ventaPosId !== null && $ventaPosId !== $sustituye->venta_pos_id)) {
                     throw ValidationException::withMessages(['sustituye' => ['La sustituta es de la misma venta que la factura que sustituye.']]);
                 }
@@ -145,6 +155,8 @@ class EmitirFacturaTenant
                     || $f->receptor_rfc !== mb_strtoupper((string) $receptor['rfc']))) {
                 throw ValidationException::withMessages(['anticipos' => ['Algún anticipo ya se aplicó, no está timbrado o es de otro RFC.']]);
             }
+            // Y los timbró el RFC de hoy (ADR 0228).
+            $aplicados->each(fn (FacturaTenant $f) => $this->emisores->exigirMismoRfc($f, $emisor, 'anticipos'));
             if ($aplicados->isNotEmpty()) {
                 $relacionados[] = [
                     'relationship' => CatalogosSat::RELACION_ANTICIPO,
@@ -173,9 +185,10 @@ class EmitirFacturaTenant
                 'receptor_regimen' => $receptor['regimen_fiscal'] ?? null,
                 'forma_pago' => $formaPago,
                 'conceptos' => $items,
+                ...$this->delEmisor($emisor),
             ];
 
-            $factura = $this->timbrarYGuardar($llave, $cuerpo, $comun);
+            $factura = $this->timbrarYGuardar($emisor, $llave, $cuerpo, $comun);
             // Con egreso, el anticipo queda aplicado al timbrarse su egreso.
             if ($factura->estado === EstadoFactura::Timbrada && ! $conEgreso) {
                 FacturaTenant::query()->whereKey($aplicados->modelKeys())->update(['anticipo_aplicado_en' => $factura->getKey()]);
@@ -194,11 +207,14 @@ class EmitirFacturaTenant
     public function aplicarAnticipo(DatosFiscalesTenant $emisor, FacturaTenant $operacion, FacturaTenant $anticipo): FacturaTenant
     {
         $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
-        $llave = self::llaveDe($emisor);
+        $llave = self::llaveParaTimbrar($emisor);
 
-        return DB::connection('tenant')->transaction(function () use ($operacion, $anticipo, $ivaBps, $llave): FacturaTenant {
+        return DB::connection('tenant')->transaction(function () use ($emisor, $operacion, $anticipo, $ivaBps, $llave): FacturaTenant {
             $anticipo = FacturaTenant::query()->whereKey($anticipo->getKey())->lockForUpdate()->firstOrFail();
             $operacion = FacturaTenant::query()->whereKey($operacion->getKey())->lockForUpdate()->firstOrFail();
+            // El egreso lo timbra el mismo RFC que el anticipo y la operación (ADR 0228).
+            $this->emisores->exigirMismoRfc($anticipo, $emisor, 'anticipos');
+            $this->emisores->exigirMismoRfc($operacion, $emisor);
             if (! $anticipo->anticipo || $anticipo->estado !== EstadoFactura::Timbrada || $anticipo->anticipo_aplicado_en !== null) {
                 throw ValidationException::withMessages(['anticipos' => ['Este anticipo ya se aplicó o no está timbrado.']]);
             }
@@ -221,7 +237,7 @@ class EmitirFacturaTenant
                 + $this->armarCuerpo($receptor, $items, CatalogosSat::USO_NOTA_DE_CREDITO, CatalogosSat::FORMA_APLICACION_ANTICIPO, (string) $operacion->moneda, $ivaBps)
                 + ['related_documents' => [['relationship' => CatalogosSat::RELACION_ANTICIPO, 'documents' => [(string) $operacion->uuid]]]];
 
-            $egreso = $this->timbrarYGuardar($llave, $cuerpo, [
+            $egreso = $this->timbrarYGuardar($emisor, $llave, $cuerpo, [
                 'receptor_nombre' => $operacion->receptor_nombre,
                 'receptor_rfc' => $operacion->receptor_rfc,
                 'receptor_email' => $operacion->receptor_email,
@@ -240,6 +256,7 @@ class EmitirFacturaTenant
                 'receptor_regimen' => $regimen,
                 'forma_pago' => CatalogosSat::FORMA_APLICACION_ANTICIPO,
                 'conceptos' => $items,
+                ...$this->delEmisor($emisor),
             ]);
             if ($egreso->estado === EstadoFactura::Timbrada) {
                 $anticipo->forceFill(['anticipo_aplicado_en' => $operacion->getKey()])->save();
@@ -263,22 +280,29 @@ class EmitirFacturaTenant
         ?string $regimenReceptor,
     ): FacturaTenant {
         $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
-        // Con el IVA de la factura que acredita (exenta, tasa cero o el general).
-        $tratamiento = self::tratamientoDe($original);
-        $tasa = $tratamiento->bps($ivaBps);
-        // El importe sin IVA más grande cuyo total (con el IVA redondeado, como el CFDI)
-        // no pasa del monto: así una nota por el total acredita el total.
-        $subtotal = intdiv($montoMinor * 10000, 10000 + $tasa) + 1;
-        while ($subtotal > 1 && $subtotal + self::ivaDeImporte($subtotal, $tasa) > $montoMinor) {
-            $subtotal--;
+        // Con el IVA de la factura que acredita (exenta, tasa cero o el general). Si mezcla
+        // (ADR 0228), un concepto por cada IVA, con el monto repartido en proporción a lo
+        // que la factura llevó de cada uno.
+        $items = [];
+        foreach (self::partesPorIva($original, $montoMinor, $ivaBps) as [$tratamiento, $parte]) {
+            $tasa = $tratamiento->bps($ivaBps);
+            // El importe sin IVA más grande cuyo total (con el IVA redondeado, como el CFDI)
+            // no pasa de su parte: así una nota por el total acredita el total.
+            $sinIva = intdiv($parte * 10000, 10000 + $tasa) + 1;
+            while ($sinIva > 1 && $sinIva + self::ivaDeImporte($sinIva, $tasa) > $parte) {
+                $sinIva--;
+            }
+            $items[] = ['descripcion' => mb_substr($descripcion, 0, 1000), 'cantidad' => 1, 'precio_unitario_minor' => $sinIva, 'iva' => $tratamiento->value] + CatalogosSat::NOTA_DE_CREDITO;
         }
-        $impuesto = self::ivaDeImporte($subtotal, $tasa);
+        $subtotal = array_sum(array_column($items, 'precio_unitario_minor'));
+        $impuesto = self::ivaDe($items, $ivaBps);
         $total = $subtotal + $impuesto;
-        $items = [['descripcion' => mb_substr($descripcion, 0, 1000), 'cantidad' => 1, 'precio_unitario_minor' => $subtotal, 'iva' => $tratamiento->value] + CatalogosSat::NOTA_DE_CREDITO];
-        $llave = self::llaveDe($emisor);
+        $llave = self::llaveParaTimbrar($emisor);
 
-        return DB::connection('tenant')->transaction(function () use ($original, $items, $subtotal, $impuesto, $total, $formaPago, $regimenReceptor, $llave, $ivaBps): FacturaTenant {
+        return DB::connection('tenant')->transaction(function () use ($emisor, $original, $items, $subtotal, $impuesto, $total, $formaPago, $regimenReceptor, $llave, $ivaBps): FacturaTenant {
             $original = FacturaTenant::query()->whereKey($original->getKey())->lockForUpdate()->firstOrFail();
+            // La nota de crédito la timbra el RFC que timbró la factura (ADR 0228).
+            $this->emisores->exigirMismoRfc($original, $emisor);
             if ($original->estado !== EstadoFactura::Timbrada || $original->tipo !== FacturaTenant::INGRESO) {
                 throw ValidationException::withMessages(['factura' => ['Solo se acredita una factura de venta timbrada.']]);
             }
@@ -308,7 +332,7 @@ class EmitirFacturaTenant
                 + $this->armarCuerpo($receptor, $items, CatalogosSat::USO_NOTA_DE_CREDITO, $formaPago, (string) $original->moneda, $ivaBps)
                 + ['related_documents' => [['relationship' => FacturaTenant::RELACION_NOTA_DE_CREDITO, 'documents' => [(string) $original->uuid]]]];
 
-            $nota = $this->timbrarYGuardar($llave, $cuerpo, [
+            $nota = $this->timbrarYGuardar($emisor, $llave, $cuerpo, [
                 'receptor_nombre' => $original->receptor_nombre,
                 'receptor_rfc' => $original->receptor_rfc,
                 'receptor_email' => $original->receptor_email,
@@ -328,6 +352,7 @@ class EmitirFacturaTenant
                 'receptor_regimen' => $regimen,
                 'forma_pago' => $formaPago,
                 'conceptos' => $items,
+                ...$this->delEmisor($emisor),
             ]);
             // El régimen del cliente queda en la factura: la siguiente nota no lo pide.
             if ($nota->estado === EstadoFactura::Timbrada && $original->receptor_regimen === null) {
@@ -369,6 +394,33 @@ class EmitirFacturaTenant
     }
 
     /**
+     * La llave para timbrar: la del negocio ({@see llaveDe()}), y no con un sello que
+     * FacturAPI dice que es de otro RFC (ADR 0228): el CFDI saldría a nombre de otro.
+     */
+    private static function llaveParaTimbrar(DatosFiscalesTenant $emisor): string
+    {
+        if ($emisor->selloDeOtroRfc()) {
+            throw ValidationException::withMessages(['facturacion' => [
+                "El sello digital (CSD) que tiene FacturAPI es del RFC {$emisor->rfc_del_sello} y tus datos fiscales dicen {$emisor->rfc}: sube el sello de tu RFC antes de facturar.",
+            ]]);
+        }
+
+        return self::llaveDe($emisor);
+    }
+
+    /**
+     * Con qué emisor y con qué RFC se timbra (ADR 0228).
+     *
+     * @return array{emisor_fiscal_id: int, emisor_rfc: string}
+     */
+    private function delEmisor(DatosFiscalesTenant $datos): array
+    {
+        $emisor = $this->emisores->vigente($datos);
+
+        return ['emisor_fiscal_id' => (int) $emisor->getKey(), 'emisor_rfc' => $emisor->rfc];
+    }
+
+    /**
      * El IVA de los conceptos de una factura, si todos llevan el mismo (sus notas de
      * crédito y la aplicación de su anticipo van igual); si mezcla, el general.
      */
@@ -380,6 +432,38 @@ class EmitirFacturaTenant
         )));
 
         return count($tratamientos) === 1 ? TratamientoIva::from($tratamientos[0]) : TratamientoIva::General;
+    }
+
+    /**
+     * Cómo se reparte el monto de una nota de crédito entre los IVA de la factura que
+     * acredita (ADR 0228): en proporción a lo que llevó de cada uno (con IVA). Una
+     * factura con un solo IVA (o de antes de guardar sus conceptos), todo con ese.
+     *
+     * @return list<array{0: TratamientoIva, 1: int}>
+     */
+    private static function partesPorIva(FacturaTenant $factura, int $montoMinor, int $ivaBps): array
+    {
+        $porIva = [];
+        foreach (is_array($factura->conceptos) ? $factura->conceptos : [] as $c) {
+            if (! is_array($c)) {
+                continue;
+            }
+            $tratamiento = TratamientoIva::de($c['iva'] ?? null);
+            $importe = (int) ($c['cantidad'] ?? 0) * (int) ($c['precio_unitario_minor'] ?? 0);
+            $porIva[$tratamiento->value] = ($porIva[$tratamiento->value] ?? 0) + $importe + self::ivaDeImporte($importe, $tratamiento->bps($ivaBps));
+        }
+        if (count($porIva) <= 1) {
+            return [[self::tratamientoDe($factura), $montoMinor]];
+        }
+        $partes = FacturasDeVentasTenant::repartir(array_values($porIva), $montoMinor);
+        $resultado = [];
+        foreach (array_keys($porIva) as $i => $iva) {
+            if ($partes[$i] > 0) {
+                $resultado[] = [TratamientoIva::from((string) $iva), $partes[$i]];
+            }
+        }
+
+        return $resultado;
     }
 
     /** El IVA de un importe, redondeado al centavo (la mitad hacia arriba). */
@@ -415,13 +499,33 @@ class EmitirFacturaTenant
     }
 
     /**
+     * Timbra. FacturAPI borra las llaves que pasan un año sin usarse (ADR 0228): si ya no
+     * reconoce la del negocio, se crea otra y se intenta una vez más.
+     *
+     * @param  array<string, mixed>  $cuerpo
+     */
+    private function timbrar(DatosFiscalesTenant $emisor, string $llave, array $cuerpo): ResultadoTimbre
+    {
+        try {
+            return $this->cliente->timbrar($llave, $cuerpo);
+        } catch (LlaveCfdiRechazada $rechazo) {
+            $nueva = $this->emisores->renovarLlave($emisor);
+            if ($nueva === null) {
+                throw $rechazo;
+            }
+
+            return $this->cliente->timbrar($nueva, $cuerpo);
+        }
+    }
+
+    /**
      * Timbra y guarda (dentro de la transacción): con un timbre del negocio, timbrada
      * con su UUID o con el error del proveedor (y sin gastar el timbre).
      *
      * @param  array<string, mixed>  $cuerpo
      * @param  array<string, mixed>  $comun
      */
-    private function timbrarYGuardar(string $llave, array $cuerpo, array $comun): FacturaTenant
+    private function timbrarYGuardar(DatosFiscalesTenant $emisor, string $llave, array $cuerpo, array $comun): FacturaTenant
     {
         $saldo = $this->timbres->apartarParaTimbrar();
         // La llave de idempotencia de FacturAPI: la huella de lo que se pide y cuántas
@@ -433,7 +537,7 @@ class EmitirFacturaTenant
         $previas = FacturaTenant::query()->where('huella', $huella)->whereNotNull('facturapi_id')->count();
         $comun['huella'] = $huella;
         try {
-            $resultado = $this->cliente->timbrar($llave, $cuerpo + ['idempotency_key' => $huella.'-'.$previas]);
+            $resultado = $this->timbrar($emisor, $llave, $cuerpo + ['idempotency_key' => $huella.'-'.$previas]);
         } catch (TimbradoFallido $e) {
             return FacturaTenant::query()->create($comun + [
                 'estado' => EstadoFactura::Error->value,

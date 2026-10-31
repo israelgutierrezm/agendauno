@@ -94,6 +94,7 @@ function rutasExclusivasPorModalidad(): array
         'integraciones.fitpass.clases.guardar' => 'clases',
         'integraciones.fitpass.horarios' => 'clases',
         'integraciones.fitpass.por-marcar' => 'clases',
+        'integraciones.fitpass.por-cancelar' => 'clases',
         'lugares-plataforma.cancelar' => 'clases',
         'lugares-plataforma.llego' => 'clases',
         'lugares-plataforma.marcado' => 'clases',

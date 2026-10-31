@@ -692,7 +692,7 @@ onMounted(() => void cuenta.asegurar());
 
       <!-- Lo que compró en el mostrador (ADR 0145); sin compras, no aparece. -->
       <ComprasMostrador class="order-7" />
-      <!-- Sus facturas (ADR 0212); sin facturas, no aparece. -->
+      <!-- Sus facturas (ADR 0212, 0228); si el negocio no factura y no tiene, no aparece. -->
       <MisFacturas class="order-8" />
     </div>
   </section>

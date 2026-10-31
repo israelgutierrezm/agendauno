@@ -16,11 +16,14 @@ use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\VisitantePlataformaTenant;
 use App\Modules\Tenancy\ProveedorPartner;
+use App\Support\ReporteDeErrores;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Las reservas que llegan desde la app de Wellhub o TotalPass (ADR 0149). La persona
@@ -65,6 +68,9 @@ class ReservasPlataformaTenant
         'USER_IS_ALREADY_BOOKED' => 'Ya tienes un lugar en esta clase.',
         'CLASS_IS_FULL' => 'La clase está llena.',
     ];
+
+    /** Lo que se le dice a la persona cuando el negocio cancela la clase. */
+    private const MOTIVO_CLASE_CANCELADA = 'El negocio canceló la clase.';
 
     public function __construct(
         private readonly RegistroDeIntegracionesTenant $registro,
@@ -111,14 +117,71 @@ class ReservasPlataformaTenant
 
     /**
      * Las reservas de la plataforma de clases que ya terminaron sin check-in: no asistió.
+     * Las de una clase que canceló el negocio no: esa clase no ocurrió (ADR 0230).
      */
     public function cerrarTerminadas(): int
     {
         return LugarPlataformaTenant::query()
             ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
             ->where('estado', LugarPlataformaTenant::RESERVADO)
-            ->whereHas('sesion', fn ($q) => $q->where('termina_en', '<', now()))
+            ->whereHas('sesion', fn ($q) => $q->where('estado', EstadoSesionTenant::Programada->value)->where('termina_en', '<', now()))
             ->update(['estado' => LugarPlataformaTenant::NO_ASISTIO, 'updated_at' => now()]);
+    }
+
+    /**
+     * El negocio canceló la clase: se cancelan las reservas de plataforma que tenía
+     * (ADR 0230). Wellhub y TotalPass le avisan a la persona; las de Fitpass, que no tiene
+     * API, quedan «por cancelar en su panel» ({@see porCancelarEnPlataforma()}). Corre ya
+     * confirmada la cancelación, y si una plataforma no responde, el lugar sigue reservado
+     * para que {@see reintentarDeSesionesCanceladas()} lo intente de nuevo: la cancelación
+     * del negocio ya quedó.
+     */
+    public function cancelarDeSesionCancelada(int $sesionId): void
+    {
+        LugarPlataformaTenant::query()
+            ->where('sesion_id', $sesionId)
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->where('estado', LugarPlataformaTenant::RESERVADO)
+            ->with('sesion')
+            ->get()
+            ->each(function (LugarPlataformaTenant $lugar): void {
+                try {
+                    $error = $this->cancelarPorElNegocio($lugar, self::MOTIVO_CLASE_CANCELADA);
+                    if ($error !== null) {
+                        Log::warning('No se pudo cancelar en la plataforma la reserva de una clase cancelada: se reintenta.', ['lugar' => $lugar->ulid, 'error' => $error]);
+                    }
+                } catch (Throwable $e) {
+                    ReporteDeErrores::reportarAtrapado($e);
+                }
+            });
+    }
+
+    /**
+     * Las reservas de plataforma que siguen vivas en clases canceladas: las que la
+     * plataforma no pudo cancelar al momento se reintentan mientras la clase no empiece;
+     * después ya no hay nada que avisar y solo se cierran aquí. Cuántas revisó.
+     */
+    public function reintentarDeSesionesCanceladas(): int
+    {
+        $lugares = LugarPlataformaTenant::query()
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->where('estado', LugarPlataformaTenant::RESERVADO)
+            ->whereHas('sesion', fn ($q) => $q->where('estado', EstadoSesionTenant::Cancelada->value))
+            ->with('sesion')
+            ->get();
+        foreach ($lugares->groupBy('sesion_id') as $sesionId => $deLaSesion) {
+            $sesion = $deLaSesion->first()?->sesion;
+            if ($sesion instanceof SesionTenant && $sesion->inicia_en->isFuture()) {
+                $this->cancelarDeSesionCancelada((int) $sesionId);
+
+                continue;
+            }
+            LugarPlataformaTenant::query()
+                ->whereKey($deLaSesion->modelKeys())
+                ->update(['estado' => LugarPlataformaTenant::CANCELADO, 'motivo' => 'CANCELADA_POR_NEGOCIO', 'updated_at' => now()]);
+        }
+
+        return $lugares->count();
     }
 
     /**
@@ -440,7 +503,8 @@ class ReservasPlataformaTenant
                     ->where('visitante_id', $visitante->getKey())
                     ->whereIn('estado', LugarPlataformaTenant::OCUPAN_LUGAR)
                     ->exists() => 'USER_IS_ALREADY_BOOKED',
-                ! $this->hayLugar($sesion, $proveedor) => 'CLASS_IS_FULL',
+                // Lo libre, primero para la lista de espera (ADR 0230).
+                ! $this->hayLugar($this->conListaAtendida($sesion), $proveedor) => 'CLASS_IS_FULL',
                 default => null,
             };
 
@@ -456,6 +520,14 @@ class ReservasPlataformaTenant
 
             return [$lugar, $motivo];
         });
+    }
+
+    /** La clase bloqueada, después de ofrecer a su lista de espera lo que esté libre. */
+    private function conListaAtendida(SesionTenant $sesion): SesionTenant
+    {
+        app(ReservasTenant::class)->ofrecerLugaresLibres($sesion);
+
+        return $sesion;
     }
 
     /** ¿Le queda lugar a la plataforma en la clase? Sin cupo, los que se le ofrecen. */
@@ -550,7 +622,7 @@ class ReservasPlataformaTenant
             if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
                 throw new DomainException('La clase no está programada: no admite reservas.');
             }
-            if (! $this->hayLugar($bloqueada, ProveedorPartner::Fitpass)) {
+            if (! $this->hayLugar($this->conListaAtendida($bloqueada), ProveedorPartner::Fitpass)) {
                 throw new DomainException('La clase ya no tiene lugar para Fitpass.');
             }
 
@@ -584,6 +656,29 @@ class ReservasPlataformaTenant
             ->whereIn('estado', [LugarPlataformaTenant::ASISTIO, LugarPlataformaTenant::NO_ASISTIO])
             ->whereNull('marcado_en_plataforma_en')
             ->whereHas('sesion', fn ($q) => $q->where('termina_en', '<=', now())->where('inicia_en', '>=', now()->subHours(48)))
+            ->with(['sesion.oferta', 'visitante'])
+            ->get()
+            ->sortBy(fn (LugarPlataformaTenant $l): int => (int) $l->sesion?->inicia_en->getTimestamp())
+            ->values();
+    }
+
+    /**
+     * Las reservas de una plataforma sin API que el negocio canceló aquí y falta cancelar
+     * en su panel (ADR 0230): una clase cancelada o una reserva que canceló recepción.
+     * Mientras Fitpass acepta cambios (48 horas después de la clase), las más próximas
+     * primero; cada una se quita al marcarla como hecha.
+     *
+     * @return Collection<int, LugarPlataformaTenant>
+     */
+    public function porCancelarEnPlataforma(ProveedorPartner $proveedor): Collection
+    {
+        return LugarPlataformaTenant::query()
+            ->where('proveedor', $proveedor->value)
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->where('estado', LugarPlataformaTenant::CANCELADO)
+            ->where('motivo', 'CANCELADA_POR_NEGOCIO')
+            ->whereNull('marcado_en_plataforma_en')
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', now()->subHours(48)))
             ->with(['sesion.oferta', 'visitante'])
             ->get()
             ->sortBy(fn (LugarPlataformaTenant $l): int => (int) $l->sesion?->inicia_en->getTimestamp())

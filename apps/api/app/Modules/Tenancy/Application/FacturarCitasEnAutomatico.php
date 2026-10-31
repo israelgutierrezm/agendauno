@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\FotoFiscal;
 use App\Modules\Tenancy\Facturacion\TratamientoIva;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
@@ -71,11 +72,12 @@ class FacturarCitasEnAutomatico
         $emisor = DatosFiscalesTenant::query()->firstOrFail();
         $borrador = $this->ventas->borradorDeOrden($orden);
         $receptor = $fiscales->receptor();
-        // El IVA y la clave del SAT del servicio de la cita (ADR 0212).
+        // El IVA y las claves del SAT del servicio de la cita como se vendió (ADR 0228): la
+        // foto de su orden; una de antes de guardarla, lo que dice hoy el servicio.
         $servicio = $reserva->sesion?->oferta;
-        $iva = TratamientoIva::de($servicio?->iva);
-        $clave = (string) ($servicio->clave_sat ?? '');
-        $clave = $clave !== '' ? $clave : '86121600';
+        $foto = $orden->sesion_id !== null ? $orden->fotoFiscal() : FotoFiscal::deServicio($servicio?->iva, $servicio?->clave_sat);
+        $iva = $foto->iva;
+        $clave = $foto->claveProdServ;
 
         // El anticipo de una cita con anticipo: su CFDI de anticipo.
         if ((int) $reserva->orden_id === (int) $orden->getKey() && $reserva->saldo_orden_id !== null) {
@@ -88,13 +90,13 @@ class FacturarCitasEnAutomatico
         }
 
         // El resto, con su anticipo facturado: la operación completa y el egreso.
-        $anticipo = (int) $reserva->saldo_orden_id === (int) $orden->getKey() ? $this->anticipoSinAplicar($reserva) : null;
+        $anticipo = (int) $reserva->saldo_orden_id === (int) $orden->getKey() ? $this->anticipoSinAplicar($reserva, (string) $emisor->rfc) : null;
         if ($anticipo instanceof FacturaTenant) {
             $descripcion = $reserva->sesion?->oferta->nombre ?? $borrador['etiqueta'];
             $total = (int) $anticipo->total_minor + (int) $borrador['total_minor'];
             $operacion = $this->emisor->emitir(
                 $emisor, $receptor,
-                [['descripcion' => (string) $descripcion, 'cantidad' => 1, 'precio_unitario_minor' => $this->sinIva($total, $iva), 'clave_prod_serv' => $clave, 'clave_unidad' => 'E48', 'iva' => $iva->value]],
+                [['descripcion' => (string) $descripcion, 'cantidad' => 1, 'precio_unitario_minor' => $this->sinIva($total, $iva), 'clave_prod_serv' => $clave, 'clave_unidad' => $foto->claveUnidad, 'iva' => $iva->value]],
                 $fiscales->uso_cfdi, $borrador['forma_pago'], $borrador['moneda'],
                 anticipos: [(string) $anticipo->ulid], ordenId: (int) $orden->getKey(), conEgreso: true,
             );
@@ -125,6 +127,8 @@ class FacturarCitasEnAutomatico
         $emisor = DatosFiscalesTenant::query()->firstOrFail();
         FacturaTenant::query()
             ->where('anticipo', true)->where('estado', EstadoFactura::Timbrada->value)->whereNull('anticipo_aplicado_en')->whereNotNull('orden_id')
+            // Los que timbró otro RFC ya no los aplica el de hoy (ADR 0228).
+            ->delRfc((string) $emisor->rfc)
             ->get()
             ->each(function (FacturaTenant $anticipo) use ($emisor, &$hechos): void {
                 $reserva = ReservaTenant::query()->where('orden_id', $anticipo->orden_id)->whereNotNull('saldo_orden_id')->first();
@@ -166,18 +170,19 @@ class FacturarCitasEnAutomatico
             ->where('estado', EstadoFactura::Timbrada->value)->exists();
     }
 
-    /** El CFDI del anticipo de la cita, timbrado y aún sin aplicar. */
-    private function anticipoSinAplicar(ReservaTenant $reserva): ?FacturaTenant
+    /**
+     * El CFDI del anticipo de la cita, timbrado con el RFC de hoy y aún sin aplicar. Uno
+     * que timbró otro RFC no se relaciona (ADR 0228): el resto va como cualquier venta.
+     */
+    private function anticipoSinAplicar(ReservaTenant $reserva, string $rfc): ?FacturaTenant
     {
         return FacturaTenant::query()->where('orden_id', $reserva->orden_id)->where('anticipo', true)
-            ->where('estado', EstadoFactura::Timbrada->value)->whereNull('anticipo_aplicado_en')->latest('id')->first();
+            ->where('estado', EstadoFactura::Timbrada->value)->whereNull('anticipo_aplicado_en')->delRfc($rfc)->latest('id')->first();
     }
 
     /** El importe sin IVA de un precio con IVA (el CFDI se lo suma). */
     private function sinIva(int $conIva, TratamientoIva $tratamiento): int
     {
-        $iva = intdiv($tratamiento->bps($this->parametros->entero('facturacion.iva_porcentaje') * 100), 100);
-
-        return max(1, (int) round($conIva * 100 / (100 + $iva)));
+        return max(1, $tratamiento->sinIva($conIva, $this->parametros->entero('facturacion.iva_porcentaje') * 100));
     }
 }

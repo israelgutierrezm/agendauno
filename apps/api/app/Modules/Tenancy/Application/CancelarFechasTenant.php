@@ -31,17 +31,19 @@ class CancelarFechasTenant
     public function __construct(private readonly ReservasTenant $reservas) {}
 
     /**
-     * Las programadas por venir de ese día, en la zona de cada sede.
+     * Las programadas por venir de ese día, en la zona de cada sede. Con `$sucursalId`,
+     * solo las de esa sede (ADR 0230); sin ella, las de todo el negocio.
      *
      * @return Collection<int, SesionTenant>
      */
-    public function delDia(string $fecha): Collection
+    public function delDia(string $fecha, ?int $sucursalId = null): Collection
     {
         $dia = CarbonImmutable::parse($fecha);
 
         return SesionTenant::query()
             ->where('estado', EstadoSesionTenant::Programada->value)
             ->where('inicia_en', '>', now())
+            ->when($sucursalId !== null, static fn ($q) => $q->where('sucursal_id', $sucursalId))
             // Un margen de un día a cada lado cubre cualquier zona; luego se filtra por la suya.
             ->whereBetween('inicia_en', [$dia->subDay()->startOfDay(), $dia->addDays(2)->startOfDay()])
             ->orderBy('inicia_en')

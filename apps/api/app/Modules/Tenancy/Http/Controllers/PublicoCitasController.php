@@ -261,9 +261,11 @@ class PublicoCitasController
 
         $clave = $validado['idempotency_key'] ?? null;
         try {
+            // Sin cuenta: siempre se paga, aunque la ficha de ese correo tenga algo pagado por
+            // adelantado (escribir un correo no prueba que sea suyo; ADR 0230).
             $reserva = $instructor instanceof Usuario
-                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave, cupon: $validado['cupon'] ?? null)
-                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave, $validado['cupon'] ?? null);
+                ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, 0, pagarTodo: $pagarTodo, clave: $clave, cupon: $validado['cupon'] ?? null, sinCuenta: true)
+                : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 0, $pagarTodo, $clave, $validado['cupon'] ?? null, sinCuenta: true);
         } catch (LimiteCitasPorPagar) {
             // Sin decir a un anónimo si ese correo es de un cliente ni cuánto debe.
             throw new LimiteCitasPorPagar('No se puede agendar con estos datos desde aquí. Entra a tu cuenta o comunícate con el negocio.');

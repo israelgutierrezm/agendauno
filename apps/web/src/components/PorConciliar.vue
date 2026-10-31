@@ -124,6 +124,10 @@ function titulo(i: Incidencia): string {
       return t("porConciliar.primeraVezRepetida", { monto });
     case "contracargo":
       return t("porConciliar.contracargo", { monto });
+    case "revisar_si_vino":
+      return t("porConciliar.revisarSiVino", {
+        monto: dinero(i.excedente_minor ?? 0, i.moneda),
+      });
     default:
       return t("porConciliar.pagoTardio", { monto });
   }

@@ -177,10 +177,13 @@ class CambiarSerieTenant
             if ($motivo !== null) {
                 $sesion->save();
                 $conservadas[] = ['fecha' => $dia, 'motivo' => $motivo];
-
-                continue;
+            } else {
+                $movidas++;
             }
-            $movidas++;
+            // Si subió el cupo, los lugares nuevos se ofrecen primero a la lista (ADR 0230).
+            if (array_key_exists('capacidad', $nuevos)) {
+                $this->reservas->ofrecerLugaresLibres($sesion);
+            }
         }
 
         // Días nuevos: sus fechas, hasta donde ya estaba generada la serie o el

@@ -47,7 +47,7 @@ class FacturacionNoConfigurada implements CancelacionCfdi, ClienteFacturacion, O
         throw new TimbradoFallido(self::MOTIVO);
     }
 
-    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): void
+    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): ?string
     {
         throw new TimbradoFallido(self::MOTIVO);
     }

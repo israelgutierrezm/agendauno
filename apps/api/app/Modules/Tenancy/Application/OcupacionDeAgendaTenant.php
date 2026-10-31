@@ -93,12 +93,12 @@ class OcupacionDeAgendaTenant
         $primerDia = CarbonImmutable::parse($desde);
         $ultimoDia = CarbonImmutable::parse($hasta);
 
+        // Cada cierre es de una sede o de todo el negocio (ADR 0230).
         $cerrados = ExcepcionHorarioTenant::query()
             ->whereDate('fecha', '>=', $primerDia->toDateString())
             ->whereDate('fecha', '<=', $ultimoDia->toDateString())
-            ->get(['fecha'])
-            ->map(static fn (ExcepcionHorarioTenant $e): string => CarbonImmutable::parse((string) $e->fecha)->toDateString())
-            ->all();
+            ->get(['fecha', 'sucursal_id'])
+            ->groupBy(static fn (ExcepcionHorarioTenant $e): string => CarbonImmutable::parse((string) $e->fecha)->toDateString());
         $bloqueos = BloqueoAgendaTenant::query()
             ->whereNull('recurso_id')
             ->where('desde', '<', $ultimoDia->addDays(2))
@@ -108,10 +108,11 @@ class OcupacionDeAgendaTenant
         $ventanas = [];
         for ($dia = $primerDia; $dia->lessThanOrEqualTo($ultimoDia); $dia = $dia->addDay()) {
             $fecha = $dia->toDateString();
-            if (in_array($fecha, $cerrados, true)) {
-                continue;
-            }
+            $cierres = $cerrados->get($fecha) ?? collect();
             foreach ($horarios->get($dia->isoWeekday()) ?? [] as $horario) {
+                if ($cierres->contains(static fn (ExcepcionHorarioTenant $e): bool => $e->sucursal_id === null || (int) $e->sucursal_id === (int) $horario->sucursal_id)) {
+                    continue;
+                }
                 $zona = (string) ($zonas[$horario->sucursal_id] ?? $zonaNegocio);
                 $tramos = [[
                     CarbonImmutable::parse($fecha.' '.$horario->hora_inicio, $zona)->utc(),

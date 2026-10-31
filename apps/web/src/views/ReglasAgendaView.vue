@@ -39,6 +39,11 @@ interface DiaCerrado {
   id: string;
   fecha: string;
   motivo: string | null;
+  // De qué sede es; sin ella, de todo el negocio (ADR 0230).
+  sucursal_id?: string | null;
+  sucursal?: string | null;
+  // Si quien lo ve lo puede quitar (lo dice el servidor).
+  editable?: boolean;
 }
 type Pestana = "politicas" | "cierres" | "programacion" | "parametros";
 interface Oferta {
@@ -92,14 +97,25 @@ useCambiosPendientes(
 );
 const nuevaActividad = ref("");
 
-const nuevoDia = ref({ fecha: "", motivo: "" });
+// Un cierre es de una sede o de todo el negocio (ADR 0230): quien solo ve algunas sedes
+// elige entre las suyas. Con una sola sede en el negocio no hay nada que elegir.
+const sedes = computed(() => sesion.usuario?.sucursales ?? []);
+const veTodoElNegocio = computed(() => sesion.usuario?.todo_el_negocio ?? true);
+const eligeSede = computed(
+  () => sedes.value.length > 1 || !veTodoElNegocio.value,
+);
+const sedePorOmision = computed(() =>
+  veTodoElNegocio.value ? "" : (sedes.value[0]?.id ?? ""),
+);
+
+const nuevoDia = ref({ fecha: "", motivo: "", sucursal: sedePorOmision.value });
 // Lo ya programado ese día y si se cancela al cerrarlo (ADR 0223).
 const afectadas = ref<{ sesiones: number; reservas: number } | null>(null);
 const cancelarDelDia = ref(false);
 let pedidoAfectadas = 0;
 watch(
-  () => nuevoDia.value.fecha,
-  async (dia) => {
+  () => [nuevoDia.value.fecha, nuevoDia.value.sucursal] as const,
+  async ([dia, sucursal]) => {
     const mio = ++pedidoAfectadas;
     afectadas.value = null;
     cancelarDelDia.value = false;
@@ -108,7 +124,10 @@ watch(
       const { data } = await api.get<{
         data: { sesiones: number; reservas: number };
       }>(`${base.value}/excepciones-horario/afectadas`, {
-        params: { fecha: dia },
+        params: {
+          fecha: dia,
+          ...(sucursal !== "" ? { sucursal_id: sucursal } : {}),
+        },
       });
       if (mio === pedidoAfectadas) afectadas.value = data.data;
     } catch {
@@ -298,6 +317,9 @@ async function agregarDia(): Promise<void> {
     }>(`${base.value}/excepciones-horario`, {
       fecha: nuevoDia.value.fecha,
       motivo: nuevoDia.value.motivo || null,
+      ...(nuevoDia.value.sucursal !== ""
+        ? { sucursal_id: nuevoDia.value.sucursal }
+        : {}),
       ...(cancelarDelDia.value ? { cancelar_sesiones: true } : {}),
     });
     const canceladas = data.meta?.cancelacion?.canceladas ?? 0;
@@ -306,7 +328,7 @@ async function agregarDia(): Promise<void> {
         t("reglasAgenda.fechasDelDiaCanceladas", { n: canceladas }, canceladas),
       );
     }
-    nuevoDia.value = { fecha: "", motivo: "" };
+    nuevoDia.value = { fecha: "", motivo: "", sucursal: sedePorOmision.value };
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -652,6 +674,24 @@ onMounted(cargar);
               :placeholder="$t('reglasAgenda.motivoPh')"
             />
           </div>
+          <div v-if="eligeSede">
+            <label class="tu-label" for="ra-sede">{{
+              $t("reglasAgenda.aplicaA")
+            }}</label>
+            <select
+              id="ra-sede"
+              v-model="nuevoDia.sucursal"
+              class="tu-input"
+              data-prueba="sede-del-dia"
+            >
+              <option v-if="veTodoElNegocio" value="">
+                {{ $t("reglasAgenda.todoElNegocio") }}
+              </option>
+              <option v-for="s in sedes" :key="s.id" :value="s.id">
+                {{ s.nombre }}
+              </option>
+            </select>
+          </div>
           <button
             type="submit"
             class="tu-btn tu-btn-secundario"
@@ -697,6 +737,13 @@ onMounted(cargar);
                 {{ fecha(d.fecha) }}
               </p>
               <p
+                v-if="eligeSede || d.sucursal"
+                class="mt-0.5 text-xs"
+                data-prueba="sede-de-dia-cerrado"
+              >
+                {{ d.sucursal ?? $t("reglasAgenda.todoElNegocio") }}
+              </p>
+              <p
                 v-if="d.motivo"
                 class="mt-0.5 text-xs"
                 :style="{ color: 'var(--texto-suave)' }"
@@ -705,7 +752,7 @@ onMounted(cargar);
               </p>
             </div>
             <button
-              v-if="puedeEliminar"
+              v-if="puedeEliminar && d.editable !== false"
               type="button"
               class="tu-btn tu-btn-peligro tu-btn-chico shrink-0"
               data-prueba="quitar-dia"

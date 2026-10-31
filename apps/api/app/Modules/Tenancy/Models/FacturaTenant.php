@@ -7,12 +7,16 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Factura (CFDI) tenant-local timbrada vía FacturAPI. Montos en minor (entero).
+ *
+ * @property int|null $emisor_fiscal_id
+ * @property string|null $emisor_rfc
  */
 class FacturaTenant extends Model
 {
@@ -31,6 +35,8 @@ class FacturaTenant extends Model
         'tipo', 'relacionada_id', 'relacion', 'receptor_regimen', 'forma_pago', 'conceptos',
         // La huella del CFDI pedido: arma la llave de idempotencia de FacturAPI.
         'huella',
+        // Con qué emisor (organización de FacturAPI) y con qué RFC se timbró (ADR 0228).
+        'emisor_fiscal_id', 'emisor_rfc',
         'cancelacion_estado', 'cancelacion_motivo', 'cancelacion_detalle', 'cancelacion_solicitada_en', 'cancelada_en',
     ];
 
@@ -77,6 +83,29 @@ class FacturaTenant extends Model
     public function venta(): BelongsTo
     {
         return $this->belongsTo(VentaPosTenant::class, 'venta_pos_id');
+    }
+
+    /**
+     * Las que timbró ese RFC (ADR 0228). Sin dato, son de antes de guardarlo y fueron con
+     * el de hoy.
+     *
+     * @param  Builder<FacturaTenant>  $consulta
+     */
+    public function scopeDelRfc(Builder $consulta, string $rfc): void
+    {
+        $consulta->where(static fn (Builder $q) => $q->whereNull('emisor_rfc')->orWhere('emisor_rfc', mb_strtoupper($rfc)));
+    }
+
+    /**
+     * El emisor con que se timbró (ADR 0228): con su llave se descarga, se reenvía y se
+     * cancela, aunque el negocio ya timbre con otro RFC. Sin dato, es de antes de
+     * guardarlo y se timbró con el de hoy.
+     *
+     * @return BelongsTo<EmisorFiscalTenant, $this>
+     */
+    public function emisor(): BelongsTo
+    {
+        return $this->belongsTo(EmisorFiscalTenant::class, 'emisor_fiscal_id');
     }
 
     /**

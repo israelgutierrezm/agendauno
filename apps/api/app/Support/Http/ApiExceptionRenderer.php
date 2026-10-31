@@ -12,10 +12,12 @@ use App\Modules\Tenancy\Pagos\Exceptions\PagoException;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
@@ -30,6 +32,8 @@ use Throwable;
  */
 class ApiExceptionRenderer
 {
+    use DetectsConcurrencyErrors;
+
     public function __invoke(Throwable $e, Request $request): ?JsonResponse
     {
         if (! $request->is('api/*')) {
@@ -88,6 +92,13 @@ class ApiExceptionRenderer
                 $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar la operación de tenancy.',
                 $e->estadoHttp(),
                 $e->meta(),
+            ),
+            // Dos operaciones chocaron (deadlock o candado vencido; 40001/1213) y agotaron sus
+            // reintentos: no quedó nada a medias y se puede intentar otra vez (ADR 0230).
+            $e instanceof PDOException && $this->causedByConcurrencyError($e) => $this->make(
+                'CONCURRENT_CONFLICT',
+                'Otra operación estaba cambiando lo mismo. Inténtalo de nuevo.',
+                409,
             ),
             default => $this->generic($e),
         };

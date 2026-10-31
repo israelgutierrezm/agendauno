@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\FotoFiscal;
 use App\Modules\Tenancy\Facturacion\TratamientoIva;
 use App\Modules\Tenancy\Models\DatosFiscalesPersonaTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use App\Modules\Tenancy\Models\LineaDevolucionVentaTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PresupuestoTenant;
-use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
@@ -40,17 +41,19 @@ use Illuminate\Validation\ValidationException;
  * A quién: la persona de la venta y, si ya se le facturó antes, con los datos fiscales
  * de su última factura (RFC, código postal y uso del CFDI), para no volver a pedirlos.
  *
+ * El IVA y las claves del SAT (ADR 0228): los de la foto fiscal que cada línea guardó al
+ * venderse ({@see FotoFiscal}), no los del catálogo de hoy. Cada línea es su concepto,
+ * así nunca se juntan en uno conceptos exentos y con IVA. Lo que no se cobró de la lista
+ * (el descuento de la orden) y lo devuelto se reparten entre las líneas en proporción a
+ * lo que valen; la promoción no toca las cuotas. Una venta de antes de guardar la foto
+ * se factura con el catálogo de hoy, y el borrador lo dice (`fiscal_del_catalogo`).
+ *
  * @phpstan-type Concepto array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string, iva: string}
  * @phpstan-type Receptor array{nombre: string|null, email: string|null, rfc: string|null, codigo_postal: string|null, uso_cfdi: string|null, regimen_fiscal: string|null}
+ * @phpstan-type Borrador array{etiqueta: string, receptor: Receptor, conceptos: list<Concepto>, forma_pago: string, total_minor: int, moneda: string, descuento_minor: int, devuelto_minor: int, fiscal_del_catalogo: bool}
  */
 class FacturasDeVentasTenant
 {
-    /** Un servicio (clase, cita, plan): la clave y la unidad que ya sugiere la pantalla. */
-    private const SERVICIO = ['clave_prod_serv' => '86121600', 'clave_unidad' => 'E48'];
-
-    /** Un artículo del mostrador: «no existe en el catálogo» y pieza. */
-    private const ARTICULO = ['clave_prod_serv' => '01010101', 'clave_unidad' => 'H87'];
-
     public function __construct(private readonly ParametrosTenant $parametros) {}
 
     /** La factura timbrada de la orden, si ya la tiene (sus notas de crédito no cuentan). */
@@ -102,43 +105,40 @@ class FacturasDeVentasTenant
     }
 
     /**
-     * Lo que se factura de una orden: sus líneas (si suman lo pagado) o un concepto con
-     * el total, a quién y con qué forma de pago del SAT.
+     * Lo que se factura de una orden: cada línea con su foto fiscal y lo que de verdad se
+     * cobró de ella (el descuento y lo devuelto, repartidos), a quién y con qué forma de
+     * pago del SAT. La de una cita (sin líneas), un concepto con la foto de su servicio.
      *
-     * @return array{etiqueta: string, receptor: Receptor, conceptos: list<Concepto>, forma_pago: string, total_minor: int, moneda: string}
+     * @return Borrador
      */
     public function borradorDeOrden(OrdenTenant $orden): array
     {
         $orden->loadMissing(['lineas.producto', 'persona', 'sesion.oferta']);
-        $lineas = $orden->lineas;
         // Lo que de verdad se quedó el negocio: lo cobrado menos lo devuelto.
         $total = min((int) $orden->total_minor, self::cobradoNeto($orden));
         // Un presupuesto con impuestos desglosados trae el impuesto como una línea más
-        // (ADR 0127): no es un concepto con IVA encima. Va un solo concepto con el total.
+        // (ADR 0127): no es un producto con IVA encima. Su importe va en lo vendido.
         $desglosado = PresupuestoTenant::query()
             ->where('orden_id', $orden->getKey())
             ->where('impuestos', ModoImpuestos::Desglosados->value)
             ->exists();
-        $suman = (int) $lineas->sum('subtotal_minor') === $total;
-        // El IVA y la clave del SAT de lo vendido (ADR 0212): los del plan o producto de
-        // cada línea; una cita o clase, los de su servicio.
-        $oferta = $orden->sesion?->oferta;
-        $deLinea = static fn (LineaOrdenTenant $l): array => $l->producto instanceof ProductoTenant
-            ? [TratamientoIva::de($l->producto->iva), $l->producto->clave_sat]
-            : [TratamientoIva::de($oferta?->iva), $oferta?->clave_sat];
-        if ($lineas->isNotEmpty() && $suman && ! $desglosado) {
-            $conceptos = array_values($lineas->map(function (LineaOrdenTenant $l) use ($deLinea): array {
-                [$iva, $clave] = $deLinea($l);
-
-                return $this->concepto($l->nombre(), (int) $l->cantidad, (int) $l->precio_unitario_minor, self::SERVICIO, $iva, $clave);
-            })->all());
+        $lineas = array_values(($desglosado ? $orden->lineas->reject(self::esLineaDeImpuestos(...)) : $orden->lineas)->all());
+        $conceptos = [];
+        $delCatalogo = false;
+        if ($lineas === []) {
+            $delCatalogo = ! $orden->tieneFotoFiscal();
+            if ($total > 0) {
+                $conceptos[] = $this->concepto($this->nombreDeOrden($orden), 1, $total, $orden->fotoFiscal());
+            }
         } else {
-            // Un solo concepto: con el IVA de todo lo vendido si es el mismo; si no, el general.
-            $tratamientos = $lineas->isNotEmpty()
-                ? $lineas->map(static fn (LineaOrdenTenant $l): string => $deLinea($l)[0]->value)->unique()->values()
-                : collect([TratamientoIva::de($oferta?->iva)->value]);
-            $iva = $tratamientos->count() === 1 ? TratamientoIva::from((string) $tratamientos->first()) : TratamientoIva::General;
-            $conceptos = [$this->concepto($this->nombreDeOrden($orden, sinImpuestos: $desglosado), 1, $total, self::SERVICIO, $iva)];
+            foreach (self::cobradoDeCadaLinea($orden, $lineas, $total) as $i => $importe) {
+                if ($importe <= 0) {
+                    continue;
+                }
+                $linea = $lineas[$i];
+                $delCatalogo = $delCatalogo || ! $linea->tieneFotoFiscal();
+                $conceptos[] = $this->conceptoPorPiezas($linea->nombre(), (int) $linea->cantidad, $importe, $linea->fotoFiscal());
+            }
         }
         $pago = PagoTenant::query()->where('orden_id', $orden->getKey())->whereNotNull('aprobado_en')->latest('id')->first();
 
@@ -149,7 +149,132 @@ class FacturasDeVentasTenant
             'forma_pago' => $pago instanceof PagoTenant ? self::formaDelPago($pago) : '01',
             'total_minor' => $total,
             'moneda' => (string) $orden->moneda,
+            // Lo que no se factura, a la vista (ADR 0228): el descuento de la orden y lo devuelto.
+            'descuento_minor' => (int) $orden->descuento_minor,
+            'devuelto_minor' => self::devueltoDe($orden),
+            'fiscal_del_catalogo' => $delCatalogo,
         ];
+    }
+
+    /**
+     * Lo que de verdad se cobró de cada línea (con IVA): su subtotal menos su parte de la
+     * promoción (que no toca las cuotas, B04) y, en proporción a lo que queda, ajustado
+     * a lo que se factura (el descuento de contado, lo devuelto o los impuestos
+     * desglosados de un presupuesto). Suma exactamente `$total`.
+     *
+     * @param  list<LineaOrdenTenant>  $lineas
+     * @return list<int>
+     */
+    private static function cobradoDeCadaLinea(OrdenTenant $orden, array $lineas, int $total): array
+    {
+        $importes = array_map(static fn (LineaOrdenTenant $l): int => max(0, (int) $l->subtotal_minor), $lineas);
+        $promocion = max(0, (int) $orden->descuento_minor - (int) $orden->descuento_contado_minor);
+        $vendido = array_map(static fn (LineaOrdenTenant $l, int $importe): int => $l->concepto === null ? $importe : 0, $lineas, $importes);
+        if ($promocion > 0 && array_sum($vendido) > 0) {
+            foreach (self::repartir($vendido, min($promocion, array_sum($vendido))) as $i => $parte) {
+                $importes[$i] -= $parte;
+            }
+        }
+
+        return self::repartir($importes, $total);
+    }
+
+    /**
+     * Reparte `$monto` en proporción a los pesos, en centavos exactos: lo que sobra del
+     * redondeo va a los de mayor fracción. Sin pesos, todo al último.
+     *
+     * @param  list<int>  $pesos
+     * @return list<int>
+     */
+    public static function repartir(array $pesos, int $monto): array
+    {
+        $suma = array_sum($pesos);
+        if ($pesos === [] || $suma <= 0) {
+            return $pesos === [] ? [] : [...array_fill(0, count($pesos) - 1, 0), $monto];
+        }
+        $partes = [];
+        $fracciones = [];
+        foreach ($pesos as $i => $peso) {
+            $partes[$i] = intdiv($monto * $peso, $suma);
+            $fracciones[$i] = ($monto * $peso) % $suma;
+        }
+        $falta = $monto - array_sum($partes);
+        arsort($fracciones);
+        foreach (array_keys($fracciones) as $i) {
+            if ($falta <= 0) {
+                break;
+            }
+            $partes[$i]++;
+            $falta--;
+        }
+
+        return array_values($partes);
+    }
+
+    /** La línea «Impuestos (…)» de un presupuesto desglosado (ADR 0127): no es un producto. */
+    private static function esLineaDeImpuestos(LineaOrdenTenant $linea): bool
+    {
+        return $linea->getAttribute('producto_comercial_id') === null
+            && $linea->getAttribute('articulo_id') === null
+            && str_starts_with((string) $linea->getAttribute('descripcion'), 'Impuestos (');
+    }
+
+    /**
+     * La factura de una venta lleva el IVA de su foto (ADR 0228), no el que diga la
+     * pantalla, o 422 en `items`. Si todo lo vendido lleva el mismo IVA, cada concepto va
+     * con ese (quien no lo dice, lo toma). Si mezcla, cada concepto dice el suyo y lo de
+     * cada IVA es lo de la venta, a unos centavos. En una venta de antes de guardar la
+     * foto, el catálogo de hoy es solo una sugerencia: vale lo que se revisó en pantalla.
+     *
+     * @template T of array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string, iva?: string|null}
+     *
+     * @param  list<T>  $items
+     * @return list<T>
+     */
+    public function conIvaDeLaVenta(array $items, OrdenTenant|VentaPosTenant $venta): array
+    {
+        $borrador = $venta instanceof OrdenTenant ? $this->borradorDeOrden($venta) : $this->borradorDeVenta($venta);
+        $deLaVenta = self::importesPorIva($borrador['conceptos']);
+        $conFoto = ! $borrador['fiscal_del_catalogo'];
+        if (count($deLaVenta) <= 1) {
+            $iva = (string) (array_key_first($deLaVenta) ?? TratamientoIva::General->value);
+            $items = array_map(static fn (array $i): array => ($i['iva'] ?? '') === '' ? array_merge($i, ['iva' => $iva]) : $i, $items);
+            $cuadra = ! $conFoto || array_diff(array_column($items, 'iva'), [$iva]) === [];
+        } else {
+            $cuadra = array_filter($items, static fn (array $i): bool => ($i['iva'] ?? '') === '') === [];
+            if ($conFoto) {
+                $deLaFactura = self::importesPorIva($items);
+                $cuadra = $cuadra && array_keys($deLaFactura) === array_keys($deLaVenta);
+                foreach ($deLaVenta as $iva => $importe) {
+                    $cuadra = $cuadra && abs(($deLaFactura[$iva] ?? 0) - $importe) <= count($items) + 1;
+                }
+            }
+        }
+        if (! $cuadra) {
+            throw ValidationException::withMessages(['items' => [
+                'Cada concepto de esta venta va con el IVA con que se vendió y, si mezcla exentos y con IVA, con su importe. Vuelve a cargar la venta.',
+            ]]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * Lo de cada IVA (sin IVA), ordenado por IVA.
+     *
+     * @param  array<int, array{cantidad: int, precio_unitario_minor: int, iva?: string|null}>  $conceptos
+     * @return array<string, int>
+     */
+    private static function importesPorIva(array $conceptos): array
+    {
+        $por = [];
+        foreach ($conceptos as $c) {
+            $iva = TratamientoIva::de($c['iva'] ?? null)->value;
+            $por[$iva] = ($por[$iva] ?? 0) + (int) $c['cantidad'] * (int) $c['precio_unitario_minor'];
+        }
+        ksort($por);
+
+        return $por;
     }
 
     /**
@@ -158,37 +283,57 @@ class FacturasDeVentasTenant
      */
     public static function cobradoNeto(OrdenTenant $orden): int
     {
-        $pagos = PagoTenant::query()
-            ->where('orden_id', $orden->getKey())
-            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
-            ->get(['id', 'monto_minor']);
-        $devuelto = (int) ReembolsoTenant::query()
-            ->whereIn('pago_id', $pagos->modelKeys())
+        return max(0, (int) self::pagosCobrados($orden)->sum('monto_minor') - self::devueltoDe($orden));
+    }
+
+    /** Lo devuelto de lo cobrado de una orden (devoluciones aprobadas). */
+    private static function devueltoDe(OrdenTenant $orden): int
+    {
+        return (int) ReembolsoTenant::query()
+            ->whereIn('pago_id', self::pagosCobrados($orden)->select('id'))
             ->where('estado', EstadoReembolso::Aprobado->value)
             ->sum('monto_minor');
-
-        return max(0, (int) $pagos->sum('monto_minor') - $devuelto);
     }
 
     /**
-     * Lo que se factura de una venta del mostrador: sus artículos (con extras), sin la
-     * propina.
+     * @return Builder<PagoTenant>
+     */
+    private static function pagosCobrados(OrdenTenant $orden): Builder
+    {
+        return PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value]);
+    }
+
+    /**
+     * Lo que se factura de una venta del mostrador: sus artículos (con extras) con la
+     * foto fiscal de cada uno, sin la propina. El cupón ya viene repartido en las líneas
+     * (ADR 0220); lo devuelto no se factura (ADR 0178): de cada línea, lo que se cobró
+     * menos lo que se le devolvió.
      *
-     * @return array{etiqueta: string, receptor: Receptor, conceptos: list<Concepto>, forma_pago: string, total_minor: int, moneda: string}
+     * @return Borrador
      */
     public function borradorDeVenta(VentaPosTenant $venta): array
     {
         $venta->loadMissing(['lineas.articulo', 'persona']);
-        // Lo devuelto no se factura (ADR 0178): por pieza, lo que se cobró por ella, como
-        // al devolver.
-        $lineas = $venta->lineas->filter(static fn (LineaVentaPosTenant $l): bool => self::piezasQueQuedan($l) > 0);
-        $conceptos = array_values($lineas->map(function (LineaVentaPosTenant $l): array {
+        $devueltoDe = LineaDevolucionVentaTenant::query()
+            ->whereIn('linea_venta_pos_id', $venta->lineas->modelKeys())
+            ->selectRaw('linea_venta_pos_id, SUM(monto_minor) as monto')
+            ->groupBy('linea_venta_pos_id')
+            ->pluck('monto', 'linea_venta_pos_id');
+        $conceptos = [];
+        $delCatalogo = false;
+        foreach ($venta->lineas as $l) {
+            $piezas = self::piezasQueQuedan($l);
+            $importe = max(0, (int) $l->subtotal_minor - (int) ($devueltoDe[$l->getKey()] ?? 0));
+            if ($piezas <= 0 || $importe <= 0) {
+                continue;
+            }
             $extras = array_map(static fn (array $e): string => (string) $e['nombre'], $l->extras ?? []);
             $nombre = (string) ($l->articulo->nombre ?? 'Producto').($extras !== [] ? ' con '.implode(', ', $extras) : '');
-
-            return $this->concepto($nombre, self::piezasQueQuedan($l), intdiv((int) $l->subtotal_minor, max(1, (int) $l->cantidad)), self::ARTICULO,
-                TratamientoIva::de($l->articulo?->iva), $l->articulo?->clave_sat);
-        })->all());
+            $delCatalogo = $delCatalogo || ! $l->tieneFotoFiscal();
+            $conceptos[] = $this->conceptoPorPiezas($nombre, $piezas, $importe, $l->fotoFiscal());
+        }
         $devuelto = (int) $venta->devoluciones()->sum('monto_minor');
 
         return [
@@ -198,6 +343,9 @@ class FacturasDeVentasTenant
             'forma_pago' => self::formaDeLasPartes(CajasTenant::partesDeVenta($venta)),
             'total_minor' => max(0, (int) $venta->total_minor - $devuelto),
             'moneda' => (string) $venta->moneda,
+            'descuento_minor' => (int) $venta->descuento_minor,
+            'devuelto_minor' => $devuelto,
+            'fiscal_del_catalogo' => $delCatalogo,
         ];
     }
 
@@ -291,34 +439,42 @@ class FacturasDeVentasTenant
 
     /**
      * Un concepto con su precio sin IVA (el de venta ya lo trae; exento o a tasa cero,
-     * no lleva). Con la clave del SAT del producto, si la tiene.
+     * no lleva), con el IVA y las claves del SAT de su foto fiscal.
      *
-     * @param  array{clave_prod_serv: string, clave_unidad: string}  $claves
      * @return Concepto
      */
-    private function concepto(string $descripcion, int $cantidad, int $precioConIva, array $claves, TratamientoIva $tratamiento = TratamientoIva::General, ?string $claveSat = null): array
+    private function concepto(string $descripcion, int $cantidad, int $precioConIva, FotoFiscal $foto): array
     {
-        $iva = intdiv($tratamiento->bps($this->parametros->entero('facturacion.iva_porcentaje') * 100), 100);
-
         return [
             'descripcion' => mb_substr($descripcion, 0, 1000),
             'cantidad' => max(1, $cantidad),
-            'precio_unitario_minor' => max(1, (int) round($precioConIva * 100 / (100 + $iva))),
-            ...$claves,
-            ...($claveSat !== null && $claveSat !== '' ? ['clave_prod_serv' => $claveSat] : []),
-            'iva' => $tratamiento->value,
+            'precio_unitario_minor' => max(1, $foto->iva->sinIva($precioConIva, $this->parametros->entero('facturacion.iva_porcentaje') * 100)),
+            'clave_prod_serv' => $foto->claveProdServ,
+            'clave_unidad' => $foto->claveUnidad,
+            'iva' => $foto->iva->value,
         ];
     }
 
-    private function nombreDeOrden(OrdenTenant $orden, bool $sinImpuestos = false): string
+    /**
+     * El concepto de una línea por lo que se cobró de ella (con IVA): con sus piezas si
+     * el importe se divide exacto entre ellas; si no (un descuento repartido), una sola
+     * partida que dice cuántas fueron, para no perder centavos.
+     *
+     * @return Concepto
+     */
+    private function conceptoPorPiezas(string $nombre, int $piezas, int $importe, FotoFiscal $foto): array
+    {
+        if ($piezas > 1 && $importe % $piezas !== 0) {
+            return $this->concepto("{$piezas} × {$nombre}", 1, $importe, $foto);
+        }
+
+        return $this->concepto($nombre, max(1, $piezas), intdiv($importe, max(1, $piezas)), $foto);
+    }
+
+    private function nombreDeOrden(OrdenTenant $orden): string
     {
         // La línea de impuestos de un presupuesto desglosado no es lo que se vendió.
-        $lineas = $sinImpuestos
-            ? $orden->lineas->reject(static fn (LineaOrdenTenant $l): bool => $l->getAttribute('producto_comercial_id') === null
-                && $l->getAttribute('articulo_id') === null
-                && str_starts_with((string) $l->getAttribute('descripcion'), 'Impuestos ('))
-            : $orden->lineas;
-        $nombres = $lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->unique()->implode(', ');
+        $nombres = $orden->lineas->reject(self::esLineaDeImpuestos(...))->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->unique()->implode(', ');
         if ($nombres !== '') {
             return mb_substr($nombres, 0, 255);
         }

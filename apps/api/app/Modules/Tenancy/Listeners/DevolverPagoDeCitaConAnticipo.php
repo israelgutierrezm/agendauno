@@ -96,19 +96,35 @@ class DevolverPagoDeCitaConAnticipo implements ShouldQueue
         }
     }
 
-    /** No llegó: el negocio conserva el anticipo y le devuelve lo demás que pagó en línea. */
+    /**
+     * No llegó, y alguien lo registró: el negocio conserva el anticipo y le devuelve lo
+     * demás que pagó en línea. Si la marca es del sistema (nadie registró nada), no se
+     * mueve dinero: lo revisa el negocio (ADR 0231).
+     */
     private function noLlego(EventoDeDominioTenant $evento): void
     {
         $payload = $evento->payload;
         $reservaUlid = $payload['reserva_id'] ?? null;
-        if (($payload['estado'] ?? null) !== 'ausente' || ! is_string($reservaUlid) || $reservaUlid === '') {
+        $estado = $payload['estado'] ?? null;
+        if (! in_array($estado, ['ausente', 'presente'], true) || ! is_string($reservaUlid) || $reservaUlid === '') {
             return;
         }
         $reserva = ReservaTenant::query()->where('ulid', $reservaUlid)->first();
         if (! $reserva instanceof ReservaTenant || $reserva->anticipo_minor === null) {
             return;
         }
+        if ($estado === 'presente') {
+            $this->anticipos->cerrarRevisionSiVino($reserva, 'Se registró que sí llegó.');
+
+            return;
+        }
+        if (($payload['automatica'] ?? false) === true) {
+            $this->anticipos->pedirRevisarSiVino($reserva);
+
+            return;
+        }
 
         $this->anticipos->devolverLoDeMas($reserva, 'El cliente no llegó: el negocio conserva el anticipo y le devuelve lo demás.', 'inasistencia:'.$reserva->ulid);
+        $this->anticipos->cerrarRevisionSiVino($reserva, 'Se registró que no llegó y se devolvió lo de más.');
     }
 }

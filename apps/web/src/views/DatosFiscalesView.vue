@@ -35,6 +35,10 @@ interface DatosFiscales {
   pendientes?: string[];
   error?: string | null;
   portal_manifiesto?: string;
+  // El RFC que FacturAPI dice que trae el sello (ADR 0228): si no es el capturado, no
+  // se factura.
+  rfc_del_sello?: string | null;
+  sello_de_otro_rfc?: boolean;
 }
 
 const { t } = useI18n();
@@ -82,6 +86,13 @@ const subiendoSello = ref(false);
 const mensajeSello = ref<string | null>(null);
 const errorSello = ref<string | null>(null);
 
+// Otro RFC que el guardado es otro emisor (ADR 0228): al guardarlo, su alta empieza de nuevo.
+const cambiaDeRfc = computed(
+  () =>
+    guardados.value !== null &&
+    form.value.rfc.trim() !== "" &&
+    form.value.rfc.trim().toUpperCase() !== guardados.value.rfc.toUpperCase(),
+);
 // Régimen: del catálogo del SAT, primero los que corresponden al RFC escrito.
 const tipoPersona = computed(() => tipoPersonaDeRfc(form.value.rfc));
 function textoPersonas(personas: TipoPersona[]): string {
@@ -167,6 +178,7 @@ async function revisarAlta(): Promise<void> {
       {},
     );
     guardados.value = data.data;
+    sellosCargados.value = data.data.sellos_cargados;
     toast.exito(t("cfdi.alta.revisado"));
   } catch (e) {
     toast.error(mensajeDeError(e));
@@ -390,6 +402,15 @@ onMounted(cargar);
               >
                 {{ $t("datosFiscalesSat.rfcAyuda") }}
               </p>
+              <!-- Otro RFC es otro emisor (ADR 0228): se avisa antes de guardar. -->
+              <AvisoTono
+                v-if="cambiaDeRfc"
+                tono="aviso"
+                class="mt-2"
+                data-prueba="cambio-de-rfc"
+              >
+                {{ $t("cfdi.alta.cambioDeRfc") }}
+              </AvisoTono>
             </div>
             <div>
               <label class="tu-label" for="cp">{{
@@ -500,7 +521,27 @@ onMounted(cargar);
           {{ $t("datosFiscales.sellos.requiereDatos") }}
         </p>
 
-        <form v-else class="mt-4 space-y-4" @submit.prevent="subirSello">
+        <!-- El sello que tiene FacturAPI es de otro RFC (ADR 0228): no se factura. -->
+        <AvisoTono
+          v-if="guardados?.sello_de_otro_rfc"
+          tono="peligro"
+          class="mt-4"
+          role="alert"
+          data-prueba="sello-de-otro-rfc"
+        >
+          {{
+            $t("cfdi.alta.selloDeOtroRfc", {
+              rfcSello: guardados.rfc_del_sello ?? "",
+              rfc: guardados.rfc,
+            })
+          }}
+        </AvisoTono>
+
+        <form
+          v-if="guardados !== null"
+          class="mt-4 space-y-4"
+          @submit.prevent="subirSello"
+        >
           <div class="grid sm:grid-cols-2 gap-4">
             <div>
               <label class="tu-label" for="cer">{{

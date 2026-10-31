@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\CupoLleno;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
 use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
+use App\Modules\Tenancy\Support\RevisionSinCandados;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -48,6 +49,11 @@ use Illuminate\Validation\ValidationException;
  * - **Por partes:** sin `parcial` es todo o nada; con `parcial` entran las válidas y el
  *   archivo corregido se vuelve a subir (lo ya importado queda `existente`).
  * - **Avisos apagados:** importar no le manda nada a nadie (como las citas, ADR 0160).
+ * - **Sin detener las reservas (ADR 0230):** la revisión de todo el archivo (la vista
+ *   previa y el primer paso de importar) corre sin candados ({@see RevisionSinCandados}) y
+ *   lo que pasa la revisión se guarda en lotes chicos, cada uno con sus candados y su
+ *   transacción. Sin `parcial`, si entre la revisión y un lote una fila ya no se puede, ese
+ *   lote no entra y se dice cuántas ya entraron; volver a subir el archivo no las duplica.
  */
 class ImportarReservasTenant
 {
@@ -62,6 +68,9 @@ class ImportarReservasTenant
     public const PENDIENTE = 'pendiente';
 
     public const INVALIDA = 'invalida';
+
+    /** Filas por transacción al guardar: lo que una clase espera a lo más. */
+    public const FILAS_POR_LOTE = 20;
 
     public function __construct(
         private readonly ReservasTenant $reservas,
@@ -83,136 +92,229 @@ class ImportarReservasTenant
         if (count($filas) > $max) {
             throw ValidationException::withMessages(['archivo' => ["Se importan hasta {$max} reservas a la vez."]]);
         }
+        $lote = (string) Str::ulid();
+        $porFila = $this->ordenar($filas);
+
+        // La revisión de todo el archivo: las mismas reglas, sin candados y sin que se quede nada.
+        $revisado = self::recorridoNuevo();
+        RevisionSinCandados::correr(function () use ($porFila, $actor, $corte, $yaDescontadas, $recordar, $lote, &$revisado): void {
+            $this->recorrer($porFila, $actor, $corte, $yaDescontadas, $recordar, $lote, $revisado);
+        });
+        $resumen = self::resumen($revisado);
+        $ok = $resumen['pendientes'] === 0 && $resumen['invalidas'] === 0;
+
+        if (! $guardar || (! $ok && ! $parcial)) {
+            return ['ok' => $ok, 'importadas' => 0, 'lote' => null, 'resumen' => $resumen, 'filas' => self::porNumeroDeFila($revisado['salida'])];
+        }
+
+        $guardado = $this->guardarPorLotes($porFila, $actor, $corte, $yaDescontadas, $parcial, $recordar, $lote);
+        $resumen = self::resumen($guardado);
+        $ok = $resumen['pendientes'] === 0 && $resumen['invalidas'] === 0;
+
+        return ['ok' => $ok, 'importadas' => $resumen['validas'], 'lote' => $lote, 'resumen' => $resumen, 'filas' => self::porNumeroDeFila($guardado['salida'])];
+    }
+
+    /**
+     * Guarda el archivo ya revisado, un lote chico por transacción. Con `parcial`, la fila
+     * que no se puede se queda fuera, como en la revisión. Sin él, una fila que pasó la
+     * revisión y ya no se puede (la clase se llenó justo ahora) deshace su lote y se
+     * responde cuántas ya quedaron: volver a subirlo no las duplica.
+     *
+     * @param  array<int, array<string, string>>  $porFila
+     * @return array{salida: list<array<string, mixed>>, vistas: array<string, true>, referencias: array<string, true>, reintegradas: int}
+     */
+    private function guardarPorLotes(array $porFila, Usuario $actor, string $corte, bool $yaDescontadas, bool $parcial, bool $recordar, string $lote): array
+    {
         $db = DB::connection('tenant');
-        $db->beginTransaction();
+        $nivel = $db->transactionLevel();
+        $recorrido = self::recorridoNuevo();
+        $confirmado = $recorrido;
         try {
-            $lote = (string) Str::ulid();
-            $sucursales = SucursalTenant::query()->get();
-            $vistas = [];
-            $referencias = [];
-            $reintegradas = 0;
-            $salida = [];
-            foreach ($this->ordenar($filas) as $numero => $datos) {
-                $resultado = ['fila' => $numero, 'datos' => $datos, 'estado' => self::VALIDA, 'errores' => [], 'avisos' => [], 'alumno' => null, 'clase' => null, 'inicia_en' => null, 'queda' => null];
-                $db->beginTransaction();
-                try {
-                    $this->validar($datos);
-                    $persona = PersonaTenant::query()
-                        ->whereRaw('lower(email) = ?', [mb_strtolower($datos['email'])])
-                        ->where('tipo', TipoPersonaTenant::Miembro->value)
-                        ->where('archivado', false)
-                        ->first() ?? $this->error('email', 'No hay un alumno con ese correo: impórtalo primero.');
-                    $sucursal = $this->sucursal($sucursales, $datos['sucursal'], $actor);
-                    $zona = $sucursal->zona_horaria !== '' ? $sucursal->zona_horaria : $this->fechas->zona();
-                    $inicia = CarbonImmutable::parse("{$datos['fecha']} {$datos['hora']}", $zona)->utc();
-                    if (! $inicia->isFuture()) {
-                        $this->error('fecha', 'Ya pasó: solo se importan reservas de clases que aún no empiezan.');
+            foreach (array_chunk($porFila, self::FILAS_POR_LOTE, true) as $filasDelLote) {
+                $db->transaction(function () use ($filasDelLote, $actor, $corte, $yaDescontadas, $parcial, $recordar, $lote, &$recorrido): void {
+                    $yaVistas = count($recorrido['salida']);
+                    $this->recorrer($filasDelLote, $actor, $corte, $yaDescontadas, $recordar, $lote, $recorrido);
+                    if ($parcial) {
+                        return;
                     }
-                    if ($inicia->lessThan(CarbonImmutable::parse("{$corte} 00:00:00", $zona)->utc())) {
-                        $this->error('fecha', "Es antes del corte ({$corte}): queda en el otro sistema.");
-                    }
-                    $sesion = $this->sesion($sucursal, $inicia, $datos['clase']);
-                    $resultado['alumno'] = $persona->nombreCompleto();
-                    $resultado['clase'] = $sesion->oferta->nombre ?? $datos['clase'];
-                    $resultado['inicia_en'] = $inicia->toIso8601String();
-
-                    $clave = (string) $persona->getKey().'|'.(string) $sesion->getKey();
-                    if (isset($vistas[$clave])) {
-                        $this->error('clase', 'Esta reserva está repetida en el archivo.');
-                    }
-                    $vistas[$clave] = true;
-                    if ($datos['referencia'] !== '') {
-                        if (isset($referencias[$datos['referencia']])) {
-                            $this->error('referencia', 'Esa referencia está repetida en el archivo.');
+                    foreach (array_slice($recorrido['salida'], $yaVistas) as $fila) {
+                        if ($fila['errores'] !== []) {
+                            throw new FilaYaNoSePuede((int) $fila['fila'], (string) $fila['errores'][0]);
                         }
-                        $referencias[$datos['referencia']] = true;
                     }
-
-                    $idempotencia = 'importacion:'.hash('sha256', $datos['referencia'] !== ''
-                        ? 'referencia|'.$datos['referencia']
-                        : (string) $persona->ulid.'|'.(string) $sesion->ulid);
-                    if ($this->yaEsta($idempotencia, $persona, $sesion)) {
-                        $resultado['estado'] = self::EXISTENTE;
-                        $resultado['avisos'][] = 'Ya estaba: no se duplica.';
-                        $db->commit();
-                        $salida[] = $resultado;
-
-                        continue;
-                    }
-
-                    $enEspera = $datos['estado'] === 'en_espera';
-                    $reintegro = $yaDescontadas && ! $enEspera
-                        ? $this->reintegrar($persona, $sesion, $corte, $numero, $lote, $actor)
-                        : 0;
-                    $reserva = $this->reservas->crear($sesion, $persona, $idempotencia, $enEspera, null, CanalReserva::Directo->value);
-                    if ($datos['referencia'] !== '') {
-                        $reserva->forceFill(['referencia_externa' => $datos['referencia']])->save();
-                    }
-                    $this->sinAvisos($reserva, $recordar);
-                    $reintegradas += $reintegro;
-                    if ($reintegro > 0) {
-                        $resultado['avisos'][] = 'Su crédito ya se había descontado en el otro sistema: se reintegra y se aparta para esta clase.';
-                    }
-                    $resultado['queda'] = $reserva->estado->value;
-                    if ($enEspera && $reserva->estado === EstadoReserva::Confirmada) {
-                        $resultado['avisos'][] = 'Había lugar: queda confirmada y aparta su crédito.';
-                    }
-                    $db->commit();
-                } catch (ValidationException $e) {
-                    $db->rollBack();
-                    $resultado['estado'] = self::INVALIDA;
-                    $resultado['errores'] = array_values(array_merge(...array_values($e->errors())));
-                } catch (YaReservado) {
-                    $db->rollBack();
-                    $resultado['estado'] = self::EXISTENTE;
-                    $resultado['avisos'][] = 'Ya tenía esta clase reservada: no se duplica.';
-                } catch (SinDerechoDisponible $e) {
-                    $db->rollBack();
-                    $resultado['estado'] = self::PENDIENTE;
-                    $resultado['errores'][] = $e->getMessage().' Carga su saldo de apertura o véndele un plan y vuelve a subir el archivo.';
-                } catch (CupoLleno) {
-                    $db->rollBack();
-                    $resultado['estado'] = self::PENDIENTE;
-                    $resultado['errores'][] = 'La clase ya está llena aquí: abre más lugares o súbela como «en_espera».';
-                } catch (ReservaException $e) {
-                    $db->rollBack();
-                    $resultado['estado'] = self::INVALIDA;
-                    $resultado['errores'][] = $e->getMessage();
-                }
-                $salida[] = $resultado;
+                });
+                $confirmado = $recorrido;
             }
-            usort($salida, static fn (array $a, array $b): int => $a['fila'] <=> $b['fila']);
+        } catch (FilaYaNoSePuede $e) {
+            $entraron = self::resumen($confirmado)['validas'];
+            $this->anotarImportacion($actor, $lote, $confirmado, $corte, $yaDescontadas, $parcial, $recordar);
 
-            $cuenta = static fn (string $estado): int => count(array_filter($salida, static fn (array $f): bool => $f['estado'] === $estado));
-            $resumen = [
-                'total' => count($salida),
-                'validas' => $cuenta(self::VALIDA),
-                'existentes' => $cuenta(self::EXISTENTE),
-                'pendientes' => $cuenta(self::PENDIENTE),
-                'invalidas' => $cuenta(self::INVALIDA),
-                'en_espera' => count(array_filter($salida, static fn (array $f): bool => $f['queda'] === EstadoReserva::EnEspera->value)),
-                'creditos_reintegrados' => $reintegradas,
-            ];
-            $ok = $resumen['pendientes'] === 0 && $resumen['invalidas'] === 0;
-
-            if (! $guardar || (! $ok && ! $parcial)) {
-                $db->rollBack();
-
-                return ['ok' => $ok, 'importadas' => 0, 'lote' => null, 'resumen' => $resumen, 'filas' => $salida];
-            }
-
-            $this->auditoria->registrar($actor, 'importacion.reservas', 'importacion', $lote, null, [
-                'resumen' => $resumen, 'corte' => $corte, 'ya_descontadas' => $yaDescontadas, 'parcial' => $parcial, 'recordatorios' => $recordar,
-            ]);
-            $db->commit();
-
-            return ['ok' => $ok, 'importadas' => $resumen['validas'], 'lote' => $lote, 'resumen' => $resumen, 'filas' => $salida];
+            throw ValidationException::withMessages(['archivo' => [
+                "Algo cambió mientras se importaba (fila {$e->fila}: {$e->getMessage()}). Ya entraron {$entraron} reservas: vuelve a revisar el archivo; las que ya entraron no se duplican.",
+            ]]);
         } catch (\Throwable $e) {
-            if ($db->transactionLevel() > 0) {
+            // Nada del lote queda abierto (una fila pudo cortarse a la mitad).
+            while ($db->transactionLevel() > $nivel) {
                 $db->rollBack();
             }
 
             throw $e;
+        }
+        $this->anotarImportacion($actor, $lote, $recorrido, $corte, $yaDescontadas, $parcial, $recordar);
+
+        return $recorrido;
+    }
+
+    /**
+     * @param  array{salida: list<array<string, mixed>>, vistas: array<string, true>, referencias: array<string, true>, reintegradas: int}  $recorrido
+     */
+    private function anotarImportacion(Usuario $actor, string $lote, array $recorrido, string $corte, bool $yaDescontadas, bool $parcial, bool $recordar): void
+    {
+        $this->auditoria->registrar($actor, 'importacion.reservas', 'importacion', $lote, null, [
+            'resumen' => self::resumen($recorrido), 'corte' => $corte, 'ya_descontadas' => $yaDescontadas, 'parcial' => $parcial, 'recordatorios' => $recordar,
+        ]);
+    }
+
+    /**
+     * Lo que se lleva de una fila a la siguiente al recorrer un archivo.
+     *
+     * @return array{salida: list<array<string, mixed>>, vistas: array<string, true>, referencias: array<string, true>, reintegradas: int}
+     */
+    private static function recorridoNuevo(): array
+    {
+        return ['salida' => [], 'vistas' => [], 'referencias' => [], 'reintegradas' => 0];
+    }
+
+    /**
+     * @param  array{salida: list<array<string, mixed>>, vistas: array<string, true>, referencias: array<string, true>, reintegradas: int}  $recorrido
+     * @return array{total: int, validas: int, existentes: int, pendientes: int, invalidas: int, en_espera: int, creditos_reintegrados: int}
+     */
+    private static function resumen(array $recorrido): array
+    {
+        $salida = $recorrido['salida'];
+        $cuenta = static fn (string $estado): int => count(array_filter($salida, static fn (array $f): bool => $f['estado'] === $estado));
+
+        return [
+            'total' => count($salida),
+            'validas' => $cuenta(self::VALIDA),
+            'existentes' => $cuenta(self::EXISTENTE),
+            'pendientes' => $cuenta(self::PENDIENTE),
+            'invalidas' => $cuenta(self::INVALIDA),
+            'en_espera' => count(array_filter($salida, static fn (array $f): bool => $f['queda'] === EstadoReserva::EnEspera->value)),
+            'creditos_reintegrados' => $recorrido['reintegradas'],
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $salida
+     * @return list<array<string, mixed>>
+     */
+    private static function porNumeroDeFila(array $salida): array
+    {
+        usort($salida, static fn (array $a, array $b): int => $a['fila'] <=> $b['fila']);
+
+        return $salida;
+    }
+
+    /**
+     * Aplica cada fila con las reglas de reservar, cada una con su punto de regreso: la que
+     * no se puede se deshace y dice por qué. Debe correr dentro de una transacción.
+     *
+     * @param  array<int, array<string, string>>  $porFila
+     * @param  array{salida: list<array<string, mixed>>, vistas: array<string, true>, referencias: array<string, true>, reintegradas: int}  $recorrido
+     */
+    private function recorrer(array $porFila, Usuario $actor, string $corte, bool $yaDescontadas, bool $recordar, string $lote, array &$recorrido): void
+    {
+        $db = DB::connection('tenant');
+        $sucursales = SucursalTenant::query()->get();
+        foreach ($porFila as $numero => $datos) {
+            $resultado = ['fila' => $numero, 'datos' => $datos, 'estado' => self::VALIDA, 'errores' => [], 'avisos' => [], 'alumno' => null, 'clase' => null, 'inicia_en' => null, 'queda' => null];
+            $db->beginTransaction();
+            try {
+                $this->validar($datos);
+                $persona = PersonaTenant::query()
+                    ->whereRaw('lower(email) = ?', [mb_strtolower($datos['email'])])
+                    ->where('tipo', TipoPersonaTenant::Miembro->value)
+                    ->where('archivado', false)
+                    ->first() ?? $this->error('email', 'No hay un alumno con ese correo: impórtalo primero.');
+                $sucursal = $this->sucursal($sucursales, $datos['sucursal'], $actor);
+                $zona = $sucursal->zona_horaria !== '' ? $sucursal->zona_horaria : $this->fechas->zona();
+                $inicia = CarbonImmutable::parse("{$datos['fecha']} {$datos['hora']}", $zona)->utc();
+                if (! $inicia->isFuture()) {
+                    $this->error('fecha', 'Ya pasó: solo se importan reservas de clases que aún no empiezan.');
+                }
+                if ($inicia->lessThan(CarbonImmutable::parse("{$corte} 00:00:00", $zona)->utc())) {
+                    $this->error('fecha', "Es antes del corte ({$corte}): queda en el otro sistema.");
+                }
+                $sesion = $this->sesion($sucursal, $inicia, $datos['clase']);
+                $resultado['alumno'] = $persona->nombreCompleto();
+                $resultado['clase'] = $sesion->oferta->nombre ?? $datos['clase'];
+                $resultado['inicia_en'] = $inicia->toIso8601String();
+
+                $clave = (string) $persona->getKey().'|'.(string) $sesion->getKey();
+                if (isset($recorrido['vistas'][$clave])) {
+                    $this->error('clase', 'Esta reserva está repetida en el archivo.');
+                }
+                $recorrido['vistas'][$clave] = true;
+                if ($datos['referencia'] !== '') {
+                    if (isset($recorrido['referencias'][$datos['referencia']])) {
+                        $this->error('referencia', 'Esa referencia está repetida en el archivo.');
+                    }
+                    $recorrido['referencias'][$datos['referencia']] = true;
+                }
+
+                $idempotencia = 'importacion:'.hash('sha256', $datos['referencia'] !== ''
+                    ? 'referencia|'.$datos['referencia']
+                    : (string) $persona->ulid.'|'.(string) $sesion->ulid);
+                if ($this->yaEsta($idempotencia, $persona, $sesion)) {
+                    $resultado['estado'] = self::EXISTENTE;
+                    $resultado['avisos'][] = 'Ya estaba: no se duplica.';
+                    $db->commit();
+                    $recorrido['salida'][] = $resultado;
+
+                    continue;
+                }
+
+                $enEspera = $datos['estado'] === 'en_espera';
+                $reintegro = $yaDescontadas && ! $enEspera
+                    ? $this->reintegrar($persona, $sesion, $corte, $numero, $lote, $actor)
+                    : 0;
+                $reserva = $this->reservas->crear($sesion, $persona, $idempotencia, $enEspera, null, CanalReserva::Directo->value);
+                if ($datos['referencia'] !== '') {
+                    $reserva->forceFill(['referencia_externa' => $datos['referencia']])->save();
+                }
+                $this->sinAvisos($reserva, $recordar);
+                $recorrido['reintegradas'] += $reintegro;
+                if ($reintegro > 0) {
+                    $resultado['avisos'][] = 'Su crédito ya se había descontado en el otro sistema: se reintegra y se aparta para esta clase.';
+                }
+                $resultado['queda'] = $reserva->estado->value;
+                if ($enEspera && $reserva->estado === EstadoReserva::Confirmada) {
+                    $resultado['avisos'][] = 'Había lugar: queda confirmada y aparta su crédito.';
+                }
+                $db->commit();
+            } catch (ValidationException $e) {
+                $db->rollBack();
+                $resultado['estado'] = self::INVALIDA;
+                $resultado['errores'] = array_values(array_merge(...array_values($e->errors())));
+            } catch (YaReservado) {
+                $db->rollBack();
+                $resultado['estado'] = self::EXISTENTE;
+                $resultado['avisos'][] = 'Ya tenía esta clase reservada: no se duplica.';
+            } catch (SinDerechoDisponible $e) {
+                $db->rollBack();
+                $resultado['estado'] = self::PENDIENTE;
+                $resultado['errores'][] = $e->getMessage().' Carga su saldo de apertura o véndele un plan y vuelve a subir el archivo.';
+            } catch (CupoLleno) {
+                $db->rollBack();
+                $resultado['estado'] = self::PENDIENTE;
+                $resultado['errores'][] = 'La clase ya está llena aquí: abre más lugares o súbela como «en_espera».';
+            } catch (ReservaException $e) {
+                $db->rollBack();
+                $resultado['estado'] = self::INVALIDA;
+                $resultado['errores'][] = $e->getMessage();
+            }
+            $recorrido['salida'][] = $resultado;
         }
     }
 

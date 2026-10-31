@@ -30,10 +30,15 @@ class ResolverDerechoTenant
         private readonly FechasNegocioTenant $fechas,
     ) {}
 
-    public function paraSesion(PersonaTenant $persona, SesionTenant $sesion, int $unidades): ?DerechoTenant
+    /**
+     * @param  list<int>  $sinUsar  planes que no se deben elegir (se quedaron sin saldo al
+     *                              apartar el crédito, bajo su candado)
+     */
+    public function paraSesion(PersonaTenant $persona, SesionTenant $sesion, int $unidades, array $sinUsar = []): ?DerechoTenant
     {
         // Un plan que llegó a su tope del día o de la semana no se usa (ADR 0182).
         $derechos = $this->candidatos($persona, $sesion)
+            ->reject(static fn (DerechoTenant $derecho): bool => in_array((int) $derecho->getKey(), $sinUsar, true))
             ->filter(fn (DerechoTenant $derecho): bool => app(TopesDeReservaTenant::class)->alcanzado($derecho, $sesion) === null)
             ->values();
 

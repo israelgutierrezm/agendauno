@@ -57,6 +57,10 @@ use Illuminate\Support\Facades\DB;
  * clave se guarda con la reserva en la misma transacción (es única): de dos reintentos
  * a la vez, el segundo encuentra la del primero. Una cita nueva sale con
  * `wasRecentlyCreated`; la de un reintento, no.
+ *
+ * Sin cuenta (ADR 0230): escribir un correo no prueba que sea suyo, así que quien agenda
+ * desde la página pública siempre paga (no gasta lo que esa ficha ya pagó por adelantado)
+ * y su límite de citas por pagar cuenta solo las agendadas sin cuenta.
  */
 class AgendarCitaTenant
 {
@@ -85,6 +89,7 @@ class AgendarCitaTenant
         bool $pagarTodo = false,
         ?string $clave = null,
         ?string $cupon = null,
+        bool $sinCuenta = false,
     ): ReservaTenant {
         $this->exigirNegocioDeCitas();
         $previa = $this->yaAgendada($clave, $persona, $oferta, $sucursal, $inicia, $instructorId);
@@ -116,7 +121,7 @@ class AgendarCitaTenant
         }
 
         try {
-            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave, $cupon);
+            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave, $cupon, $sinCuenta);
         } catch (SesionNoReservable|QueryException $e) {
             // Otro intento con la misma clave llegó antes: tomó el horario (o la clave
             // única) y su cita es la respuesta.
@@ -149,6 +154,7 @@ class AgendarCitaTenant
         bool $pagarTodo = false,
         ?string $clave = null,
         ?string $cupon = null,
+        bool $sinCuenta = false,
     ): ReservaTenant {
         $this->exigirNegocioDeCitas();
         // Antes de buscar a otro profesional: el reintento ya tiene a quien le tocó.
@@ -181,7 +187,7 @@ class AgendarCitaTenant
         $ultimo = null;
         foreach ($candidatos->sortBy(static fn (Usuario $u): int => (int) ($carga[$u->getKey()] ?? 0)) as $profesional) {
             try {
-                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin, pagarTodo: $pagarTodo, clave: $clave, cupon: $cupon);
+                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin, pagarTodo: $pagarTodo, clave: $clave, cupon: $cupon, sinCuenta: $sinCuenta);
             } catch (SesionNoReservable $e) {
                 $ultimo = $e;
             }
@@ -233,9 +239,11 @@ class AgendarCitaTenant
     /**
      * Cuenta sus citas próximas con la orden sin pagar (apartadas o confirmadas por
      * cobrar) bajo el candado de su ficha: dos solicitudes a la vez del mismo cliente
-     * no rebasan el límite. Debe llamarse dentro de la transacción.
+     * no rebasan el límite. Lo agendado sin cuenta y lo agendado con la cuenta se cuentan
+     * aparte: un anónimo que escribe su correo no le gasta el límite a la ficha (ADR
+     * 0230). Debe llamarse dentro de la transacción.
      */
-    private function verificarCitasPorPagar(PersonaTenant $persona): void
+    private function verificarCitasPorPagar(PersonaTenant $persona, bool $sinCuenta): void
     {
         $maximo = $this->parametros->entero('citas.maximo_por_pagar');
         if ($maximo <= 0) {
@@ -245,6 +253,7 @@ class AgendarCitaTenant
         PersonaTenant::query()->whereKey($persona->getKey())->lockForUpdate()->first();
         $porPagar = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
+            ->where('sin_cuenta', $sinCuenta)
             ->whereIn('estado', [EstadoReserva::PendientePago->value, EstadoReserva::Confirmada->value])
             ->whereHas('orden', fn ($q) => $q->where('estado', EstadoOrden::Pendiente->value))
             ->whereHas('sesion', fn ($q) => $q->where('tipo', TipoSesionTenant::Cita->value)->where('inicia_en', '>', now()))
@@ -267,9 +276,13 @@ class AgendarCitaTenant
         bool $pagarTodo,
         ?string $clave,
         ?string $cupon = null,
+        bool $sinCuenta = false,
     ): ReservaTenant {
-        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave, $cupon): ReservaTenant {
-            $reserva = $this->crearCita($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo);
+        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $clave, $cupon, $sinCuenta): ReservaTenant {
+            $reserva = $this->crearCita($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio, $pagarTodo, $sinCuenta);
+            if ($sinCuenta) {
+                $reserva->update(['sin_cuenta' => true]);
+            }
             // Con cupón (ADR 0220): a lo que falta pagar (el resto, si hay anticipo). Si el
             // cupón no sirve, no se agenda: quien lo escribió lo corrige.
             if ($cupon !== null && $cupon !== '') {
@@ -301,6 +314,7 @@ class AgendarCitaTenant
         CarbonImmutable $termina,
         bool $porNegocio,
         bool $pagarTodo,
+        bool $sinCuenta = false,
     ): ReservaTenant {
         // Punto de serialización por profesional (ver arriba). Debe ir antes de
         // leer su agenda para que la lectura vea lo que otra solicitud guardó.
@@ -313,10 +327,10 @@ class AgendarCitaTenant
         }
 
         // El cliente no aparta sin fin citas que no paga (ADR 0065); una ya pagada por
-        // adelantado no cuenta.
+        // adelantado no cuenta (sin cuenta, lo pagado por esa ficha no se usa).
         if (! $porNegocio && $oferta->politica_reserva === PoliticaReservaTenant::Pago
-            && $this->prepagados->disponible($persona, $oferta) === null) {
-            $this->verificarCitasPorPagar($persona);
+            && ($sinCuenta || $this->prepagados->disponible($persona, $oferta) === null)) {
+            $this->verificarCitasPorPagar($persona, $sinCuenta);
         }
 
         // El hueco debe seguir libre (el proveedor no puede tener dos cosas a la vez),
@@ -350,7 +364,7 @@ class AgendarCitaTenant
 
         if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {
             // Ya lo pagó por adelantado (un presupuesto, ADR 0218): no se cobra otra vez.
-            $prepago = $this->prepagados->disponible($persona, $oferta, bloquear: true);
+            $prepago = $sinCuenta ? null : $this->prepagados->disponible($persona, $oferta, bloquear: true);
             if ($prepago !== null) {
                 return $this->reservas->reservarPrepagada($sesion, $persona, $prepago);
             }

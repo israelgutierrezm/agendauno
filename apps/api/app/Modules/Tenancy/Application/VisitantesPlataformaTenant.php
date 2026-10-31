@@ -81,15 +81,17 @@ class VisitantesPlataformaTenant
      * La clase de una visita que llegó sola (la persona hizo check-in en la app): la que
      * reservó por la plataforma, si es de ese momento; si no, la única clase a esa hora
      * (de media hora antes de empezar a que termina). Con varias o ninguna, null: la
-     * visita queda sin clase y recepción la asigna.
+     * visita queda sin clase y recepción la asigna. Cada conexión es de una sede (ADR
+     * 0202): con `$sucursalId`, solo las clases de esa sede.
      */
-    public function sesionDeVisita(?VisitantePlataformaTenant $visitante, CarbonInterface $cuando): ?SesionTenant
+    public function sesionDeVisita(?VisitantePlataformaTenant $visitante, CarbonInterface $cuando, ?int $sucursalId = null): ?SesionTenant
     {
         $candidatas = SesionTenant::query()
             ->where('tipo', TipoSesionTenant::Clase->value)
             ->where('estado', EstadoSesionTenant::Programada->value)
             ->where('inicia_en', '<=', $cuando->copy()->addMinutes(self::MINUTOS_ANTES))
             ->where('termina_en', '>=', $cuando)
+            ->when($sucursalId !== null, static fn ($q) => $q->where('sucursal_id', $sucursalId))
             ->orderBy('inicia_en')
             ->get();
         if ($candidatas->isEmpty()) {

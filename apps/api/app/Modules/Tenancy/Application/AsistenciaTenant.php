@@ -9,7 +9,9 @@ use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\AsistenciaTenant as ModeloAsistenciaTenant;
+use App\Modules\Tenancy\Models\MarcaProcesoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\ParametroNegocioTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -45,6 +47,9 @@ use Illuminate\Support\Facades\DB;
  */
 class AsistenciaTenant
 {
+    /** Hasta dónde llegaron las inasistencias automáticas en este negocio. */
+    private const MARCA_INASISTENCIAS = 'asistencia.inasistencias_hasta';
+
     public function __construct(
         private readonly CreditosTenant $creditos,
         private readonly RegistrarEventoTenant $eventos,
@@ -80,9 +85,24 @@ class AsistenciaTenant
                 return $anterior;
             }
             if ($anterior instanceof ModeloAsistenciaTenant && $anterior->estado === $estado) {
+                // Alguien confirma lo que el sistema marcó solo (ADR 0231).
+                $confirma = (bool) $anterior->automatica;
                 // Mismo estado: a lo más cambia si llegó tarde (no mueve créditos).
-                if ((bool) $anterior->retardo !== $retardo) {
+                if ((bool) $anterior->retardo !== $retardo || $confirma) {
                     $anterior->update(['retardo' => $retardo, 'automatica' => false]);
+                }
+                // Sin mover créditos, pero lo que espera una marca humana ya puede correr
+                // (devolver lo de más de una cita con anticipo).
+                if ($confirma) {
+                    $sesion = $bloqueada->sesion;
+                    $this->eventos->registrar('asistencia.marcada', 'asistencia', $anterior->ulid, [
+                        ...($sesion instanceof SesionTenant ? DatosDeSesion::para($sesion) : []),
+                        'persona_id' => $bloqueada->persona?->ulid,
+                        'estado' => $estado->value,
+                        'retardo' => $retardo,
+                        'automatica' => false,
+                        'reserva_id' => $bloqueada->ulid,
+                    ]);
                 }
 
                 return $anterior;
@@ -173,23 +193,23 @@ class AsistenciaTenant
 
     /**
      * Al terminar una clase o cita, quien no tiene registro «no se presentó» (si el
-     * negocio lo tiene encendido). Solo las que terminaron en el último día: lo de
-     * antes no se toca de golpe.
+     * negocio lo tiene encendido). Retoma desde donde se quedó la última vuelta, para que
+     * una caída del programador o la cola no deje reservas sin marcar y su crédito apartado
+     * para siempre (ADR 0230). Lo de antes no se toca de golpe (ADR 0101, 0166): encender
+     * la opción no marca nada hacia atrás.
      *
      * @return int cuántas se marcaron
      */
     public function marcarInasistenciasAlTerminar(?DateTimeInterface $reabrioEn = null): int
     {
+        $ahora = CarbonImmutable::now();
         if (! $this->parametros->siNo('asistencia.no_asistio_al_terminar')) {
+            // Apagada no queda nada pendiente: al encenderla se empieza desde ese momento.
+            MarcaProcesoTenant::guardar(self::MARCA_INASISTENCIAS, $ahora);
+
             return 0;
         }
-        $ahora = CarbonImmutable::now();
-        // Las del último día; si el negocio reabrió hace menos (estuvo suspendido), solo
-        // desde que reabrió: las de antes nadie las pudo registrar (ADR 0166).
-        $desde = $ahora->subDay();
-        if ($reabrioEn !== null && CarbonImmutable::instance($reabrioEn)->greaterThan($desde)) {
-            $desde = CarbonImmutable::instance($reabrioEn);
-        }
+        $desde = $this->desdeCuandoMarcar($ahora, $reabrioEn);
         $marcadas = 0;
         SesionTenant::query()
             ->where('estado', EstadoSesionTenant::Programada->value)
@@ -203,8 +223,29 @@ class AsistenciaTenant
                     $marcadas++;
                 }
             });
+        // Solo si la vuelta terminó: una que falla se retoma desde el mismo punto.
+        MarcaProcesoTenant::guardar(self::MARCA_INASISTENCIAS, $ahora);
 
         return $marcadas;
+    }
+
+    /**
+     * Desde cuándo marcar: donde se quedó la última vuelta (la primera vez, un día atrás),
+     * con un tope de días (`asistencia.dias_retomar_inasistencias`). Nunca antes de que se
+     * encendiera la opción ni de que el negocio reabriera tras una suspensión: lo de antes
+     * nadie lo pudo registrar (ADR 0101, 0166).
+     */
+    private function desdeCuandoMarcar(CarbonImmutable $ahora, ?DateTimeInterface $reabrioEn): CarbonImmutable
+    {
+        $desde = MarcaProcesoTenant::leer(self::MARCA_INASISTENCIAS) ?? $ahora->subDay();
+        $desde = $desde->max($ahora->subDays($this->parametros->entero('asistencia.dias_retomar_inasistencias')));
+
+        $encendida = ParametroNegocioTenant::query()->where('clave', 'asistencia.no_asistio_al_terminar')->first()?->updated_at;
+        if ($encendida !== null) {
+            $desde = $desde->max(CarbonImmutable::instance($encendida));
+        }
+
+        return $reabrioEn !== null ? $desde->max(CarbonImmutable::instance($reabrioEn)) : $desde;
     }
 
     /**

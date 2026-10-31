@@ -97,7 +97,7 @@ class ImportarClasesTenant
                     $desde = $modo === 'semanal' ? $datos['desde'] : $datos['fecha'];
                     $hasta = $modo === 'semanal' ? $datos['hasta'] : $desde;
                     $fechas = [];
-                    $cerradas = ExcepcionHorarioTenant::query()->whereBetween('fecha', [$desde, $hasta])->get()
+                    $cerradas = ExcepcionHorarioTenant::query()->queAplicanA((int) $sucursal->id)->whereBetween('fecha', [$desde, $hasta])->get()
                         ->map(fn ($e): string => $e->fecha->toDateString())->all();
                     for ($dia = CarbonImmutable::parse($desde); $dia->toDateString() <= $hasta; $dia = $dia->addDay()) {
                         if ($modo === 'fechas' || in_array($dia->dayOfWeekIso, $dias, true)) {

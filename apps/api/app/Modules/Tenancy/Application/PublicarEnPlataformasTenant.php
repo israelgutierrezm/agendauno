@@ -260,8 +260,9 @@ class PublicarEnPlataformasTenant
         }
         // La conexión (la sede) que la publicó.
         $integracion = $publicado->publicacion->integracion;
+        // Una clase cancelada ya no manda sus lugares: se retira ({@see alCambiarSesion()}).
         if (! $publicador instanceof PublicadorPlataforma || ! $integracion instanceof IntegracionTenant
-            || ! $this->publica($integracion) || $sesion->inicia_en->isPast()) {
+            || ! $this->publica($integracion) || $sesion->inicia_en->isPast() || $sesion->estado !== EstadoSesionTenant::Programada) {
             return;
         }
         $fresca = SesionTenant::query()->whereKey($sesion->getKey())

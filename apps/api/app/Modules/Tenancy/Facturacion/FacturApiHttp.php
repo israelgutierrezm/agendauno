@@ -39,6 +39,7 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
         if ($respuesta->serverError() || $respuesta->status() === 429) {
             throw new FacturacionSinRespuesta;
         }
+        self::exigirLlaveVigente($respuesta);
         if ($respuesta->failed()) {
             throw new TimbradoFallido((string) ($respuesta->json('message') ?? 'FacturAPI rechazo el timbrado.'));
         }
@@ -55,6 +56,7 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
             ->baseUrl($this->baseUrl)
             ->get("/invoices/{$facturaId}/{$formato}");
 
+        self::exigirLlaveVigente($respuesta);
         if ($respuesta->failed()) {
             throw new TimbradoFallido((string) ($respuesta->json('message') ?? 'FacturAPI no pudo entregar el archivo.'));
         }
@@ -77,6 +79,7 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
                 static fn (?string $v): bool => $v !== null,
             )));
 
+        self::exigirLlaveVigente($respuesta);
         if ($respuesta->failed()) {
             throw new TimbradoFallido((string) ($respuesta->json('message') ?? 'FacturAPI no aceptó la cancelación.'));
         }
@@ -91,6 +94,7 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
             ->acceptJson()
             ->get("/invoices/{$facturaId}");
 
+        self::exigirLlaveVigente($respuesta);
         if ($respuesta->failed()) {
             throw new TimbradoFallido((string) ($respuesta->json('message') ?? 'FacturAPI no pudo consultar la factura.'));
         }
@@ -120,12 +124,19 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
         ]), 'FacturAPI no aceptó los datos fiscales.');
     }
 
-    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): void
+    /**
+     * FacturAPI responde la organización: el RFC del certificado queda en `legal.tax_id`
+     * (ADR 0228).
+     */
+    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): ?string
     {
-        $this->revisar(Http::withToken($llaveUsuario)->baseUrl($this->baseUrl)->acceptJson()->timeout(30)
+        $respuesta = Http::withToken($llaveUsuario)->baseUrl($this->baseUrl)->acceptJson()->timeout(30)
             ->attach('cer', $certificado, 'sello.cer')
             ->attach('key', $llave, 'sello.key')
-            ->put("/organizations/{$organizacion}/certificate", ['password' => $contrasena]), 'FacturAPI no aceptó el sello digital (CSD).');
+            ->put("/organizations/{$organizacion}/certificate", ['password' => $contrasena]);
+        $this->revisar($respuesta, 'FacturAPI no aceptó el sello digital (CSD).');
+
+        return self::rfcDe($respuesta);
     }
 
     /** FacturAPI responde la llave nueva como una cadena JSON. */
@@ -151,12 +162,14 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
             is_array($pasos) ? $pasos : [],
         )));
 
-        return ['lista' => (bool) $respuesta->json('is_production_ready'), 'pendientes' => $pendientes];
+        return ['lista' => (bool) $respuesta->json('is_production_ready'), 'pendientes' => $pendientes, 'rfc' => self::rfcDe($respuesta)];
     }
 
     public function enviarPorCorreo(string $llaveOrganizacion, string $facturaId, string $correo): void
     {
-        $this->revisar($this->pedir($llaveOrganizacion)->post("/invoices/{$facturaId}/email", ['email' => $correo]), 'FacturAPI no envió la factura.');
+        $respuesta = $this->pedir($llaveOrganizacion)->post("/invoices/{$facturaId}/email", ['email' => $correo]);
+        self::exigirLlaveVigente($respuesta);
+        $this->revisar($respuesta, 'FacturAPI no envió la factura.');
     }
 
     private function pedir(string $llave): PendingRequest
@@ -170,6 +183,25 @@ class FacturApiHttp implements CancelacionCfdi, ClienteFacturacion, Organizacion
         if ($respuesta->failed()) {
             throw new TimbradoFallido((string) ($respuesta->json('message') ?? $porOmision));
         }
+    }
+
+    /**
+     * FacturAPI no reconoce la llave de la organización (401; borra las que pasan un año
+     * sin usarse): {@see LlaveCfdiRechazada}, para crear otra e intentarlo de nuevo.
+     */
+    private static function exigirLlaveVigente(Response $respuesta): void
+    {
+        if ($respuesta->status() === 401) {
+            throw new LlaveCfdiRechazada((string) ($respuesta->json('message') ?? 'FacturAPI no reconoce la llave del negocio.'));
+        }
+    }
+
+    /** El RFC de la organización, que FacturAPI toma de su certificado. */
+    private static function rfcDe(Response $respuesta): ?string
+    {
+        $rfc = $respuesta->json('legal.tax_id');
+
+        return is_string($rfc) && trim($rfc) !== '' ? mb_strtoupper(trim($rfc)) : null;
     }
 
     /** Lo que dice FacturAPI, en los estados de la cancelación. */

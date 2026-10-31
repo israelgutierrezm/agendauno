@@ -22,6 +22,11 @@ export default {
   noAsistio: "No llegó",
   antesDe: "antes de {cuando}",
   yaMarcado: "Ya lo marqué",
+  // Lo que el negocio canceló aquí y Fitpass no se entera solo (ADR 0230).
+  porCancelarTitulo: "Por cancelar en Fitpass Admin",
+  porCancelarAyuda:
+    "Estas reservas se cancelaron aquí (se canceló la clase o las canceló recepción). Cancélalas también en Fitpass Admin para que la persona se entere.",
+  yaCancelada: "Ya la cancelé",
   columnas: {
     fecha: "Fecha",
     hora: "Hora",

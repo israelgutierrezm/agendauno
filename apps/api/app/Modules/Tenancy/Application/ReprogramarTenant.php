@@ -50,18 +50,19 @@ class ReprogramarTenant
     public function moverCita(ReservaTenant $reserva, CarbonImmutable $inicia, ?int $instructorId, ?Usuario $actor): ReservaTenant
     {
         return DB::connection('tenant')->transaction(function () use ($reserva, $inicia, $instructorId, $actor): ReservaTenant {
-            $bloqueada = $this->reservaMovible($reserva);
-            $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->firstOrFail();
+            // La sesión y luego la reserva: el orden único del motor (ADR 0230).
+            [$sesion, $bloqueada] = $this->reservas->bloquearConSesion($reserva);
+            $this->exigirMovible($bloqueada);
             if (! $sesion->esCita()) {
                 throw new SesionNoReservable('Esta reserva es de una clase: muévela a otra fecha de la clase.');
             }
-            // Con otro profesional: debe atender citas (uno dado de baja ya no se encuentra).
+            // Con otro profesional: quien atiende citas y da ese servicio (ADR 0217).
             if ($instructorId !== null && $instructorId !== (int) $sesion->instructor_id) {
-                $profesional = Usuario::query()->find($instructorId);
-                if (! $profesional instanceof Usuario || ! $profesional->esProfesional()) {
-                    throw new SesionNoReservable('Esa persona no atiende citas.');
-                }
+                $this->exigirQuienDaElServicio($sesion, $instructorId);
             }
+            // El profesional antes que el recurso, como al agendar (ADR 0230): al revés, una
+            // cita que se agenda y otra que se mueve se bloquearían entre sí.
+            $this->agenda->bloquear($instructorId ?? ($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null), null);
 
             // Cabina o equipo (2.4): uno libre a la nueva hora (la misma si sigue libre).
             $oferta = $sesion->oferta;
@@ -78,13 +79,63 @@ class ReprogramarTenant
             $this->moverSesion($sesion, $inicia, $instructorId ?? ($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null), [$bloqueada], $actor);
 
             return $bloqueada->refresh();
-        });
+        }, 3);
+    }
+
+    /**
+     * Pasa una cita a otro profesional, a la misma hora (`PUT /sesiones/{sesion}/instructor`):
+     * con el candado de la sesión, a quien atiende citas y da ese servicio (ADR 0217), sin
+     * encimarse. Si aún no ocurre, quien la tiene recibe el aviso con su profesional nuevo.
+     */
+    public function pasarCitaA(SesionTenant $sesion, ?int $instructorId, ?Usuario $actor): SesionTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($sesion, $instructorId, $actor): SesionTenant {
+            $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
+                throw new SesionNoReservable('Esta cita ya no está programada.');
+            }
+            if ($instructorId === null) {
+                throw new SesionNoReservable('Una cita siempre tiene quién la atienda: elige a otro profesional.');
+            }
+            if ($instructorId === (int) $bloqueada->instructor_id) {
+                return $bloqueada;
+            }
+            $this->exigirQuienDaElServicio($bloqueada, $instructorId);
+            $reservas = ReservaTenant::query()
+                ->where('sesion_id', $bloqueada->getKey())
+                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
+                ->lockForUpdate()
+                ->get()
+                ->all();
+
+            $this->agenda->bloquear($instructorId, null);
+            $this->agenda->exigirSinConflictos($instructorId, null, $bloqueada->inicia_en, $bloqueada->termina_en, (int) $bloqueada->getKey(), margenes: MargenesServicio::deSesion($bloqueada));
+
+            $antes = DatosDeSesion::para($bloqueada);
+            $bloqueada->update(['instructor_id' => $instructorId]);
+            $bloqueada->unsetRelation('instructor');
+            if ($bloqueada->inicia_en->isFuture()) {
+                foreach ($reservas as $reserva) {
+                    $this->avisar($reserva, $bloqueada, $antes);
+                }
+            }
+            $this->anotarEnBitacora($bloqueada, $reservas, $antes, $actor);
+
+            return $bloqueada;
+        }, 3);
     }
 
     public function moverAClase(ReservaTenant $reserva, SesionTenant $destino, ?Usuario $actor): ReservaTenant
     {
         return DB::connection('tenant')->transaction(function () use ($reserva, $destino, $actor): ReservaTenant {
-            $bloqueada = $this->reservaMovible($reserva);
+            // Las dos sesiones y luego la reserva: el orden único del motor (ADR 0230).
+            SesionTenant::query()
+                ->whereKey([ReservaTenant::query()->whereKey($reserva->getKey())->value('sesion_id'), $destino->getKey()])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+            $this->exigirMovible($bloqueada);
             $origen = SesionTenant::query()->whereKey($bloqueada->sesion_id)->firstOrFail();
             $antes = DatosDeSesion::para($origen);
 
@@ -97,7 +148,7 @@ class ReprogramarTenant
             $this->auditoria->registrar($actor, 'reserva.reprogramada', 'reserva', (string) $bloqueada->ulid, $antes, DatosDeSesion::para($nueva));
 
             return $bloqueada;
-        });
+        }, 3);
     }
 
     public function moverClase(SesionTenant $sesion, CarbonImmutable $inicia, ?int $instructorId, ?Usuario $actor): SesionTenant
@@ -109,6 +160,10 @@ class ReprogramarTenant
             }
             if (ReservaTenant::query()->where('sesion_id', $bloqueada->getKey())->whereHas('asistencia')->exists()) {
                 throw new ReservaYaAtendida('Esta clase ya tiene asistencia registrada; no se puede mover.');
+            }
+            // Una cita pasa a otro profesional con las mismas reglas por cualquier camino.
+            if ($bloqueada->esCita() && $instructorId !== null && $instructorId !== (int) $bloqueada->instructor_id) {
+                $this->exigirQuienDaElServicio($bloqueada, $instructorId);
             }
 
             $reservas = ReservaTenant::query()
@@ -128,7 +183,7 @@ class ReprogramarTenant
             }
 
             return $bloqueada->refresh();
-        });
+        }, 3);
     }
 
     /**
@@ -168,7 +223,17 @@ class ReprogramarTenant
             }
         }
 
-        // Bitácora: en una cita se reprogramó la reserva; en una clase, la sesión.
+        $this->anotarEnBitacora($sesion, $reservas, $antes, $actor);
+    }
+
+    /**
+     * Bitácora: en una cita se reprogramó la reserva; en una clase, la sesión.
+     *
+     * @param  list<ReservaTenant>  $reservas
+     * @param  array<string, string>  $antes
+     */
+    private function anotarEnBitacora(SesionTenant $sesion, array $reservas, array $antes, ?Usuario $actor): void
+    {
         if ($sesion->esCita() && $reservas !== []) {
             $this->auditoria->registrar($actor, 'reserva.reprogramada', 'reserva', (string) $reservas[0]->ulid, $antes, DatosDeSesion::para($sesion));
         } else {
@@ -216,19 +281,83 @@ class ReprogramarTenant
     }
 
     /**
-     * La reserva bajo candado, si se puede mover: activa y sin asistencia.
+     * Su sede cambió de zona horaria (ADR 0230): la sesión conserva su hora de reloj. Se
+     * recalcula su instante, sus recordatorios se rehacen y quien tiene reserva recibe el
+     * aviso, que dice las dos zonas porque la hora de reloj es la misma. Idempotente: la
+     * zona copiada dice si ya se re-ancló. Con el mismo instante (dos zonas con la misma
+     * hora ese día) no cambia nada para nadie: solo se anota la zona, sin aviso.
      */
-    private function reservaMovible(ReservaTenant $reserva): ReservaTenant
+    public function reanclarZona(SesionTenant $sesion, string $zona): bool
     {
-        $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+        return DB::connection('tenant')->transaction(function () use ($sesion, $zona): bool {
+            $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueada->zona_horaria === $zona || $bloqueada->estado !== EstadoSesionTenant::Programada || ! $bloqueada->inicia_en->isFuture()) {
+                return false;
+            }
+            $reservas = ReservaTenant::query()
+                ->where('sesion_id', $bloqueada->getKey())
+                ->whereIn('estado', [
+                    EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                    EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+                ])
+                ->lockForUpdate()
+                ->get();
+
+            $anterior = (string) $bloqueada->zona_horaria;
+            $inicia = ReanclarZonaDeSedeTenant::mismaHoraDeReloj(CarbonImmutable::instance($bloqueada->inicia_en), $anterior, $zona);
+            $mismoInstante = $bloqueada->inicia_en->equalTo($inicia);
+            $duracion = (int) $bloqueada->inicia_en->diffInMinutes($bloqueada->termina_en, true);
+            $antes = DatosDeSesion::para($bloqueada);
+            $antes['hora'] .= self::horaDe($anterior);
+
+            $bloqueada->update(['inicia_en' => $inicia, 'termina_en' => $inicia->addMinutes($duracion), 'zona_horaria' => $zona]);
+            if ($mismoInstante) {
+                return true;
+            }
+
+            foreach ($reservas as $reserva) {
+                $this->recordatoriosDelNuevoHorario($reserva, $bloqueada);
+                if ($reserva->estado !== EstadoReserva::EnEspera) {
+                    $this->avisar($reserva, $bloqueada, $antes, ['hora' => DatosDeSesion::para($bloqueada)['hora'].self::horaDe($zona)]);
+                }
+            }
+
+            return true;
+        }, 3);
+    }
+
+    /** « (hora de Tijuana)»: dice de qué zona es una hora de reloj en un aviso. */
+    private static function horaDe(string $zona): string
+    {
+        return ' (hora de '.str_replace('_', ' ', (string) last(explode('/', $zona))).')';
+    }
+
+    /**
+     * La reserva, ya bajo candado, debe seguir activa y sin asistencia.
+     */
+    private function exigirMovible(ReservaTenant $bloqueada): void
+    {
         if (! in_array($bloqueada->estado, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
             throw new SesionNoReservable('Solo se reprograma una reserva confirmada o por pagar.');
         }
         if ($bloqueada->asistencia()->exists()) {
             throw new ReservaYaAtendida('Ya se registró la asistencia de esta reserva; no se puede mover.');
         }
+    }
 
-        return $bloqueada;
+    /**
+     * Una cita solo pasa a quien atiende citas (uno dado de baja ya no se encuentra) y da
+     * ese servicio (ADR 0217), lo mismo que al agendarla.
+     */
+    private function exigirQuienDaElServicio(SesionTenant $sesion, int $instructorId): void
+    {
+        $profesional = Usuario::query()->find($instructorId);
+        if (! $profesional instanceof Usuario || ! $profesional->esProfesional()) {
+            throw new SesionNoReservable('Esa persona no atiende citas.');
+        }
+        if ($sesion->oferta !== null && ! $sesion->oferta->loDa($instructorId)) {
+            throw new SesionNoReservable('Ese profesional no da este servicio. Elige a otro.');
+        }
     }
 
     /**
@@ -263,13 +392,15 @@ class ReprogramarTenant
 
     /**
      * @param  array<string, string>  $antes
+     * @param  array<string, string>  $ajustes  lo que cambia del horario nuevo en el aviso
      */
-    private function avisar(ReservaTenant $reserva, SesionTenant $sesion, array $antes): void
+    private function avisar(ReservaTenant $reserva, SesionTenant $sesion, array $antes, array $ajustes = []): void
     {
         $reserva->loadMissing('persona');
         $this->eventos->registrar('reserva.reprogramada', 'reserva', (string) $reserva->ulid, [
             'persona_id' => (string) $reserva->persona?->ulid,
             ...DatosDeSesion::para($sesion),
+            ...$ajustes,
             'antes_fecha' => $antes['fecha'],
             'antes_hora' => $antes['hora'],
             'antes_inicia_en' => $antes['inicia_en'],

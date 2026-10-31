@@ -12,7 +12,9 @@ use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\InvitadoSesionTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\LugarPlataformaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -40,6 +42,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\TransferenciaInvalida;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\MarcaProducto;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -161,6 +164,8 @@ class ReservasTenant
             }
             $this->exigirCitaLibre($bloqueada);
 
+            // La lista de espera va primero: lo libre se le ofrece antes de evaluar (ADR 0230).
+            $this->ofrecerLugaresLibres($bloqueada);
             if ($bloqueada->capacidad !== null && $this->disponiblesParaCanal($bloqueada, $canal) <= 0) {
                 throw new CupoLleno('La sesion esta llena.');
             }
@@ -290,6 +295,10 @@ class ReservasTenant
                     'penaliza_no_show' => $politica->penalizaNoShow,
                 ];
 
+                // La lista de espera va primero (ADR 0230): lo que esté libre se le ofrece
+                // antes de evaluar; a una reserva nueva solo le toca lo que nadie espera.
+                $this->ofrecerLugaresLibres($bloqueada);
+
                 // Si hay cupo definido y esta lleno PARA ESTE CANAL: lista de espera
                 // (sin hold) o rechazo. La disponibilidad descuenta los cupos que otras
                 // reglas de canal (R20) aun tienen reservados y sin usar.
@@ -325,13 +334,10 @@ class ReservasTenant
                 }
                 $lugarFinal = $this->lugaresDe($bloqueada) > 0 ? $lugar : null;
 
-                $retencion = null;
-                $unidadesReservadas = 0;
-
-                if (! $derecho->ilimitado) {
-                    $retencion = $this->creditos->retener($derecho, $costo, 'Reserva de sesion');
-                    $unidadesReservadas = $costo;
-                }
+                // El plan se eligió sin su candado: si otra reserva gastó su saldo, se usa otro
+                // que alcance (quedó con cuál en `$derecho`).
+                $retencion = $this->retenerDeAlgunDerecho($derecho, $persona, $bloqueada, $costo);
+                $unidadesReservadas = $retencion !== null ? $costo : 0;
 
                 $reserva = ReservaTenant::query()->create([
                     'sesion_id' => $bloqueada->getKey(),
@@ -355,6 +361,45 @@ class ReservasTenant
             // Carrera de idempotencia: otra peticion concurrente ya creo la reserva
             // con la misma clave (viola el unique). Se devuelve la existente, no un 500.
             return $this->previaDeLaClave($idempotencyKey, $sesion, $persona) ?? throw $e;
+        } catch (CupoLleno $e) {
+            // No entró, pero lo que se ofreció a la lista no se va con su transacción.
+            $this->promoverCupos($sesion);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Aparta el crédito del plan elegido; si otra reserva gastó su saldo mientras tanto,
+     * busca otro plan que alcance y con su tope sin llenar (sin el candado, `paraSesion`
+     * pudo elegir uno que ya no alcanza). `$derecho` queda con el que se usó. Sin ninguno,
+     * el saldo insuficiente se responde tal cual. Null si el plan es ilimitado. Debe
+     * llamarse con la sesión bloqueada.
+     */
+    private function retenerDeAlgunDerecho(DerechoTenant &$derecho, PersonaTenant $persona, SesionTenant $sesion, int $costo): ?RetencionCreditoTenant
+    {
+        $sinSaldo = [];
+        while (true) {
+            if ($derecho->ilimitado) {
+                return null;
+            }
+            try {
+                return $this->creditos->retener($derecho, $costo, 'Reserva de sesion');
+            } catch (SaldoInsuficiente $e) {
+                $sinSaldo[] = (int) $derecho->getKey();
+                $otro = $this->resolver->paraSesion($persona, $sesion, $costo, $sinSaldo);
+                if ($otro === null) {
+                    throw $e;
+                }
+                $derecho = $otro;
+                if (TopesDeReservaTenant::tieneTope($derecho)) {
+                    $derecho = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
+                    $tope = app(TopesDeReservaTenant::class)->alcanzado($derecho, $sesion);
+                    if ($tope !== null) {
+                        throw new TopeDeReservas($tope);
+                    }
+                }
+            }
         }
     }
 
@@ -490,13 +535,18 @@ class ReservasTenant
      * Transfiere (regala) el lugar de una reserva activa a otra persona (R9): el
      * crédito ya consumido por el titular original NO se mueve (es un regalo); solo
      * cambia el participante. No permite transferir tras registrar asistencia ni si el
-     * destino ya tiene lugar en la clase.
+     * destino ya tiene lugar en la clase. Una cita no se transfiere: su orden y su prepago
+     * siguen siendo del titular y su enlace firmado sigue controlando la cita (ADR 0230).
      */
     public function transferir(ReservaTenant $reserva, PersonaTenant $destino, ?Usuario $actor = null): ReservaTenant
     {
         return DB::connection('tenant')->transaction(function () use ($reserva, $destino, $actor): ReservaTenant {
-            $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+            // Bajo el candado de la sesión: dos transferencias al mismo destino no pasan.
+            [$sesion, $bloqueada] = $this->bloquearConSesion($reserva);
 
+            if ($sesion->esCita()) {
+                throw new TransferenciaInvalida('Una cita no se transfiere: cancélala y agéndala a nombre de esa persona.');
+            }
             if (! in_array($bloqueada->estado, [EstadoReserva::Confirmada, EstadoReserva::Ofrecida], true)) {
                 throw new TransferenciaInvalida('Solo se puede transferir una reserva activa.');
             }
@@ -510,7 +560,7 @@ class ReservasTenant
             $duplicada = ReservaTenant::query()
                 ->where('sesion_id', $bloqueada->sesion_id)
                 ->where('persona_id', $destino->getKey())
-                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+                ->whereIn('estado', self::ACTIVAS)
                 ->exists();
             if ($duplicada) {
                 throw new TransferenciaInvalida('Esa persona ya tiene lugar en esta clase.');
@@ -529,7 +579,55 @@ class ReservasTenant
             }
 
             return $bloqueada;
-        });
+        }, 3);
+    }
+
+    /**
+     * La sesión y la reserva bajo candado, en el orden único del motor (ADR 0230): primero
+     * la sesión y después la reserva. La sesión se lee sin candado y se revalida: si la
+     * reserva pasó a otra clase entre la lectura y el candado, también se bloquea esa.
+     * Debe llamarse dentro de una transacción.
+     *
+     * @return array{0: SesionTenant, 1: ReservaTenant}
+     */
+    public function bloquearConSesion(ReservaTenant $reserva): array
+    {
+        $sesionId = ReservaTenant::query()->whereKey($reserva->getKey())->value('sesion_id');
+        $sesion = SesionTenant::query()->whereKey($sesionId)->lockForUpdate()->firstOrFail();
+        $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+        if ((int) $bloqueada->sesion_id !== (int) $sesion->getKey()) {
+            $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->firstOrFail();
+        }
+
+        return [$sesion, $bloqueada];
+    }
+
+    /**
+     * Las órdenes de una reserva bajo candado, antes que su sesión: el mismo orden que al
+     * aprobar su pago (orden → pago → reserva, ADR 0181/0209). Al revés, el aviso del pago
+     * y esta cancelación de la misma cita se bloquearían entre sí.
+     */
+    public function bloquearOrdenesDe(int $reservaId): void
+    {
+        $reserva = ReservaTenant::query()->whereKey($reservaId)->first(['orden_id', 'saldo_orden_id']);
+        $ordenes = array_values(array_filter([$reserva?->orden_id, $reserva?->saldo_orden_id], static fn ($o): bool => $o !== null));
+        if ($ordenes !== []) {
+            OrdenTenant::query()->whereKey($ordenes)->orderBy('id')->lockForUpdate()->get();
+        }
+    }
+
+    /**
+     * Cierra en la pasarela, ya confirmada la cancelación, el cobro que quedó abierto de
+     * esas órdenes, para que no pueda pagarse tarde (si ya se cobró, se atiende como pago
+     * tardío). Si la cancelación se deshace, no se cierra nada.
+     *
+     * @param  list<int>  $ordenes
+     */
+    private function cerrarCobrosAlConfirmar(array $ordenes): void
+    {
+        foreach ($ordenes as $orden) {
+            DB::connection('tenant')->afterCommit(fn () => $this->intentos->deOrden($orden));
+        }
     }
 
     /**
@@ -547,9 +645,14 @@ class ReservasTenant
     {
         // Respaldo para reservas anteriores a que se congelara su política (R8).
         $horasLimite ??= $this->parametros->entero('cancelacion.horas_limite');
+        $ordenes = [];
 
-        return DB::connection('tenant')->transaction(function () use ($reserva, $quien, $actor, $horasLimite, $avisar): ReservaTenant {
-            $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+        $cancelada = DB::connection('tenant')->transaction(function () use ($reserva, $quien, $actor, $horasLimite, $avisar, &$ordenes): ReservaTenant {
+            $ordenes = [];
+            // Sus órdenes, la sesión y al final la reserva: el orden único del motor. La
+            // sesión se bloquea para promover de forma segura tras liberar el cupo.
+            $this->bloquearOrdenesDe((int) $reserva->getKey());
+            [$sesion, $bloqueada] = $this->bloquearConSesion($reserva);
 
             if (in_array($bloqueada->estado, [EstadoReserva::Cancelada, EstadoReserva::Expirada], true)) {
                 return $bloqueada;
@@ -574,7 +677,6 @@ class ReservasTenant
 
             // Declinar una oferta (R7): libera el hold sin penalizar y re-ofrece el cupo.
             if ($bloqueada->estado === EstadoReserva::Ofrecida) {
-                $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->firstOrFail();
                 if ($bloqueada->retencion !== null) {
                     $this->creditos->liberar($bloqueada->retencion);
                 }
@@ -589,9 +691,6 @@ class ReservasTenant
 
                 return $bloqueada;
             }
-
-            // Bloquea la sesion para promover de forma segura tras liberar el cupo.
-            $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->firstOrFail();
 
             // La misma decisión que se mostró en la vista previa.
             $efecto = $this->efecto($bloqueada, $sesion, $quien, $horasLimite);
@@ -634,14 +733,17 @@ class ReservasTenant
                 $this->cancelada->reservaCancelada($bloqueada, $credito);
             }
             // Si su orden (cita de pago) seguía sin cobrar, ya no se entregará: se cancela.
-            $this->cancelarOrdenPendiente($bloqueada);
+            $ordenes = $this->cancelarOrdenPendiente($bloqueada);
             // Lo que apartó para recoger en la clase (ADR 0194) se libera.
             app(ApartadosArticuloTenant::class)->liberarDeReserva($bloqueada);
 
             $this->liberarLugar($sesion);
 
             return $bloqueada;
-        });
+        }, 3);
+        $this->cerrarCobrosAlConfirmar($ordenes);
+
+        return $cancelada;
     }
 
     /**
@@ -851,6 +953,8 @@ class ReservasTenant
         if ($yaEsta) {
             throw new YaReservado('Esa persona ya tiene lugar en esa clase.');
         }
+        // Lo libre del destino, primero para su lista de espera (ADR 0230).
+        $this->ofrecerLugaresLibres($nueva);
         if ($this->disponiblesParaCanal($nueva, (string) ($reserva->canal ?? 'directo')) < 1) {
             throw new CupoLleno('Esa clase ya no tiene lugares.');
         }
@@ -873,17 +977,19 @@ class ReservasTenant
     {
         // Una cita no tiene lista de espera: nunca se ofrece a otra persona. Ni se ofrece
         // el lugar de una clase que ya empezó.
-        if ($sesion->capacidad === null || $sesion->esCita() || ! $sesion->inicia_en->isFuture()) {
+        if ($sesion->esCita() || ! $sesion->inicia_en->isFuture()) {
             return null;
         }
 
-        if ($this->ocupadas($sesion) >= $sesion->capacidad) {
+        // Sin tope (se lo quitaron a una clase que tenía lista), hay lugar para todos.
+        if ($sesion->capacidad !== null && $this->ocupadas($sesion) >= $sesion->capacidad) {
             return null;
         }
 
         // En orden de llegada. A quien hoy no tiene con qué (su plan venció, se usó o se
         // canceló) se le salta, sin perder su lugar en la lista: la oferta pasa al
-        // siguiente (no se atasca la lista en el primero).
+        // siguiente (no se atasca la lista en el primero). Lo mismo a quien su canal ya no
+        // tiene lugar: lo apartado para otro canal no se regala (R20, ADR 0230).
         $enEspera = ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->where('estado', EstadoReserva::EnEspera->value)
@@ -896,6 +1002,9 @@ class ReservasTenant
         $retencion = null;
         $unidadesReservadas = 0;
         foreach ($enEspera as $candidata) {
+            if ($this->disponiblesParaCanal($sesion, (string) ($candidata->canal ?? 'directo')) <= 0) {
+                continue;
+            }
             // Reserva el costo REAL con el que se creo la reserva (no un valor fijo).
             $costo = $candidata->costo_unidades ?? self::UNIDADES_POR_SESION;
             $derecho = null;
@@ -953,19 +1062,53 @@ class ReservasTenant
         return DB::connection('tenant')->transaction(function () use ($sesion): int {
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
-            if ($bloqueada->estado !== EstadoSesionTenant::Programada || $bloqueada->capacidad === null) {
+            if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
                 return 0;
             }
 
-            $ofrecidas = 0;
-            // Cada promover() convierte una en_espera -> ofrecida (sube `ocupadas`), asi
-            // que el bucle termina al llenar el cupo o cuando ya no hay a quien ofrecer.
-            while ($this->promover($bloqueada) !== null) {
-                $ofrecidas++;
-            }
+            return $this->ofrecerLugaresLibres($bloqueada);
+        }, 3);
+    }
 
-            return $ofrecidas;
-        });
+    /**
+     * Ofrece a la lista de espera todo lo libre (ADR 0230: tiene prioridad sobre cualquier
+     * reserva nueva). Cada promover() convierte una en_espera -> ofrecida (sube `ocupadas`),
+     * asi que el bucle termina al llenar el cupo o cuando ya no hay a quien ofrecer. Debe
+     * llamarse con la sesion bloqueada.
+     */
+    public function ofrecerLugaresLibres(SesionTenant $sesion): int
+    {
+        $ofrecidas = 0;
+        while ($this->promover($sesion) !== null) {
+            $ofrecidas++;
+        }
+
+        return $ofrecidas;
+    }
+
+    /**
+     * El barrido de las listas de espera (ADR 0230): las clases por venir con alguien
+     * esperando y lugares que se le pueden ofrecer. Atrapa lo que se libera sin un
+     * movimiento que lo anuncie, como los lugares de un canal al llegar su hora de
+     * liberarse (R20), y lo que una reserva rechazada dejó de ofrecer. Devuelve cuántas
+     * ofertas salieron.
+     */
+    public function promoverListasDeEspera(): int
+    {
+        $ofrecidas = 0;
+        SesionTenant::query()
+            ->where('estado', EstadoSesionTenant::Programada->value)
+            ->where('inicia_en', '>', now())
+            ->whereIn('id', ReservaTenant::query()->select('sesion_id')->where('estado', EstadoReserva::EnEspera->value))
+            ->orderBy('id')
+            ->get()
+            // Sin lugar no hay a quién ofrecerle: ni se toma el candado de la clase.
+            ->filter(fn (SesionTenant $s): bool => $s->capacidad === null || $this->ocupadas($s) < $s->capacidad)
+            ->each(function (SesionTenant $sesion) use (&$ofrecidas): void {
+                $ofrecidas += $this->promoverCupos($sesion);
+            });
+
+        return $ofrecidas;
     }
 
     /**
@@ -1017,16 +1160,19 @@ class ReservasTenant
             ->orderBy('id')
             ->pluck('id')
             ->each(function ($id) use (&$expiradas): void {
-                DB::connection('tenant')->transaction(function () use ($id, &$expiradas): void {
+                $expiro = DB::connection('tenant')->transaction(function () use ($id): bool {
+                    // La sesión y luego la oferta: el orden único del motor (ADR 0230).
+                    $sesion = SesionTenant::query()
+                        ->whereKey(ReservaTenant::query()->whereKey($id)->value('sesion_id'))
+                        ->lockForUpdate()
+                        ->first();
                     $oferta = ReservaTenant::query()->whereKey($id)->lockForUpdate()->first();
-                    if (! $oferta instanceof ReservaTenant || $oferta->estado !== EstadoReserva::Ofrecida) {
-                        return;
+                    if (! $sesion instanceof SesionTenant || ! $oferta instanceof ReservaTenant || $oferta->estado !== EstadoReserva::Ofrecida) {
+                        return false;
                     }
                     if ($oferta->oferta_expira_en === null || now()->lessThanOrEqualTo($oferta->oferta_expira_en)) {
-                        return;
+                        return false;
                     }
-
-                    $sesion = SesionTenant::query()->whereKey($oferta->sesion_id)->lockForUpdate()->firstOrFail();
 
                     if ($oferta->retencion !== null) {
                         $this->creditos->liberar($oferta->retencion);
@@ -1038,11 +1184,13 @@ class ReservasTenant
                         'unidades' => 0,
                         'oferta_expira_en' => null,
                     ]);
-                    $expiradas++;
 
                     // El cupo liberado se re-ofrece al siguiente de la lista.
                     $this->liberarLugar($sesion);
-                });
+
+                    return true;
+                }, 3);
+                $expiradas += $expiro ? 1 : 0;
             });
 
         return $expiradas;
@@ -1066,23 +1214,19 @@ class ReservasTenant
             ->orderBy('id')
             ->pluck('id')
             ->each(function ($id) use (&$expiradas, &$ordenes): void {
-                DB::connection('tenant')->transaction(function () use ($id, &$expiradas, &$ordenes): void {
-                    // Primero sus órdenes y después la reserva (y su sesión): el mismo orden
-                    // que al aprobar su pago (orden → pago → reserva, ADR 0181/0209). Al
-                    // revés, el aviso del pago y esta expiración de la misma cita se
-                    // bloquearían entre sí y MySQL cortaría una de las dos.
-                    $deLaReserva = ReservaTenant::query()->whereKey($id)->first(['orden_id', 'saldo_orden_id']);
-                    $ordenesDeLaReserva = array_values(array_filter([$deLaReserva?->orden_id, $deLaReserva?->saldo_orden_id], static fn ($o): bool => $o !== null));
-                    if ($ordenesDeLaReserva !== []) {
-                        OrdenTenant::query()->whereKey($ordenesDeLaReserva)->orderBy('id')->lockForUpdate()->get();
-                    }
-                    $reserva = ReservaTenant::query()->whereKey($id)->lockForUpdate()->first();
-                    if (! $reserva instanceof ReservaTenant || $reserva->estado !== EstadoReserva::PendientePago) {
-                        return;
-                    }
-
+                $canceladas = DB::connection('tenant')->transaction(function () use ($id): ?array {
+                    // Sus órdenes, la sesión y al final la reserva: el orden único del motor
+                    // (ADR 0181/0209, 0230).
+                    $this->bloquearOrdenesDe((int) $id);
                     // Libera el cupo bajo el lock de la sesión (para promover con seguridad).
-                    $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
+                    $sesion = SesionTenant::query()
+                        ->whereKey(ReservaTenant::query()->whereKey($id)->value('sesion_id'))
+                        ->lockForUpdate()
+                        ->first();
+                    $reserva = ReservaTenant::query()->whereKey($id)->lockForUpdate()->first();
+                    if (! $sesion instanceof SesionTenant || ! $reserva instanceof ReservaTenant || $reserva->estado !== EstadoReserva::PendientePago) {
+                        return null;
+                    }
 
                     // Venció sin pago: si el pago llega después, solo esta se puede reconfirmar.
                     $reserva->update([
@@ -1091,16 +1235,18 @@ class ReservasTenant
                         'cancelada_en' => now(),
                         'cancelada_por' => QuienCancela::Sistema->value,
                     ]);
-                    $this->cancelarOrdenPendiente($reserva);
-                    $expiradas++;
-                    if ($reserva->orden_id !== null) {
-                        $ordenes[] = (int) $reserva->orden_id;
-                    }
+                    $canceladas = $this->cancelarOrdenPendiente($reserva);
 
                     // Una cita sin pagar libera el horario del profesional; en una clase,
                     // el cupo liberado se ofrece al siguiente en lista de espera.
                     $this->liberarLugar($sesion);
-                });
+
+                    return $canceladas;
+                }, 3);
+                if ($canceladas !== null) {
+                    $expiradas++;
+                    $ordenes = [...$ordenes, ...$canceladas];
+                }
             });
 
         // Fuera de la transacción: el cobro que quedó abierto en la pasarela se cierra
@@ -1116,20 +1262,22 @@ class ReservasTenant
      * Llegó el pago de una reserva cuyo apartado venció sin pago (1.2): se reconfirma
      * solo si su horario sigue libre y aún no empieza, revalidando bajo candado (nunca
      * desplaza a otro cliente). En una cita, que el profesional no tenga otra cosa a
-     * esa hora; en una clase, que haya lugar. La deja pendiente de pago para que el
-     * fulfillment la confirme. Debe llamarse dentro de una transacción.
+     * esa hora; en una clase, que haya lugar. Si mientras tanto la persona volvió a
+     * reservar y ya tiene otra reserva viva en esa clase (o una cita que se le encima),
+     * no se reconfirma: serían dos lugares y dos cobros, y el pago queda por conciliar
+     * (ADR 0230). La deja pendiente de pago para que el fulfillment la confirme. Debe
+     * llamarse dentro de una transacción.
      */
     public function reconfirmarPagoTardio(ReservaTenant $reserva): bool
     {
-        $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->first();
-        if (! $bloqueada instanceof ReservaTenant
-            || $bloqueada->estado !== EstadoReserva::Cancelada
+        // La sesión y luego la reserva: el orden único del motor (ADR 0230).
+        [$sesion, $bloqueada] = $this->bloquearConSesion($reserva);
+        if ($bloqueada->estado !== EstadoReserva::Cancelada
             || $bloqueada->motivo_cancelacion !== 'vencio_pago') {
             return false;
         }
 
-        $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->first();
-        if (! $sesion instanceof SesionTenant || ! $sesion->inicia_en->isFuture()) {
+        if (! $sesion->inicia_en->isFuture() || $this->tieneOtraReservaViva($bloqueada, $sesion)) {
             return false;
         }
 
@@ -1172,20 +1320,60 @@ class ReservasTenant
     }
 
     /**
+     * ¿La persona tiene otra reserva viva en esa clase o, si es una cita, en otra cita que
+     * se le encima? Esa reserva nació después de que esta venció.
+     */
+    private function tieneOtraReservaViva(ReservaTenant $reserva, SesionTenant $sesion): bool
+    {
+        return ReservaTenant::query()
+            ->where('persona_id', $reserva->persona_id)
+            ->whereKeyNot($reserva->getKey())
+            ->whereIn('estado', self::ACTIVAS)
+            ->when(
+                $sesion->esCita(),
+                fn ($q) => $q->whereHas('sesion', fn ($s) => $s
+                    ->where('tipo', TipoSesionTenant::Cita->value)
+                    ->where('estado', EstadoSesionTenant::Programada->value)
+                    ->where('inicia_en', '<', $sesion->termina_en)
+                    ->where('termina_en', '>', $sesion->inicia_en)),
+                fn ($q) => $q->where('sesion_id', $sesion->getKey()),
+            )
+            ->exists();
+    }
+
+    /**
      * Cancela una sesion (cancelacion del NEGOCIO): marca la sesion como cancelada y
      * cancela TODAS sus reservas activas (confirmadas, ofrecidas, en espera y por
      * pagar) liberando sus holds: el credito retenido vuelve al miembro, sin
      * penalizarlo. Atomico (bloquea la sesion) e idempotente. No promueve lista de
      * espera: la sesion no ocurrira. Una clase con asistencia registrada ya ocurrió y
      * no se cancela.
+     *
+     * También los invitados (vuelve el pase del mes) y, ya confirmada la cancelación, los
+     * lugares de plataforma ({@see ReservasPlataformaTenant::cancelarDeSesionCancelada}) y
+     * los cobros que quedaron abiertos en la pasarela (ADR 0230).
      */
     public function cancelarSesion(SesionTenant $sesion, ?Usuario $actor = null): void
     {
-        DB::connection('tenant')->transaction(function () use ($sesion, $actor): void {
+        $ordenes = [];
+        $cancelada = DB::connection('tenant')->transaction(function () use ($sesion, $actor, &$ordenes): bool {
+            $ordenes = [];
+            // Las órdenes por cobrar antes que la sesión: como al aprobar un pago (ADR 0209).
+            $porCobrar = ReservaTenant::query()
+                ->where('sesion_id', $sesion->getKey())
+                ->whereIn('estado', self::ACTIVAS)
+                ->get(['orden_id', 'saldo_orden_id'])
+                ->flatMap(static fn (ReservaTenant $r): array => [$r->orden_id, $r->saldo_orden_id])
+                ->filter()
+                ->values()
+                ->all();
+            if ($porCobrar !== []) {
+                OrdenTenant::query()->whereKey($porCobrar)->orderBy('id')->lockForUpdate()->get();
+            }
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado === EstadoSesionTenant::Cancelada) {
-                return;
+                return false;
             }
             if ($this->tieneAsistencia($bloqueada)) {
                 throw new ReservaYaAtendida('Esta clase ya tiene asistencia registrada; no se puede cancelar.');
@@ -1212,22 +1400,37 @@ class ReservasTenant
                     'cancelada_por' => QuienCancela::Negocio->value,
                     'cancelada_por_usuario_id' => $actor?->getKey(),
                 ]);
-                $this->cancelarOrdenPendiente($reserva);
+                $ordenes = [...$ordenes, ...$this->cancelarOrdenPendiente($reserva)];
                 // Cada persona afectada recibe el aviso, con el enlace para reservar otra.
                 $this->cancelada->sesionCancelada($reserva, $devuelto);
             }
 
+            // Sus invitados: al cancelar su lugar vuelve el pase del mes de quien invitó.
+            InvitadoSesionTenant::query()
+                ->where('sesion_id', $bloqueada->getKey())
+                ->where('estado', InvitadoSesionTenant::RESERVADO)
+                ->update(['estado' => InvitadoSesionTenant::CANCELADO, 'cancelado_en' => now()]);
+
             $bloqueada->update(['estado' => EstadoSesionTenant::Cancelada->value]);
             app(ApartadosArticuloTenant::class)->liberarDeSesion($bloqueada);
-        });
+
+            return true;
+        }, 3);
+
+        if ($cancelada) {
+            $this->cerrarCobrosAlConfirmar($ordenes);
+            // Wellhub y TotalPass se llaman por HTTP: fuera de la transacción.
+            DB::connection('tenant')->afterCommit(fn () => app(ReservasPlataformaTenant::class)->cancelarDeSesionCancelada((int) $sesion->getKey()));
+        }
     }
 
     /**
      * Qué pasaría al cancelar la sesión completa (vista previa): cuántas reservas se
      * cancelan, cuántos créditos regresan y cuántas ya estaban pagadas (ese dinero se
-     * devuelve solo si se pagó en línea y el negocio así lo decidió, ADR 0046).
+     * devuelve solo si se pagó en línea y el negocio así lo decidió, ADR 0046). También
+     * cuántos invitados y lugares de plataforma se cancelan con ella (ADR 0230).
      *
-     * @return array{cancelable: bool, reservas: int, unidades: int, pagadas: int, se_devuelven: int, mensaje: string}
+     * @return array{cancelable: bool, reservas: int, unidades: int, pagadas: int, se_devuelven: int, invitados?: int, lugares_plataforma?: int, mensaje: string}
      */
     public function efectoDeCancelarSesion(SesionTenant $sesion): array
     {
@@ -1264,7 +1467,21 @@ class ReservasTenant
                     : " {$aMano} ya están pagadas: esos pagos no se reembolsan automáticamente.") : '');
         }
 
-        return ['cancelable' => true, 'reservas' => $n, 'unidades' => $unidades, 'pagadas' => $pagadas, 'se_devuelven' => $solas, 'mensaje' => $mensaje];
+        $invitados = InvitadoSesionTenant::query()->where('sesion_id', $sesion->getKey())->where('estado', InvitadoSesionTenant::RESERVADO)->count();
+        $plataforma = LugarPlataformaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->where('origen', LugarPlataformaTenant::ORIGEN_RESERVA)
+            ->where('estado', LugarPlataformaTenant::RESERVADO)
+            ->count();
+        $mensaje = trim($mensaje === 'No tiene reservas.' && ($invitados > 0 || $plataforma > 0) ? '' : $mensaje);
+        if ($invitados > 0) {
+            $mensaje = trim($mensaje.' '.($invitados === 1 ? 'Se cancela 1 invitado y vuelve su pase.' : "Se cancelan {$invitados} invitados y vuelven sus pases."));
+        }
+        if ($plataforma > 0) {
+            $mensaje = trim($mensaje.' '.($plataforma === 1 ? 'Se cancela 1 reserva de plataforma.' : "Se cancelan {$plataforma} reservas de plataforma."));
+        }
+
+        return ['cancelable' => true, 'reservas' => $n, 'unidades' => $unidades, 'pagadas' => $pagadas, 'se_devuelven' => $solas, 'invitados' => $invitados, 'lugares_plataforma' => $plataforma, 'mensaje' => $mensaje];
     }
 
     /**
@@ -1359,18 +1576,26 @@ class ReservasTenant
     /**
      * Cancela la orden pendiente de una reserva de pago-para-reservar (y la del saldo,
      * si lleva anticipo), para que no se pueda pagar algo que ya no se va a entregar.
-     * Una orden ya pagada no se toca.
+     * Una orden ya pagada no se toca. Devuelve las que canceló.
+     *
+     * @return list<int>
      */
-    private function cancelarOrdenPendiente(ReservaTenant $reserva): void
+    private function cancelarOrdenPendiente(ReservaTenant $reserva): array
     {
         $ordenes = array_values(array_filter([$reserva->orden_id, $reserva->saldo_orden_id], static fn ($id): bool => $id !== null));
         if ($ordenes === []) {
-            return;
+            return [];
         }
 
-        OrdenTenant::query()->whereKey($ordenes)
+        $pendientes = OrdenTenant::query()->whereKey($ordenes)
             ->where('estado', EstadoOrden::Pendiente->value)
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+        OrdenTenant::query()->whereKey($pendientes)
             ->update(['estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]);
+
+        return $pendientes;
     }
 
     /**
@@ -1457,8 +1682,7 @@ class ReservasTenant
     public function cambiarLugar(ReservaTenant $reserva, int $lugar, ?Usuario $actor = null): ReservaTenant
     {
         return DB::connection('tenant')->transaction(function () use ($reserva, $lugar, $actor): ReservaTenant {
-            $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
-            $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+            [$sesion, $bloqueada] = $this->bloquearConSesion($reserva);
 
             if (! in_array($bloqueada->estado, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
                 throw new LugarNoDisponible('Solo se elige lugar en una reserva confirmada.');
@@ -1484,7 +1708,7 @@ class ReservasTenant
             ]);
 
             return $bloqueada->refresh();
-        });
+        }, 3);
     }
 
     /**

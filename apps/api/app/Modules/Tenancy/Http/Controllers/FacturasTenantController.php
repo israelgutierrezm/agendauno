@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
 use App\Modules\Tenancy\Application\CancelarFacturaTenant;
+use App\Modules\Tenancy\Application\EmisoresFiscalesTenant;
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\FacturasDeVentasTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
@@ -67,6 +68,8 @@ class FacturasTenantController
             if ($impedimento !== null) {
                 throw ValidationException::withMessages(['sustituye' => [$impedimento]]);
             }
+            // La sustituta la timbra el mismo RFC (ADR 0228): lo dice antes de capturarla.
+            app(EmisoresFiscalesTenant::class)->exigirMismoRfc($factura, $this->datosFiscales(), 'sustituye');
 
             return response()->json(['data' => $this->ventas->borradorDeSustituta($factura)]);
         }
@@ -104,6 +107,7 @@ class FacturasTenantController
         }
         $buscar = trim((string) ($filtros['q'] ?? ''));
         $fechas = app(FechasNegocioTenant::class);
+        $rfcDeHoy = (string) DatosFiscalesTenant::query()->value('rfc');
         // Alcance por sucursal (R19): las de las compras y las ventas del mostrador de
         // sus sedes (una factura sin venta es del negocio y no es de ninguna sede).
         $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
@@ -121,7 +125,9 @@ class FacturasTenantController
                 ->where('anticipo', true)
                 ->where('estado', EstadoFactura::Timbrada->value)
                 ->whereNull('anticipo_aplicado_en')
-                ->where('receptor_rfc', mb_strtoupper((string) $filtros['anticipos_de'])));
+                ->where('receptor_rfc', mb_strtoupper((string) $filtros['anticipos_de']))
+                // Solo los que timbró el RFC de hoy: los de otro no se aplican (ADR 0228).
+                ->delRfc($rfcDeHoy));
         // De cada estado, con la búsqueda y las fechas (para los filtros).
         $conteos = (clone $consulta)->selectRaw('estado, COUNT(*) as total')->groupBy('estado')->pluck('total', 'estado')
             ->map(static fn ($n): int => (int) $n)->all();
@@ -132,7 +138,7 @@ class FacturasTenantController
             ->paginate((int) ($filtros['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($filtros['page'] ?? 1));
 
         return response()->json([
-            'data' => collect($pagina->items())->map(fn (FacturaTenant $f): array => $this->presentar($f))->all(),
+            'data' => collect($pagina->items())->map(fn (FacturaTenant $f): array => $this->presentar($f, $rfcDeHoy))->all(),
             'meta' => [
                 'total' => $pagina->total(),
                 'page' => $pagina->currentPage(),
@@ -261,6 +267,11 @@ class FacturasTenantController
 
         /** @var list<array{descripcion: string, cantidad: int, precio_unitario_minor: int, clave_prod_serv: string, clave_unidad: string, iva?: string|null}> $items */
         $items = $validado['items'];
+        // La factura de una venta lleva el IVA de lo vendido al venderse (ADR 0228): no el
+        // que mande la pantalla si no cuadra con su foto.
+        if (($orden !== null || $venta !== null) && ! ($validado['anticipo'] ?? false) && ($validado['anticipos'] ?? []) === []) {
+            $items = $this->ventas->conIvaDeLaVenta($items, $orden ?? $venta);
+        }
 
         $factura = $this->emisor->emitir(
             $datos,
@@ -296,8 +307,10 @@ class FacturasTenantController
     /**
      * @return array<string, mixed>
      */
-    private function presentar(FacturaTenant $factura): array
+    private function presentar(FacturaTenant $factura, ?string $rfcDeHoy = null): array
     {
+        $deOtroRfc = EmisoresFiscalesTenant::deOtroRfc($factura, $rfcDeHoy ?? (string) DatosFiscalesTenant::query()->value('rfc'));
+
         return [
             'id' => $factura->ulid,
             'estado' => $factura->estado->value,
@@ -308,6 +321,10 @@ class FacturasTenantController
             'impuesto_minor' => $factura->impuesto_minor,
             'total_minor' => $factura->total_minor,
             'uuid' => $factura->uuid,
+            // Con qué RFC se timbró (ADR 0228) y si ya no es el de hoy: se descarga, se reenvía
+            // y se cancela, pero no se le hacen notas de crédito ni se sustituye.
+            'emisor_rfc' => $factura->emisor_rfc,
+            'de_otro_rfc' => $deOtroRfc,
             'pdf_url' => $factura->pdf_url,
             'xml_url' => $factura->xml_url,
             'motivo_error' => $factura->motivo_error,
@@ -337,22 +354,22 @@ class FacturasTenantController
             'cancelable' => $this->cancelar->impedimento($factura) === null,
             // Con la cancelación en espera no se le hacen notas de crédito.
             'acreditable_minor' => $factura->estado === EstadoFactura::Timbrada && $factura->tipo === FacturaTenant::INGRESO && ! $factura->anticipo
-                && $factura->cancelacion_estado !== EstadoCancelacion::Pendiente
+                && $factura->cancelacion_estado !== EstadoCancelacion::Pendiente && ! $deOtroRfc
                 ? $factura->acreditable()
                 : 0,
         ];
     }
 
-    /** La factura, si quien la pide alcanza su venta (R19); sin venta, es del negocio. */
     /**
-     * El PDF o el XML de un CFDI timbrado (ADR 0212), con la llave del negocio: FacturAPI
-     * no los entrega sin ella.
+     * El PDF o el XML de un CFDI timbrado (ADR 0212), con la llave del emisor que lo
+     * timbró (ADR 0228): FacturAPI no los entrega sin ella.
      */
     public function descargar(Request $request, ClienteFacturacion $cliente): Response
     {
         $factura = $this->facturaDeMiSede($request, (string) $request->route('factura'));
+        $this->datosFiscales();
 
-        return self::archivo($factura, (string) $request->route('formato'), $this->datosFiscales(), $cliente);
+        return self::archivo($factura, (string) $request->route('formato'), $cliente);
     }
 
     /** Vuelve a mandar el CFDI por correo (al del receptor o a otro). */
@@ -372,14 +389,18 @@ class FacturasTenantController
     }
 
     /**
-     * El archivo de un CFDI timbrado, para descargar.
+     * El archivo de un CFDI timbrado, para descargar, con la llave del emisor que lo
+     * timbró (aunque hoy se timbre con otro RFC, ADR 0228).
      */
-    public static function archivo(FacturaTenant $factura, string $formato, DatosFiscalesTenant $emisor, ClienteFacturacion $cliente): Response
+    public static function archivo(FacturaTenant $factura, string $formato, ClienteFacturacion $cliente): Response
     {
         abort_unless(in_array($formato, ['pdf', 'xml'], true), 404);
         abort_unless($factura->estado === EstadoFactura::Timbrada && $factura->facturapi_id !== null, 409, 'La factura no está timbrada.');
         try {
-            $contenido = $cliente->descargar(EmitirFacturaTenant::llaveDe($emisor), (string) $factura->facturapi_id, $formato);
+            $contenido = app(EmisoresFiscalesTenant::class)->conLlaveDe(
+                $factura,
+                static fn (string $llave): string => $cliente->descargar($llave, (string) $factura->facturapi_id, $formato),
+            );
         } catch (TimbradoFallido $e) {
             throw ValidationException::withMessages(['factura' => [$e->getMessage()]]);
         }
@@ -390,6 +411,7 @@ class FacturasTenantController
         ]);
     }
 
+    /** La factura, si quien la pide alcanza su venta (R19); sin venta, es del negocio. */
     private function facturaDeMiSede(Request $request, string $ulid): FacturaTenant
     {
         $factura = FacturaTenant::query()->where('ulid', $ulid)->with(['orden', 'venta', 'relacionada'])->firstOrFail();

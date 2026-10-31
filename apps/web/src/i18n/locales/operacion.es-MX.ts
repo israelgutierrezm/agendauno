@@ -462,6 +462,17 @@ export default {
     invalida:
       "Escribe la latitud y la longitud separadas por una coma (p. ej. 19.4194, -99.1617).",
     sinPermiso: "No pudimos obtener tu ubicación desde este dispositivo.",
+    // Cambiar la zona con fechas por venir (ADR 0230).
+    confirmarZona:
+      "Esta sucursal tiene {fechas} por venir, con {personas}. Al cambiar la zona conservan su hora de reloj (las 07:00 siguen siendo las 07:00 de la zona nueva) y se le avisa a cada persona. ¿Cambiar la zona?",
+    zonaFechas: "1 fecha | {n} fechas",
+    zonaPersonas:
+      "1 persona con lugar o en espera | {n} personas con lugar o en espera",
+    cambiarZona: "Cambiar la zona",
+    zonaCambiada:
+      "Zona cambiada: 1 fecha conserva su hora de reloj. | Zona cambiada: {n} fechas conservan su hora de reloj.",
+    zonaEnCola:
+      "Zona cambiada: 1 fecha se está actualizando. | Zona cambiada: {n} fechas se están actualizando.",
   },
   reportes: {
     // Cómo conocieron al negocio los alumnos nuevos (ADR 0067).

@@ -10,7 +10,8 @@ import { useToastStore } from "@/stores/toast";
  * Fitpass sin API (ADR 0197 y 0202): sus horarios se capturan a mano en Fitpass Admin y
  * su asistencia se marca allá. Aquí: qué clases se ofrecen en Fitpass (con el nombre de
  * su «disciplina» allá), sus horarios de los próximos días para capturarlos (y las
- * canceladas, para quitarlas) y lo que falta marcar en su panel antes de 48 horas.
+ * canceladas, para quitarlas), lo que falta marcar en su panel antes de 48 horas y las
+ * reservas que el negocio canceló aquí y falta cancelar allá (ADR 0230).
  *
  * Con `operacion` (recepción, en el pase de lista) no se configuran las clases: solo
  * los horarios (con `agenda.ver`) y lo que falta marcar (con `checkins.registrar`).
@@ -45,6 +46,13 @@ interface PorMarcar {
   asistio: boolean;
   marcar_antes_de: string | null;
 }
+interface PorCancelar {
+  id: string;
+  reservacion: string;
+  nombre: string | null;
+  clase: string | null;
+  inicia_en: string | null;
+}
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -54,6 +62,7 @@ const base = computed(() => `/api/v1/app/${sesion.slug}/integraciones/fitpass`);
 const clases = ref<ClaseFitpass[]>([]);
 const horarios = ref<HorarioFitpass[]>([]);
 const porMarcar = ref<PorMarcar[]>([]);
+const porCancelar = ref<PorCancelar[]>([]);
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
@@ -66,7 +75,7 @@ const verPorMarcar = computed(() => sesion.puede("checkins.registrar"));
 async function cargar(): Promise<void> {
   error.value = null;
   try {
-    const [c, h, p] = await Promise.all([
+    const [c, h, p, pc] = await Promise.all([
       verClases.value
         ? api.get<{ data: ClaseFitpass[] }>(`${base.value}/clases`)
         : null,
@@ -78,10 +87,14 @@ async function cargar(): Promise<void> {
       verPorMarcar.value
         ? api.get<{ data: PorMarcar[] }>(`${base.value}/por-marcar`)
         : null,
+      verPorMarcar.value
+        ? api.get<{ data: PorCancelar[] }>(`${base.value}/por-cancelar`)
+        : null,
     ]);
     clases.value = c?.data.data ?? [];
     horarios.value = h?.data.data ?? [];
     porMarcar.value = p?.data.data ?? [];
+    porCancelar.value = pc?.data.data ?? [];
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -123,6 +136,18 @@ async function yaMarcado(p: PorMarcar): Promise<void> {
       {},
     );
     porMarcar.value = porMarcar.value.filter((x) => x.id !== p.id);
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
+
+async function yaCancelada(p: PorCancelar): Promise<void> {
+  try {
+    await api.post(
+      `/api/v1/app/${sesion.slug}/lugares-plataforma/${p.id}/marcado`,
+      {},
+    );
+    porCancelar.value = porCancelar.value.filter((x) => x.id !== p.id);
   } catch (e) {
     toast.error(mensajeDeError(e));
   }
@@ -319,6 +344,35 @@ onMounted(cargar);
             @click="yaMarcado(p)"
           >
             {{ $t("fitpass.yaMarcado") }}
+          </button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Solo con algo pendiente: lo que el negocio canceló aquí (ADR 0230). -->
+    <section v-if="verPorMarcar && porCancelar.length > 0">
+      <h3 class="font-medium">
+        {{ $t("fitpass.porCancelarTitulo") }}
+        <span class="tabular-nums">{{ porCancelar.length }}</span>
+      </h3>
+      <p class="tu-hint">{{ $t("fitpass.porCancelarAyuda") }}</p>
+      <ul class="mt-2 space-y-2 text-sm">
+        <li
+          v-for="p in porCancelar"
+          :key="p.id"
+          class="flex flex-wrap items-center gap-2"
+          data-prueba="por-cancelar-fitpass"
+        >
+          <span class="min-w-0 flex-1">
+            {{ p.nombre ?? p.reservacion }} · {{ p.clase ?? "—" }} ·
+            {{ fechaHora(p.inicia_en) }}
+          </span>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario"
+            @click="yaCancelada(p)"
+          >
+            {{ $t("fitpass.yaCancelada") }}
           </button>
         </li>
       </ul>

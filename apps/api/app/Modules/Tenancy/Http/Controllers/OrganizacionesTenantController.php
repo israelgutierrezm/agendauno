@@ -8,19 +8,26 @@ use App\Modules\Tenancy\Application\AsignarSucursalAlPersonalTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\ReanclarZonaDeSede;
+use App\Modules\Tenancy\Application\ReanclarZonaDeSedeTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Exceptions\CambioDeZonaSinConfirmar;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use App\Modules\Tenancy\Support\EnlaceMapa;
 use App\Modules\Tenancy\Support\HorarioSucursal;
 use App\Modules\Tenancy\Support\RedesSociales;
+use App\Support\ReporteDeErrores;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Organizaciones y sucursales del estudio, tenant-local (BD del tenant). Base para
@@ -83,11 +90,24 @@ class OrganizacionesTenantController
         return response()->json(['data' => $this->presentarSucursal($sucursal)], 201);
     }
 
-    public function actualizarSucursal(Request $request): JsonResponse
+    /**
+     * Edita una sede. Cambiar su zona con fechas por venir las re-ancla (conservan su hora
+     * de reloj) y avisa a quien tiene reserva (ADR 0230): sin `confirmar_zona` no cambia
+     * nada y responde 409 con cuántas fechas y reservas son, para que la pantalla pregunte.
+     */
+    public function actualizarSucursal(Request $request, ReanclarZonaDeSedeTenant $reanclar, RegistrarAuditoria $auditoria): JsonResponse
     {
         $sucursal = SucursalTenant::query()->where('ulid', (string) $request->route('sucursal'))->firstOrFail();
 
         $validado = $this->validarSucursal($request, obligarNombre: false);
+        $request->validate(['confirmar_zona' => ['sometimes', 'boolean']]);
+
+        $zonaAnterior = (string) $sucursal->zona_horaria;
+        $zonaNueva = isset($validado['zona_horaria']) ? (string) $validado['zona_horaria'] : $zonaAnterior;
+        $afectadas = $zonaNueva !== $zonaAnterior ? $reanclar->afectadas($sucursal, $zonaNueva) : null;
+        if ($afectadas !== null && $afectadas['sesiones'] > 0 && ! $request->boolean('confirmar_zona')) {
+            throw new CambioDeZonaSinConfirmar($zonaAnterior, $zonaNueva, $afectadas['sesiones'], $afectadas['reservas']);
+        }
 
         // Solo pisa lo enviado (edición parcial de la unidad de negocio).
         $sucursal->fill(array_filter([
@@ -108,7 +128,40 @@ class OrganizacionesTenantController
 
         $sucursal->save();
 
-        return response()->json(['data' => $this->presentarSucursal($sucursal)]);
+        if ($afectadas === null) {
+            return response()->json(['data' => $this->presentarSucursal($sucursal)]);
+        }
+        $actor = $request->attributes->get('usuario_tenant');
+        $auditoria->registrar($actor instanceof Usuario ? $actor : null, 'sucursal.zona_cambiada', 'sucursal', (string) $sucursal->ulid,
+            ['zona_horaria' => $zonaAnterior], ['zona_horaria' => $zonaNueva, ...$afectadas]);
+
+        return response()->json([
+            'data' => $this->presentarSucursal($sucursal),
+            'meta' => ['reanclaje' => [...$afectadas, 'en_cola' => $this->reanclarAlCambiarZona($request, $sucursal, $reanclar, $afectadas['sesiones'])]],
+        ]);
+    }
+
+    /**
+     * Con pocas fechas, en la misma solicitud; con muchas, o si falla a medias, en la cola
+     * (lleva el negocio y es idempotente). Devuelve si quedó en la cola.
+     */
+    private function reanclarAlCambiarZona(Request $request, SucursalTenant $sucursal, ReanclarZonaDeSedeTenant $reanclar, int $sesiones): bool
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        if ($sesiones <= ReanclarZonaDeSedeTenant::EN_LINEA_MAXIMO) {
+            try {
+                $reanclar->reanclar($sucursal);
+
+                return false;
+            } catch (Throwable $e) {
+                // La zona ya cambió: lo que faltó se termina en la cola, no se pierde.
+                ReporteDeErrores::reportarAtrapado($e);
+            }
+        }
+        ReanclarZonaDeSede::dispatch((int) $estudio->getKey(), (string) $sucursal->ulid);
+
+        return true;
     }
 
     /**

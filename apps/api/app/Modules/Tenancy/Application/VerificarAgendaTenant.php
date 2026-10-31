@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Support\RevisionSinCandados;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -40,10 +41,14 @@ class VerificarAgendaTenant
      * Punto de serialización: una escritura sin cambios sobre la fila del profesional
      * y la del recurso (en MySQL toma su candado exclusivo; en SQLite el de escritura).
      * La segunda solicitud espera y, al seguir, ve lo que guardó la primera. Debe
-     * llamarse dentro de la transacción que guarda la sesión, ANTES de revisar.
+     * llamarse dentro de la transacción que guarda la sesión, ANTES de revisar. La revisión
+     * de un archivo no pone a nadie en fila: nunca se confirma ({@see RevisionSinCandados}).
      */
     public function bloquear(?int $instructorId, ?RecursoTenant $recurso): void
     {
+        if (RevisionSinCandados::activa()) {
+            return;
+        }
         if ($instructorId !== null) {
             DB::connection('tenant')->table('users')->where('id', $instructorId)->update(['id' => DB::raw('id')]);
         }

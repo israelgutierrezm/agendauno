@@ -13,14 +13,15 @@ use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Expira las ofertas de lista de espera vencidas de cada estudio operativo (R7):
- * libera su hold, las marca `expirada` y re-ofrece el cupo al siguiente. Pensado para
- * correr con frecuencia por el scheduler.
+ * libera su hold, las marca `expirada` y re-ofrece el cupo al siguiente. Después ofrece
+ * a cada lista lo que esté libre, como los lugares de un canal que llegaron a su hora de
+ * liberarse (ADR 0230). Pensado para correr con frecuencia por el scheduler.
  */
 class ExpirarOfertas extends Command
 {
     protected $signature = 'agendauno:expirar-ofertas';
 
-    protected $description = 'Expira las ofertas de lista de espera vencidas y re-ofrece el cupo';
+    protected $description = 'Expira las ofertas de lista de espera vencidas y ofrece a cada lista los lugares libres';
 
     public function handle(ReservasTenant $reservas, GestorDeConexionTenant $gestor): int
     {
@@ -35,7 +36,12 @@ class ExpirarOfertas extends Command
                         continue;
                     }
 
-                    $expiradas += $gestor->ejecutarAislado($estudio, fn (): int => $reservas->expirarOfertasVencidas(), 0);
+                    $expiradas += $gestor->ejecutarAislado($estudio, function () use ($reservas): int {
+                        $vencidas = $reservas->expirarOfertasVencidas();
+                        $reservas->promoverListasDeEspera();
+
+                        return $vencidas;
+                    }, 0);
                 }
             });
 

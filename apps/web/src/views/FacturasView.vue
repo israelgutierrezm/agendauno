@@ -60,6 +60,9 @@ interface Factura {
   } | null;
   cancelable?: boolean;
   acreditable_minor?: number;
+  // Con qué RFC se timbró y si ya no es el de hoy (ADR 0228).
+  emisor_rfc?: string | null;
+  de_otro_rfc?: boolean;
 }
 
 // Lo que se factura de una venta (ADR 0179): conceptos sin IVA, a quién y la forma.
@@ -79,13 +82,24 @@ interface Borrador {
     precio_unitario_minor: number;
     clave_prod_serv: string;
     clave_unidad: string;
+    // El IVA de lo vendido al venderse (ADR 0228).
+    iva?: TratamientoIva;
   }[];
   forma_pago: string;
   total_minor: number;
   moneda: string;
   // La sustituta de un anticipo es otro anticipo (ADR 0180).
   anticipo?: boolean;
+  // Lo que no se factura (ADR 0228): el descuento repartido y lo devuelto.
+  descuento_minor?: number;
+  devuelto_minor?: number;
+  // Una venta de antes de guardar su foto fiscal: IVA y claves del catálogo de hoy.
+  fiscal_del_catalogo?: boolean;
 }
+
+// Cómo lleva el IVA un concepto (ADR 0212): el del negocio, exento o tasa cero.
+type TratamientoIva = "general" | "exento" | "cero";
+const TRATAMIENTOS_IVA: TratamientoIva[] = ["general", "exento", "cero"];
 
 interface Concepto {
   descripcion: string;
@@ -93,6 +107,7 @@ interface Concepto {
   precio: string; // en pesos (se convierte a minor al enviar)
   clave_prod_serv: string;
   clave_unidad: string;
+  iva: TratamientoIva;
 }
 
 const { t } = useI18n();
@@ -194,6 +209,7 @@ function conceptoNuevo(): Concepto {
     precio: "",
     clave_prod_serv: "86121600",
     clave_unidad: "E48",
+    iva: "general",
   };
 }
 
@@ -241,11 +257,14 @@ const avisoUso = computed(() =>
 const usoCfdi = ref("G03");
 const formaPago = ref("01");
 const conceptos = ref<Concepto[]>([conceptoNuevo()]);
+// La venta es de antes de guardar su foto fiscal (ADR 0228): se avisa al facturarla.
+const fiscalDelCatalogo = ref(false);
 
 // Anticipos (ADR 0163, CFDI «por remanente»): la factura de un anticipo lleva un solo
 // concepto que fija el SAT; la del resto se relaciona con los anticipos de ese RFC.
 const esAnticipo = ref(false);
 const importeAnticipo = ref("");
+const ivaAnticipo = ref<TratamientoIva>("general");
 const anticiposDisponibles = ref<Factura[]>([]);
 const anticiposElegidos = ref<string[]>([]);
 const RFC_VALIDO = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i;
@@ -277,6 +296,8 @@ const ventaLigada = ref<{
   etiqueta: string;
   total_minor: number;
   moneda: string;
+  descuento_minor: number;
+  devuelto_minor: number;
 } | null>(null);
 const formulario = ref<HTMLElement | null>(null);
 function textoDeConsulta(valor: unknown): string | null {
@@ -291,8 +312,10 @@ function limpiarFormulario(): void {
     regimen_fiscal: "",
   };
   conceptos.value = [conceptoNuevo()];
+  fiscalDelCatalogo.value = false;
   esAnticipo.value = false;
   importeAnticipo.value = "";
+  ivaAnticipo.value = "general";
   anticiposElegidos.value = [];
   usoCfdi.value = "G03";
   formaPago.value = "01";
@@ -349,12 +372,15 @@ async function cargarBorrador(): Promise<void> {
       precio: (c.precio_unitario_minor / 100).toFixed(2),
       clave_prod_serv: c.clave_prod_serv,
       clave_unidad: c.clave_unidad,
+      iva: c.iva ?? "general",
     }));
     conceptos.value = traidos.length > 0 ? traidos : [conceptoNuevo()];
+    fiscalDelCatalogo.value = b.fiscal_del_catalogo === true;
     // La sustituta de un anticipo es otro anticipo, por el mismo importe.
     if (b.anticipo === true) {
       esAnticipo.value = true;
       importeAnticipo.value = conceptos.value[0]?.precio ?? "";
+      ivaAnticipo.value = conceptos.value[0]?.iva ?? "general";
     }
     ventaLigada.value = {
       tipo:
@@ -363,6 +389,8 @@ async function cargarBorrador(): Promise<void> {
       etiqueta: b.etiqueta,
       total_minor: b.total_minor,
       moneda: b.moneda,
+      descuento_minor: b.descuento_minor ?? 0,
+      devuelto_minor: b.devuelto_minor ?? 0,
     };
     await nextTick();
     formulario.value?.scrollIntoView?.({ behavior: "smooth", block: "start" });
@@ -481,19 +509,22 @@ async function cargar(): Promise<void> {
 }
 
 // El total antes de timbrar, como lo calcula el CFDI: los precios van sin IVA y el
-// IVA de cada concepto se redondea al centavo.
+// IVA de cada concepto (el del negocio, o nada si es exento o a tasa cero) se redondea
+// al centavo.
 const ivaNegocio = computed(() => meta.value?.iva_porcentaje ?? 16);
 const totales = computed(() => {
-  const lineas = esAnticipo.value
-    ? [{ cantidad: 1, precio: importeAnticipo.value }]
-    : conceptos.value;
+  const lineas: { cantidad: number; precio: string; iva: TratamientoIva }[] =
+    esAnticipo.value
+      ? [{ cantidad: 1, precio: importeAnticipo.value, iva: ivaAnticipo.value }]
+      : conceptos.value;
   let subtotal = 0;
   let impuesto = 0;
   for (const c of lineas) {
     const importe =
       Number(c.cantidad || 0) * Math.round(Number(c.precio || 0) * 100);
+    const tasa = c.iva === "general" ? ivaNegocio.value : 0;
     subtotal += importe;
-    impuesto += Math.floor((importe * ivaNegocio.value * 100 + 5000) / 10000);
+    impuesto += Math.floor((importe * tasa * 100 + 5000) / 10000);
   }
   return { subtotal, impuesto, total: subtotal + impuesto };
 });
@@ -565,6 +596,7 @@ async function emitir(): Promise<void> {
                 ),
                 clave_prod_serv: "84111506",
                 clave_unidad: "ACT",
+                iva: ivaAnticipo.value,
               },
             ],
           }
@@ -575,6 +607,7 @@ async function emitir(): Promise<void> {
               precio_unitario_minor: Math.round(Number(c.precio) * 100),
               clave_prod_serv: c.clave_prod_serv,
               clave_unidad: c.clave_unidad,
+              iva: c.iva,
             })),
             ...(anticiposElegidos.value.length > 0
               ? { anticipos: anticiposElegidos.value }
@@ -806,6 +839,16 @@ onMounted(async () => {
                   : $t("facturas.anticipo.porAplicar")
               }}</span
             >
+            <!-- La timbró el RFC de antes (ADR 0228): sigue a la mano con su emisor. -->
+            <span
+              v-if="(fila as Factura).de_otro_rfc"
+              class="block text-xs mt-1"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="factura-de-otro-rfc"
+              >{{
+                $t("cfdi.rfcAnterior", { rfc: (fila as Factura).emisor_rfc })
+              }}</span
+            >
           </div>
         </template>
         <template #col-acciones="{ fila }">
@@ -910,6 +953,27 @@ onMounted(async () => {
                   total: dinero(ventaLigada.total_minor, ventaLigada.moneda),
                 })
           }}
+          <!-- Lo que no se factura, a la vista (ADR 0228). -->
+          <span
+            v-if="ventaLigada.descuento_minor > 0"
+            class="block mt-1"
+            data-prueba="venta-descuento"
+            >{{
+              $t("cfdi.venta.descuento", {
+                monto: dinero(ventaLigada.descuento_minor, ventaLigada.moneda),
+              })
+            }}</span
+          >
+          <span
+            v-if="ventaLigada.devuelto_minor > 0"
+            class="block mt-1"
+            data-prueba="venta-devuelto"
+            >{{
+              $t("cfdi.venta.devuelto", {
+                monto: dinero(ventaLigada.devuelto_minor, ventaLigada.moneda),
+              })
+            }}</span
+          >
           <template #acciones>
             <button
               type="button"
@@ -924,6 +988,14 @@ onMounted(async () => {
               }}
             </button>
           </template>
+        </AvisoTono>
+        <AvisoTono
+          v-if="ventaLigada && fiscalDelCatalogo"
+          tono="aviso"
+          class="mt-3"
+          data-prueba="fiscal-del-catalogo"
+        >
+          {{ $t("cfdi.iva.delCatalogo") }}
         </AvisoTono>
 
         <form class="mt-4 space-y-5" @submit.prevent="emitir">
@@ -1092,6 +1164,24 @@ onMounted(async () => {
               data-prueba="importe-anticipo"
             />
             <p class="tu-hint">{{ $t("facturas.anticipo.importeAyuda") }}</p>
+            <!-- Su nota y la aplicación del anticipo llevan el mismo IVA (ADR 0212). -->
+            <label class="tu-label mt-3" for="fa-anticipo-iva">{{
+              $t("cfdi.iva.concepto")
+            }}</label>
+            <select
+              id="fa-anticipo-iva"
+              v-model="ivaAnticipo"
+              class="tu-input"
+              data-prueba="anticipo-iva"
+            >
+              <option
+                v-for="tratamiento in TRATAMIENTOS_IVA"
+                :key="tratamiento"
+                :value="tratamiento"
+              >
+                {{ $t(`cfdi.iva.${tratamiento}`) }}
+              </option>
+            </select>
           </div>
 
           <fieldset
@@ -1137,7 +1227,7 @@ onMounted(async () => {
               class="grid sm:grid-cols-12 gap-2 items-end mb-3"
               data-prueba="concepto"
             >
-              <div class="sm:col-span-5">
+              <div class="sm:col-span-3">
                 <label class="tu-label" :for="`fa-desc-${i}`"
                   >{{ $t("facturas.nueva.descripcion") }}
                   <span class="tu-obligatorio" aria-hidden="true"
@@ -1201,6 +1291,26 @@ onMounted(async () => {
                   maxlength="8"
                   required
                 />
+              </div>
+              <!-- El IVA del concepto (ADR 0228): el de lo vendido, si viene de una venta. -->
+              <div class="sm:col-span-2">
+                <label class="tu-label" :for="`fa-iva-${i}`">{{
+                  $t("cfdi.iva.concepto")
+                }}</label>
+                <select
+                  :id="`fa-iva-${i}`"
+                  v-model="c.iva"
+                  class="tu-input"
+                  data-prueba="concepto-iva"
+                >
+                  <option
+                    v-for="tratamiento in TRATAMIENTOS_IVA"
+                    :key="tratamiento"
+                    :value="tratamiento"
+                  >
+                    {{ $t(`cfdi.iva.${tratamiento}`) }}
+                  </option>
+                </select>
               </div>
               <!-- Un renglón que aún no se timbra: quitarlo no borra nada guardado. -->
               <button

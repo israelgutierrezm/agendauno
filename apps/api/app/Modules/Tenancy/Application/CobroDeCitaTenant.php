@@ -62,6 +62,9 @@ class CobroDeCitaTenant
         }
 
         $resumen = DB::connection('tenant')->transaction(function () use ($reserva, $metodo, $items, $propinaMinor, $recibidoMinor, $referencia, $clave, $actor, $huella, $partes, $cupon): array {
+            // Sus órdenes antes que la cita: el orden único del motor, el mismo que al cancelarla
+            // y al aprobar su pago (ADR 0181/0209, 0230).
+            app(ReservasTenant::class)->bloquearOrdenesDe((int) $reserva->getKey());
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
             // Ya con la cita bajo candado: si el mismo intento llegó dos veces a la vez
             // (doble clic, reintento de red), el segundo encuentra aquí el cobro del

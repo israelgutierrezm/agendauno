@@ -144,6 +144,62 @@ it('si no llega, la confirmación dice que el anticipo no se devuelve', function
     ]);
 });
 
+/** Termina la cita sin que nadie registre nada y corre la marca automática. */
+function terminarCitaSinRegistro(array $ctx): void
+{
+    test()->travelTo(now('America/Mexico_City')->setDateFrom($ctx['dia'])->setTime(11, 0));
+    test()->artisan('agendauno:marcar-inasistencias')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+}
+
+/** Las incidencias de «revisa si vino» abiertas del negocio. */
+function revisionesSiVino(array $e): array
+{
+    return collect(test()->getJson("/api/v1/app/{$e['slug']}/incidencias-cobro", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->where('tipo', 'revisar_si_vino')->where('estado', 'abierta')->values()->all();
+}
+
+it('la inasistencia automática no devuelve dinero: pide revisar y solo una marca a mano devuelve (ADR 0231)', function (): void {
+    $ctx = barberiaConAnticipo(['anticipo_minor' => 10000]);
+    $e = $ctx['e'];
+    $cita = agendarConAnticipo($ctx, ['pagar' => 'todo'])->assertCreated()->json('data');
+    pagarAnticipoEnLinea($e['slug'], $cita['orden_id']);
+
+    terminarCitaSinRegistro($ctx);
+
+    // Pudo atenderse sin que nadie tocara «llegó»: el dinero no se mueve.
+    Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/refunds'));
+    $revisiones = revisionesSiVino($e);
+    expect($revisiones)->toHaveCount(1)->and($revisiones[0]['excedente_minor'])->toBe(15000);
+
+    // Alguien confirma que no llegó: ahora sí se devuelve lo de más, una vez.
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/asistencia", ['estado' => 'ausente'], conBearer($e['bearer']))
+        ->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    $devoluciones = Http::recorded(fn (Request $r): bool => str_ends_with($r->url(), '/refunds'));
+    expect($devoluciones)->toHaveCount(1)
+        ->and((int) $devoluciones->first()[0]['amount'])->toBe(15000)
+        ->and(revisionesSiVino($e))->toBe([]);
+});
+
+it('si se corrige a que sí llegó, no se devuelve nada y la revisión se cierra (ADR 0231)', function (): void {
+    $ctx = barberiaConAnticipo(['anticipo_minor' => 10000]);
+    $e = $ctx['e'];
+    $cita = agendarConAnticipo($ctx, ['pagar' => 'todo'])->assertCreated()->json('data');
+    pagarAnticipoEnLinea($e['slug'], $cita['orden_id']);
+    terminarCitaSinRegistro($ctx);
+    expect(revisionesSiVino($e))->toHaveCount(1);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['reserva']}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))
+        ->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/refunds'));
+    expect(revisionesSiVino($e))->toBe([]);
+});
+
 it('el anticipo puede ser un porcentaje y el cliente puede elegir pagar todo', function (): void {
     $ctx = barberiaConAnticipo(['anticipo_pct' => 30]);
     $e = $ctx['e'];

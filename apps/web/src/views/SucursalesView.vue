@@ -13,6 +13,11 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { etiquetaZona, opcionesZona, ZONA_POR_OMISION } from "@/lib/region";
+import {
+  CambioDeZonaCancelado,
+  guardarSede,
+  type Reanclaje,
+} from "@/lib/zonaDeSede";
 import { useDescartarCambios } from "@/lib/editorFormulario";
 import { useFiltrosEnUrl } from "@/lib/filtrosEnUrl";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -309,6 +314,21 @@ function cerrar(): void {
   void descartar.cerrar();
 }
 
+/** Cuántas fechas conservaron su hora al cambiar la zona (ADR 0230). */
+function avisarReanclaje(hecho: Reanclaje | undefined): void {
+  if (hecho && hecho.sesiones > 0) {
+    toast.exito(
+      t(
+        hecho.en_cola
+          ? "operacion.sedes.zonaEnCola"
+          : "operacion.sedes.zonaCambiada",
+        { n: hecho.sesiones },
+        hecho.sesiones,
+      ),
+    );
+  }
+}
+
 async function guardar(): Promise<void> {
   if (
     !puedeGestionar.value ||
@@ -353,13 +373,23 @@ async function guardar(): Promise<void> {
         cuerpo,
       );
     } else {
-      await api.put(`${base.value}/sucursales/${editandoId.value}`, cuerpo);
+      avisarReanclaje(
+        await guardarSede(
+          `${base.value}/sucursales/${editandoId.value}`,
+          cuerpo,
+          t,
+        ),
+      );
     }
     descartar.fijar();
     abierto.value = false;
     toast.exito(t("operacion.sedes.guardada", { nombre: cuerpo.nombre }));
     await cargar();
   } catch (e) {
+    // No confirmó el cambio de zona: nada cambió y sigue editando.
+    if (e instanceof CambioDeZonaCancelado) {
+      return;
+    }
     const detalle = (
       e as {
         response?: { data?: { meta?: { errors?: Record<string, string[]> } } };

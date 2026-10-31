@@ -8,7 +8,6 @@ use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Facturacion\CancelacionCfdi;
 use App\Modules\Tenancy\Facturacion\EstadoCancelacion;
 use App\Modules\Tenancy\Facturacion\TimbradoFallido;
-use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Support\Carbon;
@@ -27,6 +26,9 @@ use Illuminate\Validation\ValidationException;
  *
  * No se cancela lo que el SAT no dejaría: una factura con notas de crédito vigentes o
  * un anticipo ya aplicado (primero se cancela lo relacionado).
+ *
+ * Se pide con la llave del emisor que la timbró (ADR 0228): una factura de antes de un
+ * cambio de RFC se cancela en su organización de FacturAPI.
  */
 class CancelarFacturaTenant
 {
@@ -34,6 +36,7 @@ class CancelarFacturaTenant
         private readonly CancelacionCfdi $proveedor,
         private readonly RegistrarAuditoria $auditoria,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly EmisoresFiscalesTenant $emisores,
     ) {}
 
     /** Por qué no se puede pedir su cancelación con ese motivo (null = sí se puede). */
@@ -64,7 +67,8 @@ class CancelarFacturaTenant
             $sustituta = $motivo === '01' ? $this->sustitutaDe($factura) : null;
 
             try {
-                $estado = $this->proveedor->cancelar($this->llave(), (string) $factura->facturapi_id, $motivo, $sustituta?->uuid);
+                // Con la llave del emisor que la timbró, aunque hoy se timbre con otro RFC (ADR 0228).
+                $estado = $this->emisores->conLlaveDe($factura, fn (string $llave): EstadoCancelacion => $this->proveedor->cancelar($llave, (string) $factura->facturapi_id, $motivo, $sustituta?->uuid));
             } catch (TimbradoFallido $e) {
                 throw ValidationException::withMessages(['factura' => [$e->getMessage()]]);
             }
@@ -106,8 +110,9 @@ class CancelarFacturaTenant
                     return false;
                 }
                 try {
-                    $estado = $this->proveedor->consultarCancelacion($this->llave(), (string) $factura->facturapi_id);
-                } catch (TimbradoFallido) {
+                    $estado = $this->emisores->conLlaveDe($factura, fn (string $llave): EstadoCancelacion => $this->proveedor->consultarCancelacion($llave, (string) $factura->facturapi_id));
+                } catch (TimbradoFallido|ValidationException) {
+                    // Sin respuesta, o sin la llave de su emisor: se pregunta en la siguiente vuelta.
                     return false;
                 }
                 if ($estado === EstadoCancelacion::Pendiente) {
@@ -159,13 +164,5 @@ class CancelarFacturaTenant
             ->where('estado', EstadoFactura::Timbrada->value)
             ->latest('id')
             ->first();
-    }
-
-    /** La llave de FacturAPI del negocio, la de su organización (ADR 0212). */
-    private function llave(): string
-    {
-        $datos = DatosFiscalesTenant::query()->first();
-
-        return $datos instanceof DatosFiscalesTenant ? EmitirFacturaTenant::llaveDe($datos) : '';
     }
 }

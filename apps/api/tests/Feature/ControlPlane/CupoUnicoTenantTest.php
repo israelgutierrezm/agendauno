@@ -84,12 +84,11 @@ it('la página pública, la agenda del alumno y la del equipo cuentan el cupo co
     // 6 − 3 que ocupan lugar − 1 apartado para Wellhub = 2, en todos lados.
     expect(libresEnCadaCanalCupo($e, $sesion, $vale['bearer']))->toBe(['publico' => 2, 'alumno' => 2, 'equipo' => 2]);
 
-    // El motor deja tomar exactamente esos 2.
-    foreach (['Eli', 'Fer'] as $nombre) {
-        $venta = venderPackAMiembroTenant($e, 8000, $nombre);
-        $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $venta['persona']], conBearer($e['bearer']))
-            ->assertCreated();
-    }
+    // El motor reparte exactamente esos 2: la lista va primero (ADR 0230), así que uno se le
+    // ofrece a quien espera y el otro lo toma la primera reserva nueva.
+    $venta = venderPackAMiembroTenant($e, 8000, 'Eli');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $venta['persona']], conBearer($e['bearer']))
+        ->assertCreated();
     $otra = venderPackAMiembroTenant($e, 8000, 'Gabi');
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $otra['persona']], conBearer($e['bearer']))
         ->assertStatus(409)->assertJsonPath('code', 'CAPACITY_FULL');

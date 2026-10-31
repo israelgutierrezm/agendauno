@@ -362,6 +362,153 @@ describe("facturar una venta (ADR 0179)", () => {
     w.unmount();
   });
 
+  it("cada concepto lleva el IVA con que se vendió, el total lo respeta y avisa si salió del catálogo (ADR 0228)", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    api.post.mockResolvedValue({ data: { data: factura("3", "timbrada") } });
+    ruta.query = { orden: "ORD2" };
+    const mixto = {
+      ...borrador,
+      etiqueta: "Consulta, Crema",
+      conceptos: [
+        {
+          ...borrador.conceptos[0]!,
+          descripcion: "Consulta",
+          precio_unitario_minor: 45000,
+          iva: "exento",
+        },
+        {
+          ...borrador.conceptos[0]!,
+          descripcion: "Crema",
+          precio_unitario_minor: 9000,
+          iva: "general",
+        },
+      ],
+      total_minor: 55440,
+      descuento_minor: 6160,
+      devuelto_minor: 5544,
+      fiscal_del_catalogo: true,
+    };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/facturas/borrador")
+          ? { data: mixto }
+          : {
+              data: [],
+              meta: {
+                total: 0,
+                page: 1,
+                per_page: 20,
+                ultima_pagina: 1,
+                iva_porcentaje: 16,
+              },
+            },
+      }),
+    );
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+
+    expect((w.get("#fa-iva-0").element as HTMLSelectElement).value).toBe(
+      "exento",
+    );
+    expect((w.get("#fa-iva-1").element as HTMLSelectElement).value).toBe(
+      "general",
+    );
+    // Solo la crema suma IVA: 540.00 + 14.40.
+    expect(w.get('[data-prueba="totales-factura"]').text()).toContain("554.40");
+    expect(w.find('[data-prueba="total-distinto"]').exists()).toBe(false);
+    expect(w.find('[data-prueba="fiscal-del-catalogo"]').exists()).toBe(true);
+    // El descuento y lo devuelto, a la vista.
+    expect(w.get('[data-prueba="venta-descuento"]').text()).toContain("61.60");
+    expect(w.get('[data-prueba="venta-devuelto"]').text()).toContain("55.44");
+
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/facturas",
+      expect.objectContaining({
+        orden_id: "ORD2",
+        items: [
+          expect.objectContaining({
+            precio_unitario_minor: 45000,
+            iva: "exento",
+          }),
+          expect.objectContaining({
+            precio_unitario_minor: 9000,
+            iva: "general",
+          }),
+        ],
+      }),
+    );
+    w.unmount();
+  });
+
+  it("la factura que timbró el RFC anterior lo dice y un anticipo exento no suma IVA (ADR 0228)", async () => {
+    vi.mocked(confirmar).mockResolvedValue(true);
+    api.post.mockResolvedValue({ data: { data: factura("3", "timbrada") } });
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/facturas")
+          ? {
+              data: [
+                {
+                  ...factura("1", "timbrada"),
+                  emisor_rfc: "ABC010101AB9",
+                  de_otro_rfc: true,
+                  acreditable_minor: 0,
+                  cancelable: true,
+                },
+              ],
+              meta: {
+                total: 1,
+                page: 1,
+                per_page: 20,
+                ultima_pagina: 1,
+                iva_porcentaje: 16,
+              },
+            }
+          : { data: {} },
+      }),
+    );
+    const w = mount(FacturasView, {
+      global: { plugins: [i18n], stubs: { Teleport: true } },
+    });
+    await flushPromises();
+    expect(w.get('[data-prueba="factura-de-otro-rfc"]').text()).toContain(
+      "ABC010101AB9",
+    );
+    // Se puede cancelar con su emisor; la nota de crédito ya no se ofrece.
+    expect(w.find('[data-prueba="cancelar-factura"]').exists()).toBe(true);
+    expect(w.find('[data-prueba="nota-credito"]').exists()).toBe(false);
+
+    await w.get("#fa-nombre").setValue("Cliente Final");
+    await w.get("#fa-cp").setValue("06700");
+    await w.get("#fa-rfc").setValue("XAXX010101000");
+    await w.findAllComponents(SelectorBuscable)[1]!.setValue("G03");
+    await w.get('[data-prueba="es-anticipo"]').setValue(true);
+    await w.get('[data-prueba="importe-anticipo"]').setValue("200");
+    await w.get('[data-prueba="anticipo-iva"]').setValue("exento");
+    expect(w.get('[data-prueba="totales-factura"]').text()).not.toContain(
+      "232.00",
+    );
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/facturas",
+      expect.objectContaining({
+        anticipo: true,
+        items: [
+          expect.objectContaining({
+            precio_unitario_minor: 20000,
+            iva: "exento",
+          }),
+        ],
+      }),
+    );
+    w.unmount();
+  });
+
   it("una venta ya facturada no se liga: lo dice el API", async () => {
     ruta.query = { venta: "VTA1" };
     api.get.mockImplementation((url: string) =>

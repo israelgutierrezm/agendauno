@@ -153,7 +153,28 @@ class LugaresPlataformaTenantController
             ])->values()->all()]);
     }
 
-    /** Ya se marcó en el panel de la plataforma. */
+    /**
+     * Lo que falta cancelar en el panel de Fitpass (ADR 0230): reservas que el negocio
+     * canceló aquí (se canceló la clase, o recepción canceló la reserva). Se marcan como
+     * hechas igual que las de asistencia.
+     */
+    public function porCancelar(Request $request): JsonResponse
+    {
+        $usuario = $this->usuario($request);
+
+        return response()->json(['data' => $this->reservas->porCancelarEnPlataforma(ProveedorPartner::Fitpass)
+            ->filter(fn (LugarPlataformaTenant $l): bool => $l->sesion instanceof SesionTenant && $this->acceso->puedeOperar($l->sesion, $usuario))
+            ->map(static fn (LugarPlataformaTenant $l): array => [
+                'id' => $l->ulid,
+                'reservacion' => substr((string) $l->referencia_externa, strlen(ReservasPlataformaTenant::referencia(ProveedorPartner::Fitpass, ''))),
+                'nombre' => $l->visitante->nombre ?? null,
+                'clase' => $l->sesion?->oferta?->nombre,
+                'inicia_en' => $l->sesion?->inicia_en->toIso8601String(),
+                'zona_horaria' => $l->sesion?->zona_horaria,
+            ])->values()->all()]);
+    }
+
+    /** Ya se marcó (o se canceló) en el panel de la plataforma. */
     public function marcado(Request $request): JsonResponse
     {
         $lugar = $this->lugar($request);

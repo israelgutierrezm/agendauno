@@ -38,5 +38,7 @@ médicos suelen ser exentos.
 
 - Falta del dueño: la cuenta de FacturAPI, las dos llaves y validar el alta y el
   timbrado con un RFC real (el proveedor va simulado en las pruebas).
-- Si un negocio vende algo exento y algo con IVA en una venta que no se factura por
-  líneas, el concepto único lleva el IVA general.
+- ~~Si un negocio vende algo exento y algo con IVA en una venta que no se factura por
+  líneas, el concepto único lleva el IVA general.~~ Resuelto en el ADR 0228: cada línea
+  guarda su foto fiscal y es su propio concepto. Ahí también: cambiar de RFC conserva al
+  emisor de antes y un sello de otro RFC no deja timbrar.

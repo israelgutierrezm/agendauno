@@ -9,6 +9,13 @@ export default {
   confirmarEnvio: "¿Mandar la factura a {correo}?",
   confirmarEnvioAceptar: "Enviar factura",
   enviada: "La factura va en camino a {correo}.",
+  // La timbró el RFC de antes (ADR 0228): se descarga, se reenvía y se cancela.
+  rfcAnterior: "Timbrada con tu RFC anterior ({rfc})",
+  // Lo que no se factura de una venta (ADR 0228).
+  venta: {
+    descuento: "Ya lleva {monto} de descuento, repartidos entre los conceptos.",
+    devuelto: "No incluye {monto} ya devueltos.",
+  },
   alta: {
     lista: "Tu negocio ya factura con su propio sello.",
     pendiente: "Falta un paso para facturar:",
@@ -18,6 +25,12 @@ export default {
     revisar: "Revisar de nuevo",
     revisado: "Listo: revisamos tu alta.",
     error: "FacturAPI respondió: {motivo}",
+    // El sello que tiene FacturAPI es de otro RFC (ADR 0228): no se factura.
+    selloDeOtroRfc:
+      "El último sello digital que subiste es del RFC {rfcSello} y tus datos fiscales dicen {rfc}. Sube el sello de tu RFC o corrige tu RFC: mientras, no se factura.",
+    // Al capturar otro RFC (ADR 0228).
+    cambioDeRfc:
+      "Otro RFC es otro emisor: al guardar tendrás que subir su sello digital. Lo que ya timbraste se sigue descargando, reenviando y cancelando; sus notas de crédito y sustitutas ya no se hacen desde aquí.",
   },
   iva: {
     etiqueta: "IVA al facturar",
@@ -29,6 +42,11 @@ export default {
     claveSat: "Clave del SAT (opcional)",
     claveSatAyuda:
       "Ocho dígitos del catálogo de productos y servicios del SAT. Vacío, la de siempre.",
+    // En cada concepto de una factura (ADR 0228).
+    concepto: "IVA",
+    // Una venta de antes de guardar su foto fiscal (ADR 0228).
+    delCatalogo:
+      "Esta venta es de antes de que se guardara cómo se factura cada cosa: el IVA y las claves salen del catálogo de hoy. Revísalos antes de timbrar.",
   },
   // La llave de usuario de FacturAPI en el superadmin (ADR 0212).
   usuario: {
@@ -49,5 +67,7 @@ export default {
     titulo: "Mis facturas",
     vacio: "Aún no tienes facturas.",
     cancelada: "Cancelada",
+    periodo: "Periodo de las facturas",
+    error: "No pudimos cargar tus facturas.",
   },
 };

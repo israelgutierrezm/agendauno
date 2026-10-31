@@ -19,16 +19,21 @@ interface OrganizacionesCfdi
      */
     public function actualizarDatosLegales(string $llaveUsuario, string $organizacion, array $datos): void;
 
-    /** Sube el certificado y la llave del sello (CSD) con su contraseña. */
-    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): void;
+    /**
+     * Sube el certificado y la llave del sello (CSD) con su contraseña. Devuelve el RFC
+     * que trae el certificado, si el proveedor lo dice (ADR 0228): si no es el capturado,
+     * no se timbra.
+     */
+    public function subirSello(string $llaveUsuario, string $organizacion, string $certificado, string $llave, string $contrasena): ?string;
 
     /** Crea una llave en vivo de la organización (la anterior sigue sirviendo). */
     public function crearLlaveEnVivo(string $llaveUsuario, string $organizacion): string;
 
     /**
-     * Si ya puede timbrar y lo que le falta (p. ej. firmar la carta manifiesto).
+     * Si ya puede timbrar, lo que le falta (p. ej. firmar la carta manifiesto) y el RFC de
+     * su sello, si el proveedor lo dice (ADR 0228).
      *
-     * @return array{lista: bool, pendientes: list<string>}
+     * @return array{lista: bool, pendientes: list<string>, rfc: string|null}
      */
     public function estadoOrganizacion(string $llaveUsuario, string $organizacion): array;
 

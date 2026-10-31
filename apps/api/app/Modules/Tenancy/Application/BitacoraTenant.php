@@ -31,7 +31,7 @@ class BitacoraTenant
         'membresias' => ['membresia.', 'credito.', 'pago_automatico.'],
         'catalogo' => ['oferta.', 'producto.', 'promocion.', 'lealtad.', 'plantilla', 'recurso.', 'automatizacion.', 'capacidad.', 'excepcion_horario.', 'webhook.', 'asignacion.'],
         'privacidad' => ['privacidad.'],
-        'configuracion' => ['pasarela.', 'estudio.'],
+        'configuracion' => ['pasarela.', 'estudio.', 'sucursal.'],
     ];
 
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
@@ -175,6 +175,7 @@ class BitacoraTenant
             'privacidad.baja_atendida' => 'Canceló los datos personales (ARCO) de una persona',
             'privacidad.baja_rechazada' => 'Rechazó una solicitud de cancelación de datos',
             'reserva.reprogramada' => 'Reprogramó una cita o reserva'.(isset($antes['fecha'], $despues['fecha']) ? " del {$antes['fecha']} {$antes['hora']} al {$despues['fecha']} {$despues['hora']}" : ''),
+            'sucursal.zona_cambiada' => 'Cambió la zona horaria de una sucursal'.(isset($antes['zona_horaria'], $despues['zona_horaria']) ? " de {$antes['zona_horaria']} a {$despues['zona_horaria']}" : ''),
             'sesion.reprogramada' => 'Cambió el horario de '.((string) ($despues['actividad'] ?? 'una clase')).(isset($despues['fecha']) ? " al {$despues['fecha']} {$despues['hora']}" : ''),
             'plantilla_horario.cambiada' => 'Cambió una clase recurrente desde el '.((string) ($despues['desde'] ?? '')).(isset($despues['movidas']) ? " ({$despues['movidas']} fechas)" : ''),
             'bloqueo_agenda.creado' => 'Bloqueó la agenda'.(isset($despues['motivo']) ? ': '.$despues['motivo'] : ''),

@@ -18,6 +18,8 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
+const confirmar = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
@@ -229,6 +231,61 @@ describe("sedes: foto y enlace de Google Maps", () => {
     expect(w.get("#s-nombre").attributes("aria-invalid")).toBe("true");
     expect(w.get('[data-prueba="error-sucursal"]').text()).toContain(
       "comun.revisaCampos",
+    );
+  });
+});
+
+describe("sedes: cambiar la zona con fechas por venir (ADR 0230)", () => {
+  const SIN_CONFIRMAR = {
+    response: {
+      status: 409,
+      data: {
+        code: "TIMEZONE_CHANGE_UNCONFIRMED",
+        message: "Confírmalo para continuar.",
+        meta: { sesiones: 3, reservas: 2 },
+      },
+    },
+  };
+
+  async function guardarSede() {
+    const w = await montar();
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "sedes.editar")!
+      .trigger("click");
+    await w.get("#s-form").trigger("submit");
+    await flushPromises();
+    return w;
+  }
+
+  it("pregunta con cuántas son y solo con el sí manda la confirmación", async () => {
+    api.put.mockRejectedValueOnce(SIN_CONFIRMAR).mockResolvedValueOnce({
+      data: {
+        data: roma,
+        meta: { reanclaje: { sesiones: 3, reservas: 2, en_cola: false } },
+      },
+    });
+    const w = await guardarSede();
+
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(api.put).toHaveBeenCalledTimes(2);
+    expect(api.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/sucursales/roma",
+      expect.objectContaining({ confirmar_zona: true }),
+    );
+    expect(w.find('[data-prueba="error-sucursal"]').exists()).toBe(false);
+  });
+
+  it("sin el sí no cambia nada, no recarga y sigue editando", async () => {
+    confirmar.mockResolvedValueOnce(false);
+    api.put.mockRejectedValueOnce(SIN_CONFIRMAR);
+    const w = await guardarSede();
+
+    expect(api.put).toHaveBeenCalledTimes(1);
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(w.find('[data-prueba="error-sucursal"]').exists()).toBe(false);
+    expect((w.get("#s-nombre").element as HTMLInputElement).value).toBe(
+      "Roma Norte",
     );
   });
 });

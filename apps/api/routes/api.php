@@ -1325,6 +1325,8 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/integraciones/fitpass/clases', [FitpassTenantController::class, 'guardarClases'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.fitpass.clases.guardar');
             Route::get('/integraciones/fitpass/horarios', [FitpassTenantController::class, 'horarios'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('integraciones.fitpass.horarios');
             Route::get('/integraciones/fitpass/por-marcar', [LugaresPlataformaTenantController::class, 'porMarcar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('integraciones.fitpass.por-marcar');
+            // Lo que el negocio canceló aquí y falta cancelar en su panel (ADR 0230).
+            Route::get('/integraciones/fitpass/por-cancelar', [LugaresPlataformaTenantController::class, 'porCancelar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('integraciones.fitpass.por-cancelar');
 
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.

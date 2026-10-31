@@ -176,8 +176,8 @@ it('un cliente no aparta más citas por pagar de las que permite el negocio', fu
         ->assertJsonPath('message', 'Ya tienes 2 citas por pagar. Paga o cancela alguna para agendar otra.');
     // Tampoco con «cualquier profesional» (no se reintenta con otro).
     $a('12:00', ['instructor_id' => null])->assertUnprocessable();
-    // Ni en la página pública con su correo.
-    agendarEnLinea($ctx, ['inicia_en_local' => "{$dia} 12:00:00"])->assertUnprocessable();
+    // En la página pública, con su correo, se cuenta aparte: solo las agendadas sin cuenta (ADR 0230).
+    agendarEnLinea($ctx, ['inicia_en_local' => "{$dia} 12:00:00"])->assertCreated();
 
     // El negocio sí le agenda aunque esté en el límite (y esa también está por pagar).
     $persona = collect($this->getJson("/api/v1/app/{$slug}/miembros", conBearer($ctx['e']['bearer']))->json('data'))

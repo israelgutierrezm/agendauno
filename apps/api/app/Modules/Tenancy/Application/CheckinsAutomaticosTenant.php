@@ -173,7 +173,7 @@ class CheckinsAutomaticosTenant
             if ($previo instanceof CheckinTenant) {
                 $this->completarPrevia($previo, $visitante, $sesion);
             } else {
-                $this->registrarVisita($proveedor, CheckinTenant::VALIDADO, $resultado->referencia, $visitante, $cuando, null, $sesion);
+                $this->registrarVisita($evento, $proveedor, CheckinTenant::VALIDADO, $resultado->referencia, $visitante, $cuando, null, $sesion);
             }
             $evento->terminar(EventoPlataformaTenant::PROCESADO, 'Visita validada.');
 
@@ -195,7 +195,7 @@ class CheckinsAutomaticosTenant
 
             return;
         }
-        $this->registrarVisita($proveedor, CheckinTenant::NO_VERIFICABLE, null, $quien(), $cuando, $resultado->motivo, $sesion);
+        $this->registrarVisita($evento, $proveedor, CheckinTenant::NO_VERIFICABLE, null, $quien(), $cuando, $resultado->motivo, $sesion);
         $this->alertas->registrar(
             'bienestar_no_verificable',
             ($this->gestor->actual()->slug ?? '').':'.$proveedor->value,
@@ -205,6 +205,7 @@ class CheckinsAutomaticosTenant
     }
 
     private function registrarVisita(
+        EventoPlataformaTenant $evento,
         ProveedorPartner $proveedor,
         string $estado,
         ?string $referencia,
@@ -213,7 +214,9 @@ class CheckinsAutomaticosTenant
         ?string $motivo,
         ?SesionTenant $sesion,
     ): void {
-        $sesion ??= $this->visitantes->sesionDeVisita($visitante, $cuando);
+        // Solo en la sede de la conexión por la que llegó el aviso (ADR 0202, 0230).
+        $sede = $evento->integracion?->sucursal_id;
+        $sesion ??= $this->visitantes->sesionDeVisita($visitante, $cuando, $sede !== null ? (int) $sede : null);
         try {
             $checkin = CheckinTenant::query()->create([
                 'sesion_id' => $sesion?->getKey(),

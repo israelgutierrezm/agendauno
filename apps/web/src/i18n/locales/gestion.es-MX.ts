@@ -268,6 +268,9 @@ export const reglasAgenda = {
   motivo: "Motivo (opcional)",
   motivoPh: "Día festivo",
   agregarDia: "Agregar día",
+  // Un cierre es de una sucursal o de todo el negocio (ADR 0230).
+  aplicaA: "Aplica a",
+  todoElNegocio: "Todo el negocio",
   // Lo ya programado el día que se cierra (ADR 0223).
   afectadasDia:
     "Ese día ya hay 1 clase programada ({reservas} personas con lugar o en espera). | Ese día ya hay {n} clases programadas ({reservas} personas con lugar o en espera).",
@@ -549,6 +552,9 @@ export const porConciliar = {
   primeraVezRepetida: "Clase de prueba ya usada: {monto}",
   // El banco del cliente disputa el pago (ADR 0168).
   contracargo: "Contracargo de {monto}",
+  // Nadie registró si llegó y pagó de más: no se devuelve solo (ADR 0231).
+  revisarSiVino:
+    "Revisa si llegó a su cita: pagó {monto} de más. Si no llegó, márcalo en la agenda.",
   // Pago automático (ADR 0134).
   cancelacionSinConfirmar: "Pago automático sin cancelar en {pasarela}",
   cobroTrasCancelar: "Cobro después de cancelar: {monto}",
