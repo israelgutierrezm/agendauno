@@ -12,10 +12,13 @@ use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoVersionTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
-use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -39,11 +42,12 @@ use Illuminate\Support\Facades\DB;
  *   sale en una fila por tarifa.
  *
  * En un negocio de citas (ADR 0219):
- * - Por porcentaje, se gana el porcentaje de lo cobrado por cada cita: sus órdenes
- *   pagadas, el precio del servicio pagado por adelantado o, con bono, el precio del
- *   servicio. La proyección, con el precio del servicio.
- * - Las propinas cobradas con sus citas van en su propia fila (`tipo` = `propinas`),
- *   tenga o no esquema de pago.
+ * - Por porcentaje, se gana el porcentaje de lo conservado por cada cita atendida: lo
+ *   pagado menos lo devuelto, lo neto de una vez del servicio pagado por adelantado o,
+ *   con bono, el valor del servicio al reservar (ADR 0231). La proyección, con el precio
+ *   del servicio.
+ * - Las propinas cobradas con sus citas van en su propia fila (`tipo` = `propinas`), de
+ *   quien la atendió, tenga o no esquema de pago.
  */
 class CalcularNominaTenant
 {
@@ -118,32 +122,47 @@ class CalcularNominaTenant
      */
     private function propinas(CarbonImmutable $inicio, CarbonImmutable $fin): array
     {
-        $filas = DB::connection('tenant')->table('ventas_pos')
+        $ventas = DB::connection('tenant')->table('ventas_pos')
             ->join('reservas', 'ventas_pos.reserva_id', '=', 'reservas.id')
-            ->join('sesiones', 'reservas.sesion_id', '=', 'sesiones.id')
-            ->join('users', 'sesiones.instructor_id', '=', 'users.id')
             ->whereNull('ventas_pos.anulada_en')
             ->where('ventas_pos.propina_minor', '>', 0)
             ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
-            ->groupBy('users.id', 'users.ulid', 'users.name', 'ventas_pos.moneda')
-            ->orderBy('users.name')
-            ->selectRaw('users.ulid as ulid, users.name as nombre, ventas_pos.moneda as moneda, count(*) as veces, sum(ventas_pos.propina_minor) as total')
-            ->get();
+            ->get(['reservas.sesion_id as sesion_id', 'ventas_pos.moneda as moneda', 'ventas_pos.propina_minor as propina']);
+        $sesionIds = $ventas->pluck('sesion_id')->unique()->values()->all();
+        $sesiones = SesionTenant::query()->whereKey($sesionIds)->get()->keyBy('id');
+        $asignaciones = AsignacionSesionTenant::query()->whereIn('sesion_id', $sesionIds)->get()->groupBy('sesion_id');
 
-        return $filas->map(static fn (object $f): array => [
-            'usuario_id' => (string) $f->ulid,
-            'usuario' => (string) $f->nombre,
-            'tipo' => 'propinas',
-            'monto_minor' => 0,
-            'porcentaje_bp' => null,
-            'moneda' => (string) $f->moneda,
-            'vigente_desde' => null,
-            'unidades' => (float) $f->veces,
-            'monto_total_minor' => (int) $f->total,
-            'unidades_por_venir' => 0.0,
-            'por_venir_minor' => 0,
-            'al_cierre_minor' => (int) $f->total,
-        ])->values()->all();
+        // De quien la atendió: el sustituto, si lo hubo (ADR 0231).
+        $totales = [];
+        foreach ($ventas as $venta) {
+            $sesion = $sesiones->get($venta->sesion_id);
+            $usuarioId = $sesion instanceof SesionTenant ? PersonalDeSesionTenant::imparte($sesion, $asignaciones->get($sesion->id) ?? collect()) : null;
+            if ($usuarioId === null) {
+                continue;
+            }
+            $clave = $usuarioId.'|'.$venta->moneda;
+            $totales[$clave] ??= ['usuario' => $usuarioId, 'moneda' => (string) $venta->moneda, 'veces' => 0, 'total' => 0];
+            $totales[$clave]['veces']++;
+            $totales[$clave]['total'] += (int) $venta->propina;
+        }
+        $usuarios = Usuario::query()->withTrashed()->whereKey(array_column($totales, 'usuario'))->get()->keyBy('id');
+
+        return collect($totales)
+            ->sortBy(static fn (array $t): string => (string) $usuarios->get($t['usuario'])?->name)
+            ->map(static fn (array $t): array => [
+                'usuario_id' => (string) $usuarios->get($t['usuario'])?->ulid,
+                'usuario' => (string) $usuarios->get($t['usuario'])?->name,
+                'tipo' => 'propinas',
+                'monto_minor' => 0,
+                'porcentaje_bp' => null,
+                'moneda' => $t['moneda'],
+                'vigente_desde' => null,
+                'unidades' => (float) $t['veces'],
+                'monto_total_minor' => $t['total'],
+                'unidades_por_venir' => 0.0,
+                'por_venir_minor' => 0,
+                'al_cierre_minor' => $t['total'],
+            ])->values()->all();
     }
 
     /**
@@ -201,10 +220,12 @@ class CalcularNominaTenant
     }
 
     /**
-     * Lo cobrado por esas citas (ADR 0219), sobre lo que se calcula la comisión: sus
-     * órdenes pagadas (la del servicio y la del saldo de un anticipo), el precio del
-     * servicio pagado por adelantado o, si se tomó con su bono, el precio del servicio.
-     * Con `$proyectar`, el precio del servicio de las reservas confirmadas.
+     * Lo conservado por esas citas (ADR 0219, 0231), sobre lo que se calcula la comisión:
+     * solo de quien llegó (de una inasistencia, lo conservado es del negocio). Lo pagado
+     * menos lo devuelto de sus órdenes (la del servicio y la del saldo de un anticipo); lo
+     * neto de una vez del servicio pagado por adelantado o, si se tomó con su bono, el
+     * valor del servicio al reservar. Con `$proyectar`, el precio del servicio de las
+     * reservas confirmadas.
      *
      * @param  list<int>  $sesionIds
      */
@@ -216,29 +237,60 @@ class CalcularNominaTenant
         $reservas = ReservaTenant::query()
             ->whereIn('sesion_id', $sesionIds)
             ->where('estado', EstadoReserva::Confirmada->value)
-            ->with(['sesion.oferta', 'orden', 'saldoOrden', 'lineaOrden'])
+            ->with(['sesion.oferta', 'asistencia', 'lineaOrden.orden.lineas'])
             ->get();
 
-        return (int) $reservas->sum(static function (ReservaTenant $r) use ($proyectar): int {
+        return (int) $reservas->sum(function (ReservaTenant $r) use ($proyectar): int {
             $precio = (int) ($r->sesion?->oferta->precio_clase_minor ?? 0);
             if ($proyectar) {
                 return $precio;
             }
+            if ($r->asistencia?->estado !== EstadoAsistencia::Presente) {
+                return 0;
+            }
             $pagado = 0;
-            foreach ([$r->orden, $r->saldoOrden] as $orden) {
-                if ($orden instanceof OrdenTenant && $orden->estado === EstadoOrden::Pagada) {
-                    $pagado += (int) $orden->total_minor;
-                }
+            foreach (array_filter([$r->orden_id, $r->saldo_orden_id]) as $ordenId) {
+                $pagado += $this->netoDeOrden((int) $ordenId);
             }
             if ($pagado > 0) {
                 return $pagado;
             }
             if ($r->lineaOrden instanceof LineaOrdenTenant) {
-                return (int) $r->lineaOrden->precio_unitario_minor;
+                return $this->netoDeUnaVez($r->lineaOrden);
             }
 
-            return $r->derecho_id !== null ? $precio : 0;
+            return $r->derecho_id !== null ? (int) ($r->valor_servicio_minor ?? $precio) : 0;
         });
+    }
+
+    /** Lo aprobado de una orden menos lo ya devuelto. */
+    private function netoDeOrden(int $ordenId): int
+    {
+        return (int) PagoTenant::query()
+            ->where('orden_id', $ordenId)
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
+            ->withSum(['reembolsos as devuelto_minor' => static fn ($q) => $q->where('estado', EstadoReembolso::Aprobado->value)], 'monto_minor')
+            ->get()
+            ->sum(static fn (PagoTenant $p): int => max(0, (int) $p->monto_minor - (int) $p->getAttribute('devuelto_minor')));
+    }
+
+    /**
+     * Una vez de un servicio prepagado: lo neto de su orden, en la parte de ese concepto
+     * (con los descuentos y devoluciones de la orden) y entre las veces compradas.
+     */
+    private function netoDeUnaVez(LineaOrdenTenant $linea): int
+    {
+        $orden = $linea->orden;
+        if (! $orden instanceof OrdenTenant) {
+            return 0;
+        }
+        $subtotal = (int) $orden->lineas->sum('subtotal_minor');
+        if ($subtotal <= 0) {
+            return 0;
+        }
+        $delConcepto = intdiv($this->netoDeOrden((int) $orden->getKey()) * (int) $linea->subtotal_minor, $subtotal);
+
+        return intdiv($delConcepto, max(1, (int) $linea->cantidad));
     }
 
     /**

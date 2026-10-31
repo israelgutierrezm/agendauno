@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Operacion\VolcadoBaseDatos;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 
@@ -53,6 +56,49 @@ it('un respaldo alterado no se restaura (su suma no coincide)', function (): voi
     $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])
         ->expectsOutputToContain('dañado')
         ->assertFailed();
+});
+
+it('al restaurar un respaldo viejo anota su esquema real y avisa lo que falta', function (): void {
+    estudioConSesion('estudio-a', 'a@correo.mx');
+    $estudio = Estudio::query()->where('slug', 'estudio-a')->firstOrFail();
+    $gestor = app(GestorDeConexionTenant::class);
+    $ultima = (string) $estudio->version_migraciones;
+    $gestor->ejecutarEn($estudio, fn () => DB::connection('tenant')->table('migrations')->where('migration', $ultima)->delete());
+    $this->artisan('agendauno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+    $gestor->ejecutarEn($estudio, fn () => DB::connection('tenant')->table('migrations')->insert(['migration' => $ultima, 'batch' => 99]));
+
+    $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])
+        ->expectsOutputToContain('agendauno:migrar-estudios --estudio=estudio-a --force')
+        ->assertSuccessful();
+
+    expect($estudio->fresh()->version_migraciones)->not->toBe($ultima);
+});
+
+it('con la retención en el bucket no borra respaldos y guarda una copia al mes, que se puede restaurar', function (): void {
+    config()->set('agendauno.respaldos.retencion_en_bucket', true);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $viejo = 'respaldos/estudio-a/estudio-a-20200101-000000.sqlite.gz';
+    Storage::disk('local')->put($viejo, 'viejo');
+    touch(Storage::disk('local')->path($viejo), now()->subDays(40)->getTimestamp());
+
+    $this->artisan('agendauno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+    $this->travel(2)->seconds();
+    $this->artisan('agendauno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+
+    expect(Storage::disk('local')->exists($viejo))->toBeTrue();
+    $mes = 'respaldos-mensuales/'.now()->format('Ym').'/estudio-a';
+    $copias = Storage::disk('local')->files($mes);
+    expect($copias)->toHaveCount(2);
+
+    // Tampoco la baja borra lo que el bucket retiene.
+    app(VolcadoBaseDatos::class)->borrarCarpeta('respaldos/estudio-a');
+    expect(Storage::disk('local')->exists($viejo))->toBeTrue();
+
+    $copia = collect($copias)->first(fn (string $a): bool => ! str_ends_with($a, '.sha256'));
+    $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a', '--respaldo' => $copia, '--force' => true])->assertSuccessful();
+    expect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($e['bearer']))->assertOk());
+    // La de otro negocio no se acepta.
+    $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a', '--respaldo' => 'respaldos-mensuales/202610/estudio-b/x.sqlite.gz', '--force' => true])->assertFailed();
 });
 
 it('restaura un negocio desde su respaldo (con --force)', function (): void {

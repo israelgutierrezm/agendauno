@@ -116,6 +116,8 @@ class BajaDePersonaTenant
             ->each(fn (ReservaTenant $r) => $this->reservas->cancelar($r, QuienCancela::Negocio, $actor));
 
         $archivos = [];
+        // Las suyas (aunque las pague un responsable): sin esto, su tarjeta seguiría cobrando.
+        $suyos = AcuerdoTenant::query()->where('persona_id', $persona->getKey())->where('estado', '!=', EstadoAcuerdo::Cancelado->value)->get();
         DB::connection('tenant')->transaction(function () use ($persona, $solicitud, $actor, &$archivos): void {
             AcuerdoTenant::query()
                 ->where('persona_id', $persona->getKey())
@@ -194,6 +196,7 @@ class BajaDePersonaTenant
         });
 
         // Sin membresías vigentes no hay nada que cobrar: se desligan sus tarjetas.
+        $suyos->each(fn (AcuerdoTenant $acuerdo) => $this->domiciliaciones->desactivar($acuerdo));
         $this->domiciliaciones->desactivarDePersona($persona);
 
         // Los archivos se borran ya fuera de la transacción (no se pueden deshacer).

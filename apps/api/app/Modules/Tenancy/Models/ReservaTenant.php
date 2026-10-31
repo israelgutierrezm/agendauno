@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * Reserva tenant-local de una persona en una sesion, respaldada por un derecho y
  * (si es limitado) una retencion de credito.
+ *
+ * @property bool $cambio_tardio
+ * @property int|null $valor_servicio_minor
  */
 class ReservaTenant extends Model
 {
@@ -35,6 +38,9 @@ class ReservaTenant extends Model
         'linea_orden_id',
         // La cita se agendó desde la página pública, sin cuenta (ADR 0230).
         'sin_cuenta',
+        // El precio del servicio al reservar con bono (comisión) y si se movió dentro del
+        // límite de cancelación (ADR 0231).
+        'valor_servicio_minor', 'cambio_tardio',
     ];
 
     /**
@@ -46,6 +52,8 @@ class ReservaTenant extends Model
         'unidades' => 'integer',
         'sin_avisos' => 'boolean',
         'sin_cuenta' => 'boolean',
+        'cambio_tardio' => 'boolean',
+        'valor_servicio_minor' => 'integer',
         'costo_unidades' => 'integer',
         'anticipo_minor' => 'integer',
         'horas_limite' => 'integer',

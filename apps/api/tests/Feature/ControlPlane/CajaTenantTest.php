@@ -89,6 +89,22 @@ function abrirCaja(array $c, string $bearer, int $fondo): string
         ->assertCreated()->json('data.id');
 }
 
+it('corregir un cobro de un turno cerrado pide supervisar la caja y queda por revisar en el corte', function (): void {
+    $c = mostradorConCaja();
+    $turno = abrirCaja($c, $c['recepcion'], 0);
+    $pago = packCobradoEnCaja($c, 'efectivo');
+    $this->postJson("{$c['base']}/caja/turnos/{$turno}/conteo", ['efectivo_minor' => 89900], conBearer($c['recepcion']))->assertOk();
+    abrirCaja($c, $c['recepcion'], 0);
+
+    $url = "{$c['base']}/pagos/{$pago}/metodo";
+    $corregir = ['metodo' => 'tarjeta', 'motivo' => 'Se capturó mal'];
+    $this->putJson($url, $corregir, conBearer($c['recepcion']))->assertStatus(422);
+    $this->putJson($url, $corregir, conBearer($c['e']['bearer']))->assertOk();
+
+    $libro = cajaActual($c, $c['e']['bearer'])['turno']['movimientos'];
+    expect(collect($libro)->where('tipo', 'correccion')->pluck('requiere_revision')->unique()->all())->toBe([true]);
+});
+
 it('una sede que no usa caja cobra como siempre; ya con caja, sin una abierta no se mueve dinero', function (): void {
     $c = mostradorConCaja();
     ventaDePomadas($c, $c['recepcion'], 1);

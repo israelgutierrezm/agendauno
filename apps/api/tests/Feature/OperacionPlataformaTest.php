@@ -118,6 +118,7 @@ it('con los respaldos en orden su estado es ok', function (): void {
         'fecha' => now()->toIso8601String(), 'ok' => true, 'pruebas' => [],
     ]));
 
+    config()->set('agendauno.respaldos.retencion_en_bucket', true);
     $r = $this->getJson('/api/v1/plataforma/operacion', cabecerasPlataforma())->assertOk();
 
     $puntos = collect($r->json('data.verificacion'))->where('seccion', 'Respaldos');

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SuspensionEstudio;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use App\Modules\Tenancy\ModoCobroSaas;
 use Carbon\CarbonImmutable;
@@ -49,7 +50,7 @@ class GenerarCargoRenta
      * Los meses cerrados que faltan por emitir: desde el siguiente al último cargo del
      * negocio (o desde su alta) hasta el mes anterior, a lo más los últimos
      * {@see self::MESES_ATRAS}. Un negocio que estuvo suspendido no emitió los suyos: al
-     * volver se emiten (sí usó el servicio esos meses).
+     * volver se emiten, solo por los días que operó (ADR 0231).
      *
      * @return list<string>
      */
@@ -234,9 +235,10 @@ class GenerarCargoRenta
         $fin = $inicio->endOfMonth()->startOfDay();
         $dias = $inicio->daysInMonth;
         $cubierto = $this->condiciones->cubiertoHasta($estudio);
+        $suspendido = $this->diasSuspendido($estudio, $inicio, $fin);
 
         if ($estudio->trial_termina_en === null && $cubierto === null) {
-            return [$dias, $dias];
+            return [max(0, $dias - count($suspendido)), $dias];
         }
 
         // Se cobra desde el día siguiente al fin de la prueba, y también el hueco entre
@@ -249,12 +251,41 @@ class GenerarCargoRenta
         for ($dia = $inicio; $dia->lessThanOrEqualTo($fin); $dia = $dia->addDay()) {
             $fecha = $dia->toDateString();
             $trasLaPrueba = $tras === null || $fecha > $tras || ($huecoDesde !== null && $huecoHasta !== null && $fecha > $huecoDesde && $fecha < $huecoHasta);
-            if ($trasLaPrueba && ($cubierto === null || $fecha > $cubierto)) {
+            if ($trasLaPrueba && ($cubierto === null || $fecha > $cubierto) && ! isset($suspendido[$fecha])) {
                 $cobrables++;
             }
         }
 
         return [$cobrables, $dias];
+    }
+
+    /**
+     * Los días del mes que pasó suspendido completos, en su zona (ADR 0231): el día en que
+     * se suspendió y el día en que volvió operó en parte y se cobran.
+     *
+     * @return array<string, true>
+     */
+    private function diasSuspendido(Estudio $estudio, CarbonImmutable $inicio, CarbonImmutable $fin): array
+    {
+        $zona = self::zona($estudio);
+        $dias = [];
+        $suspensiones = SuspensionEstudio::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('desde', '<=', $fin->endOfDay()->shiftTimezone($zona)->utc())
+            ->where(fn ($q) => $q->whereNull('hasta')->orWhere('hasta', '>=', $inicio->shiftTimezone($zona)->utc()))
+            ->get();
+        foreach ($suspensiones as $suspension) {
+            $desde = CarbonImmutable::parse($suspension->desde)->setTimezone($zona)->toDateString();
+            $hasta = $suspension->hasta !== null ? CarbonImmutable::parse($suspension->hasta)->setTimezone($zona)->toDateString() : null;
+            for ($dia = $inicio; $dia->lessThanOrEqualTo($fin); $dia = $dia->addDay()) {
+                $fecha = $dia->toDateString();
+                if ($fecha > $desde && ($hasta === null || $fecha < $hasta)) {
+                    $dias[$fecha] = true;
+                }
+            }
+        }
+
+        return $dias;
     }
 
     private static function zona(Estudio $estudio): string

@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $iva el IVA de lo vendido al venderse (ADR 0228)
  * @property string|null $clave_prod_serv su clave de producto o servicio del SAT al venderse
  * @property string|null $clave_unidad su clave de unidad del SAT al venderse
+ * @property int $veces_devueltas
  */
 class LineaOrdenTenant extends Model
 {
@@ -43,7 +44,7 @@ class LineaOrdenTenant extends Model
         // De un presupuesto (ADR 0127): un concepto escrito y, si es un artículo, cuál.
         'descripcion', 'articulo_id',
         // Y si es un servicio, cuál: la cita que se agende lo usa (ADR 0218).
-        'oferta_id',
+        'oferta_id', 'veces_devueltas',
     ];
 
     /**
@@ -51,6 +52,7 @@ class LineaOrdenTenant extends Model
      */
     protected $casts = [
         'cantidad' => 'integer',
+        'veces_devueltas' => 'integer',
         'precio_unitario_minor' => 'integer',
         'subtotal_minor' => 'integer',
         'concepto' => ConceptoCuota::class,

@@ -162,7 +162,12 @@ describe("inventario", () => {
 
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/articulos/a3/movimientos",
-      { sucursal_id: "s1", tipo: "entrada", cantidad: 6 },
+      {
+        sucursal_id: "s1",
+        tipo: "entrada",
+        cantidad: 6,
+        clave_intento: expect.any(String),
+      },
     );
   });
 
@@ -313,6 +318,7 @@ describe("inventario", () => {
         tipo: "ajuste",
         cantidad: -2,
         motivo: "Merma o daño: se rompieron 2",
+        clave_intento: expect.any(String),
       },
     );
   });

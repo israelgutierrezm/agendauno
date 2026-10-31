@@ -6,12 +6,14 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pasarelas\EstadoResultado;
 use App\Modules\Tenancy\Pasarelas\PasarelaConsultable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Pasarelas\Stripe\TarjetasStripe;
+use App\Support\ReporteDeErrores;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -71,7 +73,13 @@ class ConciliarPagosTenant
             ->get()
             ->filter(fn (PagoTenant $pago): bool => $this->toca($pago, $ahora))
             ->each(function (PagoTenant $pago) use (&$cuenta): void {
-                $resultado = $this->conciliar($pago);
+                // Uno que falla al aplicarse no corta a los demás de este negocio.
+                try {
+                    $resultado = $this->conciliar($pago);
+                } catch (Throwable $e) {
+                    ReporteDeErrores::reportarAtrapado($e);
+                    $resultado = null;
+                }
                 match ($resultado) {
                     EstadoResultado::Aprobado => $cuenta['aprobados']++,
                     EstadoResultado::Rechazado => $cuenta['rechazados']++,
@@ -79,7 +87,30 @@ class ConciliarPagosTenant
                 };
             });
 
+        $this->avisarLosQueSalieronDeLaVentana($ahora->copy()->subDays($dias));
+
         return $cuenta;
+    }
+
+    /**
+     * Un intento abierto más viejo que la ventana ya nadie lo consulta: uno domiciliado
+     * dejaría la renovación en «pendiente» sin mora. Queda en Por conciliar (ADR 0231).
+     */
+    private function avisarLosQueSalieronDeLaVentana(Carbon $limite): void
+    {
+        PagoTenant::query()
+            ->where('estado', EstadoPago::Pendiente->value)
+            ->whereNotNull('referencia_externa')
+            ->where('created_at', '<', $limite)
+            ->whereNotIn('id', IncidenciaCobroTenant::query()->select('pago_id')->whereNotNull('pago_id')->where('tipo', IncidenciaCobroTenant::PAGO_SIN_CONFIRMAR))
+            ->orderBy('id')
+            ->limit(100)
+            ->get()
+            ->each(fn (PagoTenant $pago) => app(IncidenciasCobroTenant::class)->porPago(
+                IncidenciaCobroTenant::PAGO_SIN_CONFIRMAR,
+                $pago,
+                'Este intento de pago lleva días sin confirmarse y ya no se consulta. Revísalo en la pasarela.',
+            ));
     }
 
     /**

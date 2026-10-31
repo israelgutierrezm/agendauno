@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use Illuminate\Support\Facades\File;
@@ -42,6 +43,8 @@ function alumnaQueTomaClase(array $e): array
 it('pagina todas las reseñas y busca más allá de las primeras 200', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vale = alumnaQueTomaClase($e);
+    $gestor = app(GestorDeConexionTenant::class);
+    $gestor->conectar(Estudio::query()->where('slug', $e['slug'])->firstOrFail());
     $reserva = ReservaTenant::query()->where('ulid', $vale['reserva'])->firstOrFail();
     for ($i = 0; $i < 205; $i++) {
         $copia = $reserva->replicate(['ulid']);
@@ -52,6 +55,7 @@ it('pagina todas las reseñas y busca más allá de las primeras 200', function 
             'comentario' => $i === 0 ? 'Comentario antiguo' : null,
         ]);
     }
+    $gestor->desconectar();
 
     $this->getJson("/api/v1/app/{$e['slug']}/resenas?page=11&per_page=20", conBearer($e['bearer']))
         ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('meta.total', 205)->assertJsonPath('meta.ultima_pagina', 11);

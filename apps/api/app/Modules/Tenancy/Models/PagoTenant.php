@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Pago de una orden, tenant-local. Reusa los enums de estado/metodo del modulo
  * Pagos (puros, sin acoplamiento). El cobro en linea queda `pendiente` con la
  * `referencia_externa` de la pasarela hasta que el webhook lo confirma.
+ *
+ * @property array<string, mixed>|null $checkout_guardado
  */
 class PagoTenant extends Model
 {
@@ -27,15 +29,19 @@ class PagoTenant extends Model
     protected $fillable = [
         'orden_id', 'proveedor', 'metodo', 'estado', 'monto_minor', 'moneda',
         'referencia_externa', 'idempotency_key', 'domiciliacion_id', 'registrado_por',
-        'aprobado_en', 'revisado_en', 'cerrado_sin_confirmar',
+        'aprobado_en', 'revisado_en', 'cerrado_sin_confirmar', 'checkout_guardado',
         // Contracargo (ADR 0168): abierto, ganado o perdido.
         'contracargo_estado', 'contracargo_referencia', 'contracargo_monto_minor', 'contracargo_motivo',
         'contracargo_vence_en', 'contracargo_en', 'contracargo_cerrado_en',
     ];
 
+    /** @var list<string> */
+    protected $hidden = ['checkout_guardado'];
+
     /**
-     * Datos de checkout para el cliente (client_secret / redirect / voucher). No se
-     * persiste: se devuelve una sola vez en la respuesta del cobro.
+     * Datos de checkout para el cliente (client_secret / redirect / voucher). Va en la
+     * respuesta del cobro; se guardan cifrados en `checkout_guardado` para repetirla a la
+     * misma llave.
      *
      * @var array<string, mixed>
      */
@@ -65,6 +71,7 @@ class PagoTenant extends Model
         // Conciliación: última consulta a la pasarela y si se cerró sin su confirmación.
         'revisado_en' => 'datetime',
         'cerrado_sin_confirmar' => 'boolean',
+        'checkout_guardado' => 'encrypted:array',
         'contracargo_monto_minor' => 'integer',
         'contracargo_vence_en' => 'datetime',
         'contracargo_en' => 'datetime',

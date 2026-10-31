@@ -629,27 +629,61 @@ async function quitarPagoAutomatico(s: Suscripcion): Promise<void> {
   }
 }
 
-async function regularizar(m: Moroso): Promise<void> {
+// «Registrar pago» cobra de verdad la renovación por caja (ADR 0231): trae lo que se
+// debe y abre el mismo diálogo de cobro; al cobrarse entra al corte y cierra la mora.
+async function registrarPagoMora(m: Moroso): Promise<void> {
   if (m.acuerdo === null) {
-    return;
-  }
-  if (
-    !(await confirmar(
-      t("confirmaciones.regularizar", { persona: m.persona?.nombre ?? "" }),
-      { aceptar: t("confirmaciones.regularizarAceptar") },
-    ))
-  ) {
     return;
   }
   accionando.value = m.id;
   error.value = null;
+  avisoCobro.value = null;
   try {
-    await api.post(`${base.value}/acuerdos/${m.acuerdo}/regularizar`, {});
-    await cargar();
+    const { data } = await api.post<{
+      data: {
+        id: string;
+        persona: string | null;
+        concepto: string | null;
+        total_minor: number;
+        moneda: string;
+      };
+    }>(`${base.value}/acuerdos/${m.acuerdo}/deuda`, {});
+    cobrando.value = { ...data.data, cuotas: [] };
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
     accionando.value = null;
+  }
+}
+
+// Condonar: perdona la renovación sin cobrarla, con motivo y permiso propio.
+const puedeCondonar = computed(() => sesion.puede("cobranza.condonar"));
+const condonando = ref<Moroso | null>(null);
+const motivoCondonar = ref("");
+const procesandoCondonar = ref(false);
+const errorCondonar = ref<string | null>(null);
+function abrirCondonar(m: Moroso): void {
+  motivoCondonar.value = "";
+  errorCondonar.value = null;
+  condonando.value = m;
+}
+async function condonar(): Promise<void> {
+  const m = condonando.value;
+  if (m === null || m.acuerdo === null || motivoCondonar.value.trim() === "") {
+    return;
+  }
+  procesandoCondonar.value = true;
+  errorCondonar.value = null;
+  try {
+    await api.post(`${base.value}/acuerdos/${m.acuerdo}/condonar`, {
+      motivo: motivoCondonar.value.trim(),
+    });
+    condonando.value = null;
+    await cargar();
+  } catch (e) {
+    errorCondonar.value = mensajeDeError(e);
+  } finally {
+    procesandoCondonar.value = false;
   }
 }
 
@@ -1271,13 +1305,23 @@ watch(vista, cargar, { immediate: true });
                       type="button"
                       :disabled="accionando === m.id"
                       :aria-busy="accionando === m.id || undefined"
-                      @click="regularizar(m)"
+                      data-prueba="registrar-pago-mora"
+                      @click="registrarPagoMora(m)"
                     >
                       {{
                         accionando === m.id
-                          ? $t("cobranza.regularizando")
-                          : $t("cobranza.regularizar")
+                          ? $t("confirmaciones.moraTrayendo")
+                          : $t("confirmaciones.regularizarAceptar")
                       }}
+                    </button>
+                    <button
+                      v-if="puedeCondonar && m.acuerdo"
+                      class="tu-btn tu-btn-secundario tu-btn-chico"
+                      type="button"
+                      data-prueba="condonar-mora"
+                      @click="abrirCondonar(m)"
+                    >
+                      {{ $t("confirmaciones.condonar") }}
                     </button>
                   </td>
                 </tr>
@@ -2072,5 +2116,54 @@ watch(vista, cargar, { immediate: true });
       @cerrar="cobrando = null"
       @registrado="alRegistrar"
     />
+
+    <!-- Condonar la mora: sin cobrar, con motivo (queda en la bitácora). -->
+    <ModalDialogo
+      :abierto="condonando !== null"
+      :titulo="$t('confirmaciones.condonarTitulo')"
+      :ocupado="procesandoCondonar"
+      @cerrar="condonando = null"
+    >
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{
+          $t("confirmaciones.condonarExplica", {
+            persona: condonando?.persona?.nombre ?? "",
+          })
+        }}
+      </p>
+      <AvisoTono v-if="errorCondonar" tono="peligro" class="mt-3" role="alert">
+        {{ errorCondonar }}
+      </AvisoTono>
+      <label class="mt-3 block">
+        <span class="tu-label">{{ $t("confirmaciones.condonarMotivo") }}</span>
+        <textarea
+          v-model="motivoCondonar"
+          class="tu-input"
+          rows="2"
+          maxlength="255"
+          data-prueba="motivo-condonar"
+        ></textarea>
+      </label>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario"
+          :disabled="procesandoCondonar"
+          @click="condonando = null"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="button"
+          class="tu-btn tu-btn-peligro"
+          :disabled="procesandoCondonar || motivoCondonar.trim() === ''"
+          :aria-busy="procesandoCondonar || undefined"
+          data-prueba="confirmar-condonar"
+          @click="condonar"
+        >
+          {{ $t("confirmaciones.condonarAceptar") }}
+        </button>
+      </template>
+    </ModalDialogo>
   </section>
 </template>

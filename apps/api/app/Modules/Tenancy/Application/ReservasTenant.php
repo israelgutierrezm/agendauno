@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\InvitadoSesionTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\LugarPlataformaTenant;
@@ -44,6 +45,7 @@ use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\MarcaProducto;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -226,6 +228,31 @@ class ReservasTenant
     }
 
     /**
+     * El cupón se aplicó después de apartar: el aviso, que aún no sale (misma
+     * transacción), lleva el total ya con él; si no queda nada que pagar, no sale (ADR 0231).
+     */
+    public function actualizarAvisoApartada(ReservaTenant $reserva, OrdenTenant $orden): void
+    {
+        if ((int) $reserva->orden_id !== (int) $orden->getKey()) {
+            return; // Con anticipo el aviso es del anticipo; el cupón va al resto.
+        }
+        $aviso = EventoOutboxTenant::query()
+            ->where('tipo', 'reserva.apartada')
+            ->where('agregado_id', (string) $reserva->ulid)
+            ->whereNull('publicado_en')
+            ->first();
+        if (! $aviso instanceof EventoOutboxTenant) {
+            return;
+        }
+        if ((int) $orden->total_minor === 0) {
+            $aviso->delete();
+
+            return;
+        }
+        $aviso->update(['payload' => [...$aviso->payload, 'total' => DatosDeOrden::dinero($orden->total_minor, (string) $orden->moneda)]]);
+    }
+
+    /**
      * @param  bool  $porElNegocio  la reserva la hace el equipo: quien llega tarde se
      *                              registra hasta que termina la clase (ADR 0223)
      */
@@ -318,6 +345,7 @@ class ReservasTenant
                         'unidades' => 0,
                         'costo_unidades' => $costo,
                         'idempotency_key' => $idempotencyKey,
+                        'valor_servicio_minor' => $bloqueada->oferta?->precio_clase_minor,
                         ...$snapshot,
                     ]);
 
@@ -350,6 +378,8 @@ class ReservasTenant
                     'unidades' => $unidadesReservadas,
                     'costo_unidades' => $costo,
                     'idempotency_key' => $idempotencyKey,
+                    // Lo que vale con bono, para la comisión (ADR 0231): el precio de hoy, no el de después.
+                    'valor_servicio_minor' => $bloqueada->oferta?->precio_clase_minor,
                     ...$snapshot,
                 ]);
 
@@ -720,6 +750,8 @@ class ReservasTenant
             // tarde, el negocio conserva solo el anticipo (lo hace DevolverPagoDeCitaConAnticipo).
             if ($efecto->anticipo === EfectoCancelacion::COBRA) {
                 $credito = self::anticipoConservado($bloqueada, (int) ($bloqueada->horas_limite ?? $horasLimite));
+            } elseif ($retencion === null && $bloqueada->linea_orden_id !== null && $efecto->credito === EfectoCancelacion::COBRA) {
+                $credito = 'Como cancelaste con menos de '.(int) ($bloqueada->horas_limite ?? $horasLimite).' h de anticipación, esa vez pagada se da por usada.';
             } elseif ($efecto->anticipo === EfectoCancelacion::DEVUELVE && $this->pagadoEnLinea($bloqueada)) {
                 $credito = ($bloqueada->saldo_orden_id !== null ? 'Tu anticipo' : 'Tu pago').' se devolverá a tu forma de pago.';
             }
@@ -786,6 +818,11 @@ class ReservasTenant
 
         $retencion = $reserva->retencion;
         if ($retencion === null || $retencion->estado !== EstadoRetencion::Activa) {
+            // Con una vez pagada por adelantado (ADR 0218): no hay retención ni orden, pero
+            // la política también vale (ADR 0231).
+            if ($reserva->linea_orden_id !== null && $quien === QuienCancela::Cliente) {
+                return $this->efectoDelPrepago($reserva, $sesion, $horasLimite);
+            }
             $pagada = $reserva->orden !== null && $reserva->orden->estado === EstadoOrden::Pagada;
             // Con anticipo (ADR 0161), si cancela el cliente lo pagado al apartar depende de
             // si cancela a tiempo.
@@ -816,7 +853,7 @@ class ReservasTenant
         // para reservas anteriores al snapshot.
         $horas = (int) ($reserva->horas_limite ?? $horasLimite);
         $limite = $sesion->inicia_en->copy()->subHours($horas);
-        $aTiempo = now()->lessThanOrEqualTo($limite);
+        $aTiempo = self::aTiempo($reserva, $limite);
 
         if ($quien !== QuienCancela::Cliente) {
             return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve.' Cancela el negocio: sin penalización.', $vencio);
@@ -842,7 +879,7 @@ class ReservasTenant
     {
         $horas = (int) ($reserva->horas_limite ?? $horasLimite);
         $limite = $sesion->inicia_en->copy()->subHours($horas);
-        $aTiempo = now()->lessThanOrEqualTo($limite);
+        $aTiempo = self::aTiempo($reserva, $limite);
         $que = $reserva->saldo_orden_id !== null ? 'anticipo' : 'pago';
 
         if (! $aTiempo && ! $this->parametros->siNo('cancelacion.cliente_cancela_tarde')) {
@@ -856,6 +893,33 @@ class ReservasTenant
 
         return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, false, $limite,
             "Se cancela con menos de {$horas} h de anticipación: el anticipo no se devuelve".self::loDeMas($reserva, 'pagaste', 'se te devuelve'), anticipo: EfectoCancelacion::COBRA);
+    }
+
+    /** Mover la cita dentro del límite no reinicia el plazo (ADR 0231). */
+    private static function aTiempo(ReservaTenant $reserva, DateTimeInterface $limite): bool
+    {
+        return ! $reserva->cambio_tardio && now()->lessThanOrEqualTo($limite);
+    }
+
+    /**
+     * Cancela el cliente una cita de una vez pagada por adelantado: a tiempo (o si su
+     * política no penaliza) la vez queda libre; tarde, se da por usada (ADR 0231).
+     */
+    private function efectoDelPrepago(ReservaTenant $reserva, SesionTenant $sesion, int $horasLimite): EfectoCancelacion
+    {
+        $horas = (int) ($reserva->horas_limite ?? $horasLimite);
+        $limite = $sesion->inicia_en->copy()->subHours($horas);
+        $aTiempo = self::aTiempo($reserva, $limite);
+
+        if (! $aTiempo && ! $this->parametros->siNo('cancelacion.cliente_cancela_tarde')) {
+            return EfectoCancelacion::noCancelable("Ya pasó el límite para cancelar sin costo ({$horas} h antes). Escríbele al negocio para cancelar.");
+        }
+        if ($aTiempo || ! ($reserva->penaliza_tarde ?? true)) {
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, $aTiempo, $limite, 'La vez pagada queda libre para otra cita.');
+        }
+
+        return new EfectoCancelacion(true, EfectoCancelacion::COBRA, 0, false, $limite,
+            "Se cancela con menos de {$horas} h de anticipación: esa vez pagada se da por usada.");
     }
 
     /** La frase del aviso al cliente cuando el negocio conserva su anticipo. */

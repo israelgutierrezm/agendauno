@@ -153,7 +153,8 @@ it('solo pausa una membresía activa, sin pago pendiente y con fechas válidas',
     $this->postJson("{$url}/cobro-fallido", [], conBearer($m['bearer']))->assertCreated();
     $this->postJson("{$url}/pausar", ['hasta' => '2026-09-20'], conBearer($m['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'MEMBERSHIP_PAUSE_NOT_ALLOWED');
-    $this->postJson("{$url}/regularizar", [], conBearer($m['bearer']))->assertOk();
+    $deuda = (string) $this->postJson("{$url}/deuda", [], conBearer($m['bearer']))->assertOk()->json('data.id');
+    $this->postJson("/api/v1/app/{$m['slug']}/ordenes/{$deuda}/liquidar", ['metodo' => 'efectivo'], conBearer($m['bearer']))->assertOk();
 
     $this->postJson("{$url}/pausar", ['hasta' => '2026-09-20'], conBearer($m['bearer']))->assertOk();
     // Ya en pausa: no se pausa dos veces.

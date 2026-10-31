@@ -144,6 +144,10 @@ final class CatalogoParametros
                 'Días después de la fecha de cobro sin recibirlo.', $e, 3, 0, 30, 'días', modalidad: 'clases'),
             new DefinicionParametro('cobranza.dias_gracia_adeudo', 'Cobranza', 'Días de gracia con un adeudo',
                 'Antes de suspender la membresía por falta de pago.', $e, 7, 0, 60, 'días', modalidad: 'clases'),
+            new DefinicionParametro('cobranza.dias_compra_sin_pagar', 'Cobranza', 'Una compra sin pagar del portal caduca a los',
+                'Lo que alguien compró desde su cuenta y no pagó deja de estar por cobrar. No afecta renovaciones.', $e, 3, 1, 60, 'días'),
+            new DefinicionParametro('apartados.horas_para_recoger', 'Cobranza', 'Lo apartado para recoger se libera a las',
+                'Horas después de terminar la clase, si nadie lo recogió.', $e, 24, 1, 720, 'h', modalidad: 'clases'),
             new DefinicionParametro('cobranza.dias_pagar_en_tienda', 'Cobranza', 'Días para pagar en tienda (OXXO)',
                 'Vigencia de la referencia de pago en efectivo de Mercado Pago u OpenPay.', $e, 3, 1, 30, 'días'),
             // Reintentos de un adeudo en mora (cobranza): días desde el fallo.
@@ -264,6 +268,9 @@ final class CatalogoParametros
             new DefinicionParametro('renta.dias_recordatorio_pago', 'Renta', 'Días antes del vencimiento para recordar el pago en el panel',
                 'Solo si no hay tarjeta que lo pague sola. 0 = solo se avisa ya vencido.', $e, 3, 0, 14, 'días', porNegocio: false),
             // Renta en dólares cobrada en pesos (ADR 0107, solo la plataforma).
+            // Tope de meses gratis por invitar a otros negocios (ADR 0231).
+            new DefinicionParametro('referidos.meses_gratis_por_anio', 'Renta', 'Meses gratis por invitar, al año',
+                'Lo más que un negocio gana en un año calendario por invitar a otros.', $e, 12, 0, 60, 'meses', porNegocio: false),
             new DefinicionParametro('renta.dias_para_pagar', 'Renta', 'Días para pagar cada cargo de la suscripción',
                 'Desde que se emite cada cargo (lo que se cobra mes vencido, nunca antes del fin del mes) hasta que vence.', $e, 10, 1, 60, 'días', porNegocio: false),
             // Stripe no cobra menos de 10 pesos ni de 50 centavos de dólar: lo que no llega

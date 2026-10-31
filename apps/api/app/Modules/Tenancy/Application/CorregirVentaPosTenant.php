@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\MovimientoCajaTenant;
+use App\Modules\Tenancy\Models\PromocionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Pagos\Exceptions\CobroNoAnulable;
@@ -100,11 +101,15 @@ final class CorregirVentaPosTenant
             }
             // En la caja abierta de hoy (ADR 0175): sale de una forma de pago y entra en otra.
             if (CajasTenant::metodo($antes) !== CajasTenant::metodo($metodo)) {
+                $origen = ['venta_pos_id' => (int) $bloqueada->getKey()];
+                $revisar = $this->cajas->exigirSupervisorSiTurnoCerrado($origen, $actor);
                 $turno = $this->cajas->turnoParaAjusteDeLaVenta($bloqueada);
                 $monto = (int) $bloqueada->total_minor + (int) $bloqueada->propina_minor;
-                $origen = ['venta_pos_id' => $bloqueada->getKey()];
                 $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($antes), -$monto, $origen, $actor, $motivo);
                 $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($metodo), $monto, $origen, $actor, $motivo);
+                if ($revisar) {
+                    $this->cajas->marcarParaRevision($turno, $origen);
+                }
             }
             $bloqueada->update(['metodo_pago' => $metodo]);
             $this->auditoria->registrar($actor, 'pos.metodo_corregido', 'venta_pos', (string) $bloqueada->ulid,
@@ -125,11 +130,20 @@ final class CorregirVentaPosTenant
             if ($impedimento !== null) {
                 throw new CobroNoAnulable($impedimento);
             }
+            $origen = ['venta_pos_id' => (int) $bloqueada->getKey()];
+            $revisar = $this->cajas->exigirSupervisorSiTurnoCerrado($origen, $actor);
             // Sale de la caja abierta de hoy (ADR 0175), bloqueada antes del inventario.
             $turno = $this->cajas->turnoParaAjusteDeLaVenta($bloqueada);
             // Sale de cada forma con la que entró (con varias formas, ADR 0177).
             $this->cajas->asentarPartes($turno, MovimientoCajaTenant::ANULACION, CajasTenant::partesDeVenta($bloqueada), -1,
-                ['venta_pos_id' => $bloqueada->getKey()], $actor, $motivo);
+                $origen, $actor, $motivo);
+            if ($revisar) {
+                $this->cajas->marcarParaRevision($turno, $origen);
+            }
+            // Anulada la venta, su cupón recupera el uso (ADR 0231).
+            if ($bloqueada->promocion_id !== null) {
+                PromocionTenant::query()->whereKey($bloqueada->promocion_id)->where('usos', '>', 0)->decrement('usos');
+            }
             // Lo vendido regresa al inventario de la sede donde se vendió.
             foreach ($bloqueada->lineas as $linea) {
                 $this->inventario->registrar(

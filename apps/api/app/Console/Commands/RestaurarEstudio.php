@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\RespaldosEstudio;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Console\Command;
 use Throwable;
@@ -19,7 +20,7 @@ class RestaurarEstudio extends Command
 
     protected $description = 'Restaura la base de datos de un negocio desde un respaldo';
 
-    public function handle(RespaldosEstudio $respaldos): int
+    public function handle(RespaldosEstudio $respaldos, GestorDeConexionTenant $gestor): int
     {
         $estudio = Estudio::query()->where('slug', (string) $this->argument('estudio'))->first();
         if (! $estudio instanceof Estudio) {
@@ -57,6 +58,19 @@ class RestaurarEstudio extends Command
             return self::FAILURE;
         }
         $this->info("{$estudio->slug} restaurado desde {$ruta}.");
+
+        // Lo anotado ya no es cierto: un respaldo viejo trae un esquema viejo.
+        try {
+            $esquema = $gestor->releerEsquema($estudio);
+        } catch (Throwable $e) {
+            $this->warn('No se pudo releer su esquema: '.$e->getMessage());
+
+            return self::SUCCESS;
+        }
+        if ($esquema['faltan'] > 0) {
+            $this->warn("A su esquema le faltan {$esquema['faltan']} migración(es) de esta versión; dará errores hasta correrlas:");
+            $this->warn("php artisan agendauno:migrar-estudios --estudio={$estudio->slug} --force");
+        }
 
         return self::SUCCESS;
     }

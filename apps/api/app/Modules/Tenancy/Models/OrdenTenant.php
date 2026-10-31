@@ -10,6 +10,7 @@ use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Orden de compra tenant-local: congela precios (snapshot) al crearse y, al
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $iva
  * @property string|null $clave_prod_serv
  * @property string|null $clave_unidad
+ * @property Carbon|null $caduca_en
  */
 class OrdenTenant extends Model
 {
@@ -32,7 +34,7 @@ class OrdenTenant extends Model
 
     protected $fillable = [
         // La de una compra del cliente desde su cuenta (repetirla es la misma orden).
-        'clave',
+        'clave', 'caduca_en',
         'persona_id', 'sucursal_id', 'sesion_id', 'renueva_acuerdo_id', 'estado', 'total_minor', 'descuento_minor', 'promocion_id', 'moneda',
         'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar', 'cancelada_en', 'cancelada_por', 'contexto_medicion_id',
         // Renovación: cuándo vence lo que renueva (ADR 0166).
@@ -51,6 +53,7 @@ class OrdenTenant extends Model
         'total_minor' => 'integer',
         'descuento_minor' => 'integer',
         'pagada_en' => 'datetime',
+        'caduca_en' => 'datetime',
         'renueva_vence_el' => 'date',
         'pagado_fuera_minor' => 'integer',
         'descuento_contado_minor' => 'integer',

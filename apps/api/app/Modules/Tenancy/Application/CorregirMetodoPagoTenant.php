@@ -91,10 +91,14 @@ class CorregirMetodoPagoTenant
             // En la caja abierta de hoy (ADR 0175): sale de una forma de pago y entra en otra.
             $anterior = CajasTenant::metodoDelPago($bloqueado);
             if ($anterior !== CajasTenant::metodo($metodo)) {
+                $origen = ['pago_id' => (int) $bloqueado->getKey()];
+                $revisar = $this->cajas->exigirSupervisorSiTurnoCerrado($origen, $actor);
                 $turno = $this->cajas->turnoParaAjusteDelCobro($bloqueado);
-                $origen = ['pago_id' => $bloqueado->getKey()];
                 $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, $anterior, -$bloqueado->monto_minor, $origen, $actor, $motivo);
                 $this->cajas->asentar($turno, MovimientoCajaTenant::CORRECCION, CajasTenant::metodo($metodo), $bloqueado->monto_minor, $origen, $actor, $motivo);
+                if ($revisar) {
+                    $this->cajas->marcarParaRevision($turno, $origen);
+                }
             }
             $bloqueado->update(['metodo' => self::metodoDeCaja($metodo)?->value]);
             $orden->update(['metodo_pago' => $metodo]);

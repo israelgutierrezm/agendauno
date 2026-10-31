@@ -20,6 +20,7 @@ use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Ordenes\Exceptions\PrimeraVezNoDisponible;
 use App\Modules\Tenancy\Ordenes\Exceptions\ProductoArchivado;
 use App\Modules\Tenancy\Ordenes\Exceptions\PromocionInvalida;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Support\Facades\DB;
@@ -153,6 +154,7 @@ class OrdenesTenant
             $promocionId = null;
             if ($codigoPromo !== null && $codigoPromo !== '') {
                 ['promocion' => $promocion, 'descuento' => $descuento] = $this->promociones->aplicarEnOrden($codigoPromo, $subtotal);
+                $this->promociones->exigirTopePorPersona($promocion, (int) $comprador->getKey());
                 $promocionId = $promocion->getKey();
             }
 
@@ -221,9 +223,9 @@ class OrdenesTenant
      * cobrarla. Descuenta de su total (nunca más que el total) y guarda cuál fue; su
      * uso se cuenta al pagarse. Una orden pagada, cancelada o que ya tiene cupón, no.
      */
-    public function aplicarCupon(OrdenTenant $orden, string $codigo): OrdenTenant
+    public function aplicarCupon(OrdenTenant $orden, string $codigo, ?int $baseMinor = null): OrdenTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($orden, $codigo): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $codigo, $baseMinor): OrdenTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
                 throw new PromocionInvalida('El cupón solo se aplica a lo que falta por pagar.');
@@ -231,7 +233,10 @@ class OrdenesTenant
             if ($bloqueada->promocion_id !== null) {
                 throw new PromocionInvalida('Ya se aplicó un cupón a este cobro.');
             }
-            ['promocion' => $promocion, 'descuento' => $descuento] = $this->promociones->aplicarEnOrden($codigo, (int) $bloqueada->total_minor);
+            // Con anticipo, el porcentaje y el mínimo son sobre todo el servicio (como la
+            // vista previa) y se descuenta del resto (ADR 0231).
+            ['promocion' => $promocion, 'descuento' => $descuento] = $this->promociones->aplicarEnOrden($codigo, $baseMinor ?? (int) $bloqueada->total_minor);
+            $this->promociones->exigirTopePorPersona($promocion, (int) $bloqueada->persona_id, (int) $bloqueada->getKey());
             $descuento = min($descuento, (int) $bloqueada->total_minor);
             $bloqueada->update([
                 'total_minor' => (int) $bloqueada->total_minor - $descuento,
@@ -241,6 +246,61 @@ class OrdenesTenant
 
             return $bloqueada;
         });
+    }
+
+    /**
+     * La compra por pagar de ese producto que ya abrió en el portal (no se abre otra):
+     * misma persona, un solo concepto y sin un cupón distinto. Null si no hay.
+     */
+    public function compraAbiertaDe(PersonaTenant $comprador, string $productoUlid, ?string $beneficiarioId, ?string $codigoPromo): ?OrdenTenant
+    {
+        if ($codigoPromo !== null && $codigoPromo !== '') {
+            return null;
+        }
+
+        return OrdenTenant::query()
+            ->where('persona_id', $comprador->getKey())
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->whereNotNull('caduca_en')
+            ->whereNull('promocion_id')
+            ->has('lineas', '=', 1)
+            ->whereHas('lineas', static fn ($q) => $q
+                ->where('beneficiario_id', $beneficiarioId)
+                ->whereHas('producto', static fn ($p) => $p->where('ulid', $productoUlid)))
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Quien compró quita del portal lo que no va a pagar. Solo una compra suya sin
+     * pagar; una renovación o una cita tienen su propio camino.
+     */
+    public function quitarCompra(OrdenTenant $orden): void
+    {
+        DB::connection('tenant')->transaction(function () use ($orden): void {
+            $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueada->estado !== EstadoOrden::Pendiente || $bloqueada->caduca_en === null) {
+                throw new OrdenNoLiquidable('Esta compra ya no se puede quitar.');
+            }
+            if (PagoTenant::query()->where('orden_id', $bloqueada->getKey())->where('estado', EstadoPago::Pendiente->value)->exists()) {
+                app(CerrarIntentosPagoTenant::class)->deOrden((int) $bloqueada->getKey());
+            }
+            $bloqueada->update(['estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]);
+        });
+    }
+
+    /**
+     * Las compras del portal sin pagar que ya pasaron su fecha dejan de estar por cobrar;
+     * con un pago en proceso (p. ej. una referencia de OXXO viva) esperan. Cuántas.
+     */
+    public function caducarComprasSinPagar(): int
+    {
+        return OrdenTenant::query()
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->whereNotNull('caduca_en')
+            ->where('caduca_en', '<', now())
+            ->whereDoesntHave('pagos', static fn ($q) => $q->where('estado', EstadoPago::Pendiente->value))
+            ->update(['estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]);
     }
 
     public function crearPorSesion(PersonaTenant $comprador, SesionTenant $sesion, int $montoMinor, string $moneda, ?int $sucursalId = null): OrdenTenant

@@ -16,6 +16,9 @@ class ClienteStripe
 {
     private const BASE = 'https://api.stripe.com/v1';
 
+    /** Vencer un intento abierto no puede dejar a la caja esperando (ADR 0231). */
+    private const SEGUNDOS_CANCELAR = 8;
+
     public function __construct(private readonly string $secretKey) {}
 
     /**
@@ -37,6 +40,7 @@ class ClienteStripe
         array $metadata = [],
         ?string $cliente = null,
         bool $guardarTarjeta = false,
+        ?int $diasOxxo = null,
     ): array {
         $datos = [
             'mode' => 'payment',
@@ -53,6 +57,9 @@ class ClienteStripe
             'cancel_url' => $cancelado,
             'metadata' => $metadata,
         ];
+        if ($metodo === 'oxxo' && $diasOxxo !== null) {
+            $datos['payment_method_options'] = ['oxxo' => ['expires_after_days' => $diasOxxo]];
+        }
         if ($cliente !== null && $cliente !== '') {
             $datos['customer'] = $cliente;
         } elseif ($email !== null && $email !== '') {
@@ -440,7 +447,9 @@ class ClienteStripe
      */
     public function expirarSesion(string $sesionId): string
     {
+        // Plazo corto: va dentro de la transacción que tiene la orden bloqueada.
         $respuesta = Http::withToken($this->secretKey)
+            ->timeout(self::SEGUNDOS_CANCELAR)
             ->asForm()
             ->post(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId).'/expire');
 
@@ -451,10 +460,27 @@ class ClienteStripe
         // No estaba abierta: se consulta cómo quedó.
         /** @var array{status?: string} $json */
         $json = Http::withToken($this->secretKey)
+            ->timeout(self::SEGUNDOS_CANCELAR)
             ->get(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId))
             ->throw()
             ->json();
 
         return (string) ($json['status'] ?? 'expired');
+    }
+
+    /**
+     * La disputa más reciente de un PaymentIntent, si tiene (ADR 0231).
+     *
+     * @return array{id?: string, status?: string, amount?: int, reason?: string}|null
+     */
+    public function disputaDeIntent(string $intent): ?array
+    {
+        /** @var array{data?: list<array{id?: string, status?: string, amount?: int, reason?: string}>} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/disputes', ['payment_intent' => $intent, 'limit' => 1])
+            ->throw()
+            ->json();
+
+        return $json['data'][0] ?? null;
     }
 }

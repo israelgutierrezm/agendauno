@@ -201,6 +201,7 @@ export default {
         configurar: "Configurar pasarelas de pago",
       },
       cuotas: { exentar: "Exentar inscripción, anualidad o penalización" },
+      cobranza: { condonar: "Condonar un adeudo sin cobrarlo" },
       facturacion: { ver: "Ver facturación e ingresos" },
       pos: { vender: "Vender en mostrador" },
       // La caja de cada sucursal (ADR 0175).

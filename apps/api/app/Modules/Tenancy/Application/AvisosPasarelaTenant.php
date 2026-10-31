@@ -26,7 +26,11 @@ use Throwable;
  */
 class AvisosPasarelaTenant
 {
-    public const MAX_INTENTOS = 5;
+    /** Unos 26 h de reintentos (ADR 0231): una caída de horas no pierde un aviso. */
+    public const MAX_INTENTOS = 30;
+
+    /** Espera doble en cada intento, hasta este tope. */
+    private const MINUTOS_MAXIMOS_ENTRE_INTENTOS = 60;
 
     /** Lo recién llegado lo procesa su propia petición: el comando lo deja un minuto. */
     private const SEGUNDOS_DE_GRACIA = 60;
@@ -67,6 +71,14 @@ class AvisosPasarelaTenant
             // La pasarela reintentó mientras se guardaba el primero.
             return AvisoPasarelaTenant::query()->where('proveedor', $proveedor)->where('clave', $clave)->firstOrFail();
         }
+    }
+
+    /** Vuelve a poner en cola los que agotaron sus intentos (al volver la pasarela); cuántos. */
+    public function reintentarFallidos(): int
+    {
+        return AvisoPasarelaTenant::query()
+            ->where('estado', AvisoPasarelaTenant::FALLIDO)
+            ->update(['estado' => AvisoPasarelaTenant::PENDIENTE, 'intentos' => 0, 'reintentar_en' => now(), 'procesado_en' => null]);
     }
 
     /** Procesa los pendientes del negocio conectado que ya toca; cuántos terminó. */
@@ -115,7 +127,7 @@ class AvisosPasarelaTenant
                 $aviso->procesado_en = now();
                 $this->alertar($aviso);
             } else {
-                $aviso->reintentar_en = now()->addMinutes(2 ** $aviso->intentos);
+                $aviso->reintentar_en = now()->addMinutes(min(2 ** min($aviso->intentos, 6), self::MINUTOS_MAXIMOS_ENTRE_INTENTOS));
             }
             $aviso->save();
         }

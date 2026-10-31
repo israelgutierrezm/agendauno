@@ -69,6 +69,9 @@ principal() {
   export VERSION_WEB
 
   echo "==> Volviendo de $ACTUAL a $DESTINO"
+  # Antes del mantenimiento: un trabajo largo espera con el servicio abierto.
+  echo "==> Esperando a que el worker de trabajos largos termine (el servicio sigue abierto)"
+  $COMPOSE stop worker-pesados || true
   echo "==> Mantenimiento y sin tareas en curso"
   $COMPOSE exec -T -u www-data api php artisan down --retry=60 --secret="$SECRETO" || true
   $COMPOSE stop worker scheduler || true
@@ -79,7 +82,7 @@ principal() {
   for llave in operacion:latido:programador operacion:latido:cola operacion:arranque:cola; do
     VERSION="$DESTINO" $COMPOSE run --rm api php artisan cache:forget "$llave" >/dev/null
   done
-  VERSION="$DESTINO" $COMPOSE up -d --remove-orphans --no-build api worker scheduler web
+  VERSION="$DESTINO" $COMPOSE up -d --remove-orphans --no-build api worker worker-pesados scheduler web
 
   echo "==> Comprobando que $DESTINO atiende antes de abrir"
   intentos=0

@@ -13,6 +13,7 @@ use PDO;
 use Pdo\Mysql;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * Lo común de los respaldos (de cada negocio, de la plataforma y de los archivos):
@@ -192,6 +193,7 @@ class VolcadoBaseDatos
             if (! $this->disco()->put($ruta.self::SUMA, $suma)) {
                 throw new RuntimeException('No se pudo guardar la suma de verificación del respaldo.');
             }
+            $this->copiaMensual($ruta, $carpeta);
 
             return $ruta;
         } finally {
@@ -330,6 +332,58 @@ class VolcadoBaseDatos
         }
 
         return $carpeta.DIRECTORY_SEPARATOR.'respaldo_'.Str::lower((string) Str::ulid());
+    }
+
+    /** ¿La retención la hace el bucket? La aplicación entonces no borra respaldos. */
+    public function retencionEnBucket(): bool
+    {
+        return (bool) config('agendauno.respaldos.retencion_en_bucket');
+    }
+
+    /** Borra los respaldos de una carpeta, salvo que la retención la haga el bucket. */
+    public function borrarCarpeta(string $carpeta): void
+    {
+        if (! $this->retencionEnBucket()) {
+            $this->disco()->deleteDirectory($carpeta);
+        }
+    }
+
+    /**
+     * El primer respaldo de cada mes se copia a su prefijo (`{mensual}/AAAAMM/{sub}/`),
+     * con otro plazo en el ciclo de vida del bucket. Una copia que falla no cuesta el
+     * respaldo: el mes queda abierto y lo intenta el siguiente. Cuenta como hecho al
+     * tener su suma, que se copia al final.
+     */
+    private function copiaMensual(string $ruta, string $carpeta): void
+    {
+        if (! $this->retencionEnBucket()) {
+            return;
+        }
+        try {
+            $mes = $this->carpetaMensual().'/'.now()->format('Ym').'/'.basename($carpeta);
+            foreach ($this->disco()->files($mes) as $archivo) {
+                if (str_ends_with($archivo, self::SUMA)) {
+                    return;
+                }
+            }
+            $destino = $mes.'/'.basename($ruta);
+            if (! $this->disco()->copy($ruta, $destino) || ! $this->disco()->copy($ruta.self::SUMA, $destino.self::SUMA)) {
+                throw new RuntimeException('No se pudo guardar la copia mensual del respaldo.');
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /** ¿Es una copia mensual de esta carpeta (un negocio, la plataforma)? */
+    public function esCopiaMensualDe(string $ruta, string $sub): bool
+    {
+        return preg_match('#^'.preg_quote($this->carpetaMensual(), '#').'/\d{6}/'.preg_quote($sub, '#').'/[^/]+$#', $ruta) === 1;
+    }
+
+    private function carpetaMensual(): string
+    {
+        return trim((string) config('agendauno.respaldos.carpeta_mensual', 'respaldos-mensuales'), '/');
     }
 
     public function carpeta(string $sub): string

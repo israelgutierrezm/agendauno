@@ -10,7 +10,8 @@ Los archivos están en `infra/produccion/`; las decisiones, en los ADR 0048, 010
 | `web` | nginx, la entrada de los dos dominios: la aplicación (`dist/app`, `app.html`; en TurnoUno y sus negocios, `app-turnouno.html`, con su ícono y su nombre), pasa `/api` y `/up` a PHP, sirve `/storage` (logos y fotos) y pasa la portada, las páginas por giro, el sitemap, el robots y `/assets-{producto}/` a la landing de su dominio (si la landing no tiene la página o no responde, la aplicación). En el subdominio de cada negocio, procesa `app.html` con SSI para que su página llegue con su cabecera, y pide a la API su sitemap y su robots (ADR 0128; si la API no responde, la cabecera genérica). Escucha solo en `127.0.0.1:8080` y, con Traefik, en su red. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). Chequeo de salud: `/_salud-web`, solo desde el contenedor (ADR 0173). Manda la CSP completa (`nginx.conf.template`, ADR 0174): un servicio externo nuevo tiene que entrar ahí; si no, lo bloquea y aparece en Errores como CSP. `CSP_CONECTAR_EXTRA` (web.env) suma orígenes de conexión. |
 | `landing-agendauno`, `landing-turnouno` | La landing de cada producto (HTML completo pre-generado), cada una en su imagen (ADR 0112): se publican solas, sin tocar la aplicación ni la API. Solo las alcanza `web`. |
 | `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). Chequeo de salud: PHP-FPM contesta su ping por FastCGI (`agendauno:salud-api`, ADR 0173). |
-| `worker` | Cola en Redis, en este orden: `default` (latido y correos de la plataforma), `mensajes` (avisos y recordatorios de cada negocio) y `campanas` (difusiones), ADR 0205. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
+| `worker` | Cola en Redis, en este orden: `latido`, `default` (correos de la plataforma), `mensajes` (avisos y recordatorios de cada negocio) y `campanas` (difusiones), ADR 0205. Con `--timeout=80`, menor que `REDIS_QUEUE_RETRY_AFTER` (90). Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
+| `worker-pesados` | Solo la cola `pesados`, con conexión propia (`redis-pesados`, `retry_after` 2000) y `--timeout=1900`: crear la base de un negocio y armar su descarga de datos (ADR 0232). Si muere, Docker lo reinicia. `actualizar.sh` y `volver.sh` esperan a que termine lo que lleva en curso **antes** de poner el mantenimiento: un despliegue puede tardar hasta 33 minutos más en empezar, con el servicio abierto. |
 | `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
 | `redis` | Caché, colas y sesiones. |
 
@@ -458,6 +459,85 @@ Se conservan `RESPALDOS_DIAS` días. Si un respaldo o el simulacro fallan, llega
 alerta por correo, y `agendauno:verificar-produccion` marca lo que esté viejo o sin
 probar.
 
+### Retención en el bucket
+
+Decisión del dueño (ADR 0232): **bloqueo de 30 días y copias mensuales durante 12 meses**.
+Con la retención en el bucket, un servidor comprometido no puede borrar las copias y una
+corrupción que se nota tarde todavía tiene un respaldo sano. La aplicación deja de borrar;
+la baja de un negocio tampoco borra sus respaldos: se los lleva el ciclo de vida.
+
+| Prefijo | Qué lleva | Vive |
+| --- | --- | --- |
+| `respaldos/` | Los diarios y los previos a cada despliegue | 31 días |
+| `respaldos-mensuales/AAAAMM/` | El primer respaldo de cada mes de la plataforma, los archivos y cada negocio | 366 días |
+
+Los pasos, con AWS S3 (`BUCKET` es el tuyo). **Object Lock solo se activa al crear el
+bucket:** si ya tienes uno, crea otro y copia lo que quieras conservar.
+
+1. Crea el bucket con Object Lock (activa también el versionado), privado:
+
+   ```sh
+   aws s3api create-bucket --bucket BUCKET --region us-east-1 --object-lock-enabled-for-bucket
+   aws s3api put-public-access-block --bucket BUCKET --public-access-block-configuration \
+     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+   ```
+
+2. Bloqueo de 30 días para todo lo que entre. `COMPLIANCE` no lo levanta nadie, ni la
+   cuenta raíz: mientras dure, un objeto no se puede borrar ni pagando de más.
+
+   ```sh
+   aws s3api put-object-lock-configuration --bucket BUCKET --object-lock-configuration \
+     '{"ObjectLockEnabled":"Enabled","Rule":{"DefaultRetention":{"Mode":"COMPLIANCE","Days":30}}}'
+   ```
+
+3. Ciclo de vida. En un bucket versionado, «expirar» deja una marca de borrado; la versión
+   real se va un día después, y nunca antes de que venza su bloqueo.
+
+   ```sh
+   aws s3api put-bucket-lifecycle-configuration --bucket BUCKET --lifecycle-configuration '{"Rules":[
+     {"ID":"diarios","Status":"Enabled","Filter":{"Prefix":"respaldos/"},"Expiration":{"Days":31},"NoncurrentVersionExpiration":{"NoncurrentDays":1}},
+     {"ID":"mensuales","Status":"Enabled","Filter":{"Prefix":"respaldos-mensuales/"},"Expiration":{"Days":366},"NoncurrentVersionExpiration":{"NoncurrentDays":1}},
+     {"ID":"limpieza","Status":"Enabled","Filter":{"Prefix":""},"Expiration":{"ExpiredObjectDeleteMarker":true},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":7}}
+   ]}'
+   ```
+
+4. Una llave solo para el servidor, **sin permiso de borrar** ni de cambiar el bucket. Esta
+   política es todo lo que necesita; ponla en `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`
+   de `api.env`. Si guardas los archivos de los negocios en S3, dales su propia llave
+   (`ARCHIVOS_S3_KEY` y `ARCHIVOS_S3_SECRET`): sin ella usarían esta, y no podrían borrar.
+   Guarda aparte, fuera del servidor, la llave de administrador.
+
+   ```json
+   {"Version":"2012-10-17","Statement":[
+     {"Effect":"Allow","Action":["s3:ListBucket","s3:GetBucketLocation"],"Resource":"arn:aws:s3:::BUCKET"},
+     {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:AbortMultipartUpload"],"Resource":"arn:aws:s3:::BUCKET/*"}
+   ]}
+   ```
+
+5. En `api.env` pon `RESPALDOS_RETENCION_BUCKET=true`, aplica con `./compose.sh up -d` y
+   comprueba:
+
+   ```sh
+   docker compose --env-file web.env exec -T -u www-data api php artisan agendauno:respaldar-plataforma --sin-archivos
+   docker compose --env-file web.env exec -T -u www-data api php artisan agendauno:simulacro-restauracion
+   aws s3 ls s3://BUCKET/respaldos-mensuales/ --recursive    # ya está la copia del mes
+   aws s3 rm s3://BUCKET/respaldos/plataforma/ARCHIVO --profile LA_LLAVE_DEL_SERVIDOR    # debe negarse
+   ```
+
+Cloudflare R2 y Backblaze B2 lo nombran distinto: en R2, «Bucket lock rules» por prefijo
+(30 días en cada uno) y «Object lifecycle rules»; en B2, «Object Lock» al crear el bucket
+y «Lifecycle Settings» por prefijo, con una «Application Key» sin `deleteFiles`. Revisa que
+su llave no pueda borrar con el mismo `rm` del paso 5.
+
+Lo que esto cambia:
+
+- Los datos de un negocio dado de baja se quedan en las copias hasta 12 meses más. Dilo en
+  el aviso de privacidad y en los términos (plazo de conservación de respaldos).
+- Para restaurar una copia mensual, búscala con `aws s3 ls` y pásala con `--respaldo=`:
+  `restaurar-estudio` y `restaurar-plataforma` las aceptan.
+- Un respaldo cifrado con otra `RESPALDOS_LLAVE` o con otra `APP_KEY` sigue necesitándolas:
+  guárdalas fuera del servidor tanto como vivan las copias, es decir, 12 meses.
+
 ### Restaurar
 
 ```bash
@@ -607,6 +687,22 @@ borra historial de los negocios.
 
 ## Alertas y monitoreo
 
+**Segundo canal, Telegram (ADR 0232).** Con `ALERTAS_TELEGRAM_TOKEN` y
+`ALERTAS_TELEGRAM_CHAT`, las alertas críticas llegan también por Telegram (solo cuántas de
+cada tipo, sin su mensaje ni datos de clientes; la misma combinación no se repite en 6
+horas), igual que los avisos de `agendauno:avisar-despliegue` y el aviso de que no salió
+el correo de alertas. `agendauno:verificar-produccion` lo marca como aviso si falta.
+
+`agendauno:revisar-pendientes` mide cada 10 minutos el outbox y los avisos de pasarela de
+cada negocio, y alerta lo atascado. La verificación lee esa medición («Outbox al día»,
+«Avisos de pasarela sin atascar») y además revisa el espacio en disco (`DISCO_LIBRE_MINIMO`).
+
+**Un contenedor `unhealthy` no se reinicia solo.** `restart: unless-stopped` solo actúa si
+el proceso sale: un worker colgado sigue colgado, aunque Docker lo marque. El aviso llega
+por la alerta de cola detenida y por el monitor externo de `/api/v1/health?estricto=1`; se
+corrige con `./compose.sh restart worker`. Si prefieres que sea solo, agrega un contenedor
+tipo `autoheal` en el servidor.
+
 El superadmin (pestaña **Operación**) muestra lo mismo que la consola y los correos:
 versión en marcha, si el servicio está abierto o en mantenimiento, el programador y
 la cola, la verificación de producción completa, los últimos respaldos con el detalle
@@ -668,11 +764,48 @@ la lista llegue recortada a las 50 más recientes.
   entonces fallarían los respaldos nocturnos. (`run --rm api …` ya corre como
   `www-data`.)
 - Mantenimiento: `docker compose … exec -u www-data api php artisan down` / `up`.
-- Nunca cambies `APP_KEY`.
+- No cambies `APP_KEY` salvo que se filtre; si se filtra, sigue «Rotar `APP_KEY`», abajo.
 - Tampoco cambies `APP_TENANT_DOMAIN` sin cambiar `DOMINIO`: los subdominios de los
   negocios dependen de ambos.
 - App móvil: compila con `--dart-define=API_BASE_URL=https://DOMINIO` (más las
   variables de Firebase, ver `docs/MOBILE.md`) y publica en Google Play y App Store.
+
+### Rotar `APP_KEY`
+
+Solo si se filtró (ADR 0232). Sin el procedimiento, las llaves de pasarelas y los demás
+secretos cifrados se vuelven ilegibles. Hazlo con pocos cambios en curso; no hace falta
+mantenimiento.
+
+1. Genera la nueva: `docker compose --env-file web.env run --rm --no-deps --entrypoint php api artisan key:generate --show`.
+2. En `api.env`: pasa la de ahora a `APP_PREVIOUS_KEYS` y pon la nueva en `APP_KEY`. Guarda
+   las dos fuera del servidor.
+3. Aplica con `./compose.sh up -d` para que todos los procesos lean las dos.
+4. Comprueba y rota (no imprime secretos; se puede repetir):
+
+   ```sh
+   docker compose --env-file web.env exec -T -u www-data api php artisan agendauno:rotar-app-key --simular
+   docker compose --env-file web.env exec -T -u www-data api php artisan agendauno:rotar-app-key
+   ```
+
+   Vuelve a cifrar lo de la plataforma y lo de cada negocio. Si sale con error (un negocio
+   sin revisar, un valor ilegible), **no sigas**: resuélvelo y repítelo.
+5. Pasados unos minutos, cuando venzan las propuestas y los estados en curso, quita
+   `APP_PREVIOUS_KEYS` y aplica con `./compose.sh up -d`. Si la llave se filtró, no lo dejes
+   para después: mientras siga ahí, sirve para firmar y descifrar.
+6. Si se filtró, cifrar con otra llave no basta: quien la tuvo pudo leer los secretos. Cambia
+   en cada proveedor las llaves de la plataforma y pide a los negocios conectar de nuevo las
+   suyas (pasarelas, FacturAPI, WhatsApp, calendarios, webhooks).
+
+Lo que no se vuelve a cifrar porque se deriva de la llave, y deja de valer al quitarla:
+
+- Los enlaces de cita sin cuenta de los correos ya enviados (cancelar, reprogramar).
+- Los QR de entrada: la app y el portal piden uno nuevo.
+- La autorización de los pases de Apple Wallet ya instalados: se emiten otra vez.
+- Los códigos de WhatsApp y de entrada al superadmin en curso (se piden de nuevo).
+
+Las copias viejas traen lo cifrado con la llave de entonces: después de restaurar una, pon
+esa llave en `APP_PREVIOUS_KEYS` y corre el comando otra vez. Por eso se guarda mientras
+vivan las copias (12 meses). `RESPALDOS_LLAVE` es otra llave y no cambia aquí.
 
 ## Pendiente de decidir
 

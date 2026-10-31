@@ -2110,11 +2110,38 @@ en el negocio.
   minuto; solo con `confirmado` dice «Pago confirmado», en verde. Sin confirmación,
   «sigue en confirmación; no hace falta pagar de nuevo».
 
+## Revisión de dinero (ADR 0231)
+
+- `POST /acuerdos/{acuerdo}/deuda` (`ordenes.gestionar`): la renovación por cobrar de esa
+  membresía, creada si falta: `id`, `persona`, `concepto`, `total_minor`, `moneda`. Se cobra con
+  `POST /ordenes/{orden}/liquidar`. **Reemplaza** a `POST /acuerdos/{acuerdo}/regularizar`.
+- `POST /acuerdos/{acuerdo}/condonar` (`cobranza.condonar`), `motivo` obligatorio: perdona el
+  periodo sin cobrar; 422 si no está en mora.
+- `DELETE /mi/ordenes/{orden}`: quita una compra suya del portal sin pagar (422 si no se
+  puede). `POST /mi/ordenes` reutiliza la abierta del mismo producto (sin cupón). Cada orden
+  trae `quitable`.
+- `GET /mi/reservas/{reserva}/reprogramar` trae `cambio_tardio`: cambiarla ahora la deja
+  como cancelación tardía si luego se cancela.
+- Pagar con `idempotency_key`: la misma llave repite el intento abierto (con su `checkout`)
+  durante 15 min; rechazado, anulado o más viejo, abre otro. Una orden en $0 queda pagada al
+  momento, sin pasarela ni caja.
+- `POST /articulos/{articulo}/movimientos` acepta `clave_intento`. `POST /promociones` y
+  `PUT` aceptan y devuelven `usos_por_persona`. El libro de `GET /caja` trae
+  `movimientos[].requiere_revision`.
+- Corregir o anular un cobro de un turno cerrado pide `caja.supervisar`.
+- `POST /ordenes/{orden}/cobrar` ya no admite `proveedor: ventanilla`. `POST` público de pago
+  de cita solo admite `metodo` `tarjeta`, `oxxo` o `spei`.
+- Incidencias nuevas en Por conciliar: `devolucion_pendiente`, `devolver_en_caja`,
+  `pago_sin_confirmar`.
+- Nómina: `porcentaje_venta` es sobre lo conservado de citas con asistencia `presente`; las
+  propinas van a quien impartió (el sustituto, si lo hubo).
+- `agendauno:procesar-avisos-pasarela --reintentar-fallidos` vuelve a poner en cola los fallidos.
+
 ## Cobranza: motivo de mora y vencimientos (ADR 0203)
 
 - `GET /dunning`: cada proceso trae `motivo_clave` (`sin_cobro_en_linea`,
-  `pago_sin_completar`, `rechazado`, `tarjeta_rechazada`, `suscripcion_sin_cobro` o
-  `null`) y `motivo_detalle` (el motivo del banco, o el texto del equipo si se registró a
+  `pago_sin_completar`, `rechazado`, `tarjeta_rechazada`, `suscripcion_sin_cobro`,
+  `sin_pago_en_caja` o `null`) y `motivo_detalle` (el motivo del banco, o el texto del equipo si se registró a
   mano con `POST /acuerdos/{acuerdo}/cobro-fallido`, que va sin clave). `ultimo_motivo`
   sigue siendo la frase que recibe el alumno; el panel no la muestra.
 - `GET /suscripciones`: cada fila trae `situacion` (`proxima`, `hoy`, `vencida`,

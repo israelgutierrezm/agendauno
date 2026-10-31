@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Mail\CorreoTicketVenta;
 use App\Modules\Tenancy\Models\LineaVentaPosTenant;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\PartesCobro;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Mail;
@@ -47,12 +48,15 @@ class TicketVentaPosTenant
         $partes = CajasTenant::partesDelCobro($venta);
         $mixto = count($partes) > 1;
 
+        $servicioVigente = $venta->orden_id !== null && $venta->servicio_minor > 0 && $venta->orden->estado === EstadoOrden::Pagada;
+
         return [
             'id' => (string) $venta->ulid,
             'folio' => self::folio($venta),
             'creado_en' => $venta->created_at?->toIso8601String(),
             'sucursal' => $venta->sucursal?->nombre,
-            'servicio' => $venta->orden_id !== null && $venta->servicio_minor > 0
+            // Solo si sigue pagado: anulado o devuelto, el ticket no lo muestra como cobrado.
+            'servicio' => $servicioVigente
                 ? ['nombre' => $venta->orden?->sesion?->oferta?->nombre, 'monto_minor' => $venta->servicio_minor]
                 : null,
             'lineas' => array_values($venta->lineas->map(static fn (LineaVentaPosTenant $l): array => [
@@ -63,7 +67,7 @@ class TicketVentaPosTenant
             ])->all()),
             'total_minor' => $venta->total_minor,
             'propina_minor' => $venta->propina_minor,
-            'cobrado_minor' => $venta->cobradoMinor(),
+            'cobrado_minor' => $servicioVigente || $venta->orden_id === null ? $venta->cobradoMinor() : $venta->cobradoMinor() - (int) $venta->servicio_minor,
             'recibido_minor' => $venta->recibido_minor,
             'cambio_minor' => $venta->recibido_minor !== null
                 ? $venta->recibido_minor - ($mixto ? PartesCobro::efectivo($partes) : $venta->cobradoMinor())

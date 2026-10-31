@@ -132,6 +132,9 @@ class RespaldosPlataforma
      */
     public function limpiar(int $dias): int
     {
+        if ($this->volcado->retencionEnBucket()) {
+            return 0;
+        }
         $limite = CarbonImmutable::now()->subDays($dias)->getTimestamp();
         $borrados = 0;
         foreach ([self::PLATAFORMA, self::ARCHIVOS] as $sub) {
@@ -160,7 +163,8 @@ class RespaldosPlataforma
      */
     public function restaurarPlataforma(string $ruta): void
     {
-        if (! str_starts_with($ruta, $this->volcado->carpeta(self::PLATAFORMA).'/') || ! $this->volcado->disco()->exists($ruta)) {
+        $suyo = str_starts_with($ruta, $this->volcado->carpeta(self::PLATAFORMA).'/') || $this->volcado->esCopiaMensualDe($ruta, self::PLATAFORMA);
+        if (! $suyo || ! $this->volcado->disco()->exists($ruta)) {
             throw new RuntimeException('Ese respaldo no existe o no es de la plataforma.');
         }
         /** @var array<string, mixed> $config */

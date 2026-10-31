@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Jobs\AplicarDespuesDelPagoRenta;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
@@ -57,6 +58,7 @@ class ConfirmarCargoRenta
                     Log::warning('Aviso de pago de renta con un importe distinto al del cargo: no se aplica.', [
                         'cargo' => $cargo->ulid, 'referencia' => $referencia, 'monto_minor' => $montoMinor,
                     ]);
+                    app(AlertasPlataforma::class)->registrar('renta_importe_distinto', $referencia, "Aviso de pago de {$montoMinor} (centavos) para el cargo {$cargo->ulid}, que es de {$cargo->monto_minor}: no se aplicó. Revísalo.", $cargo->estudio?->slug);
 
                     return null;
                 }
@@ -116,6 +118,20 @@ class ConfirmarCargoRenta
      * primer mes pagado de un invitado da su mes gratis (ADR 0188).
      */
     public function despuesDelPago(?CargoRenta $pagado): void
+    {
+        try {
+            $this->aplicarDespuesDelPago($pagado);
+        } catch (Throwable $e) {
+            // El dinero ya entró: lo que falta se reintenta en la cola, sin tumbar el aviso
+            // (todo es idempotente; ADR 0231).
+            ReporteDeErrores::reportarAtrapado($e);
+            if ($pagado instanceof CargoRenta) {
+                AplicarDespuesDelPagoRenta::dispatch((int) $pagado->getKey());
+            }
+        }
+    }
+
+    public function aplicarDespuesDelPago(?CargoRenta $pagado): void
     {
         $this->suspension->reactivarSiPago($pagado?->estudio);
         // Una compra de timbres o de mensajes: se suman al saldo del negocio.

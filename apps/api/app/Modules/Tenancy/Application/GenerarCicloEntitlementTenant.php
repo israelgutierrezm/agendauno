@@ -12,9 +12,7 @@ use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Models\DerechoTenant;
-use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;
-use App\Modules\Tenancy\Models\SesionTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -26,8 +24,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Solo se concede el cupo de los ciclos que no han terminado: los que pasaron enteros
  * sin correr (la membresía estuvo suspendida y se reactivó) no se regalan. Al cerrar un
- * ciclo no vence lo apartado para clases que ya empezaron en él (falta marcar su
- * asistencia): se consume de ese ciclo, no del siguiente.
+ * ciclo no vence nada de lo apartado para una clase, sea de este ciclo o del siguiente.
  */
 class GenerarCicloEntitlementTenant
 {
@@ -65,7 +62,7 @@ class GenerarCicloEntitlementTenant
                 && ($bloqueado->valido_hasta === null || $bloqueado->ciclo_fin->lt($bloqueado->valido_hasta))) {
                 $saldo = $this->libro->saldo($bloqueado);
                 $acarreo = $this->rollover($bloqueado, $saldo);
-                $expira = max(0, $saldo - $acarreo - $this->apartadoEnElCiclo($bloqueado));
+                $expira = max(0, $saldo - $acarreo - $this->apartado($bloqueado));
 
                 if ($expira > 0) {
                     $this->libro->registrar($bloqueado, TipoMovimiento::Expiracion, -$expira, 'Expiracion de ciclo', ContextoMovimiento::para(OrigenMovimiento::Ciclo));
@@ -88,25 +85,15 @@ class GenerarCicloEntitlementTenant
     }
 
     /**
-     * Lo apartado (retenciones activas) para clases que empezaron antes de que termine
-     * el ciclo que se cierra.
+     * Lo apartado (retenciones activas), de la clase que sea: al reservar se exige el
+     * disponible de hoy, sin importar en qué ciclo cae la clase, así que lo apartado para
+     * el mes siguiente también se queda (ADR 0231).
      */
-    private function apartadoEnElCiclo(DerechoTenant $derecho): int
+    private function apartado(DerechoTenant $derecho): int
     {
-        $fin = $derecho->ciclo_fin;
-        if (! $fin instanceof Carbon) {
-            return 0;
-        }
-
         return (int) RetencionCreditoTenant::query()
             ->where('derecho_id', $derecho->getKey())
             ->where('estado', EstadoRetencion::Activa->value)
-            ->whereIn('id', ReservaTenant::query()
-                ->select('retencion_id')
-                ->whereNotNull('retencion_id')
-                ->whereIn('sesion_id', SesionTenant::query()
-                    ->select('id')
-                    ->where('inicia_en', '<=', $this->fechas->finDelDia($fin->toDateString()))))
             ->sum('unidades');
     }
 

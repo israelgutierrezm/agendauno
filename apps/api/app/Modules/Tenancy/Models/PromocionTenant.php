@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $valor
  * @property int|null $monto_minimo_minor
  * @property int|null $usos_maximos
+ * @property int|null $usos_por_persona
  */
 class PromocionTenant extends Model
 {
@@ -30,7 +31,7 @@ class PromocionTenant extends Model
 
     protected $fillable = [
         'codigo', 'descripcion', 'tipo', 'valor', 'monto_minimo_minor',
-        'usos_maximos', 'usos', 'vence_en', 'activa',
+        'usos_maximos', 'usos', 'usos_por_persona', 'vence_en', 'activa',
     ];
 
     /**
@@ -41,6 +42,7 @@ class PromocionTenant extends Model
         'valor' => 'integer',
         'monto_minimo_minor' => 'integer',
         'usos_maximos' => 'integer',
+        'usos_por_persona' => 'integer',
         'usos' => 'integer',
         'vence_en' => 'date',
         'activa' => 'boolean',

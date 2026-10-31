@@ -18,6 +18,8 @@ export interface Movimiento {
   monto_minor: number;
   motivo: string | null;
   quien: string | null;
+  // Corrige un cobro de un turno ya cerrado (ADR 0231).
+  requiere_revision?: boolean;
   fecha: string | null;
 }
 export interface Conteo {

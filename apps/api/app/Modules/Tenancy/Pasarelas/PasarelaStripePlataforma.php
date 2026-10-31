@@ -8,6 +8,8 @@ use App\Modules\Tenancy\Application\ReciboRentaPdf;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
+use App\Support\ReporteDeErrores;
+use Throwable;
 
 /**
  * Cobro en linea de la renta del SaaS con Stripe, usando la `secret_key` de LA
@@ -86,6 +88,35 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
      * @param  array<string, string>  $llaves
      */
     public function cancelarIntento(string $referencia, array $llaves): bool
+    {
+        return $this->cerrarIntento($referencia, $llaves);
+    }
+
+    /**
+     * La sesión de Checkout de un PaymentIntent (lo cobrado por Checkout guarda la sesión);
+     * null si no tiene o Stripe no responde: es solo para decir de qué cargo es una alerta.
+     *
+     * @param  array<string, string>  $llaves
+     */
+    public function sesionDeIntent(string $intent, array $llaves): ?string
+    {
+        $secretKey = $llaves['secret_key'] ?? '';
+        if ($secretKey === '') {
+            return null;
+        }
+        try {
+            return (new ClienteStripe($secretKey))->sesionDeIntent($intent);
+        } catch (Throwable $e) {
+            ReporteDeErrores::reportarAtrapado($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $llaves
+     */
+    private function cerrarIntento(string $referencia, array $llaves): bool
     {
         $secretKey = $llaves['secret_key'] ?? '';
         // Un cargo a la tarjeta en proceso: solo se anula si aún no se cobra.

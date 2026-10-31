@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Modules\Tenancy\Application\ApartadosArticuloTenant;
+use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
@@ -35,7 +37,13 @@ class ExpirarReservasPendientes extends Command
                         continue;
                     }
 
-                    $expiradas += $gestor->ejecutarAislado($estudio, fn (): int => $reservas->expirarReservasPendientes(), 0);
+                    $expiradas += $gestor->ejecutarAislado($estudio, function () use ($reservas): int {
+                        // De paso, lo demás que caduca solo (ADR 0231).
+                        app(OrdenesTenant::class)->caducarComprasSinPagar();
+                        app(ApartadosArticuloTenant::class)->liberarNoRecogidos();
+
+                        return $reservas->expirarReservasPendientes();
+                    }, 0);
                 }
             });
 

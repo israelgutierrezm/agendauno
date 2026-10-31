@@ -133,10 +133,8 @@ describe("presupuesto en línea", () => {
     });
     await w.get('[data-prueba="presupuesto-pagar"]').trigger("click");
     await flushPromises();
-    expect(api.post).toHaveBeenLastCalledWith(`${URL}/pagar`, {
-      t: "tok",
-      idempotency_key: "presupuesto-P1-OR1",
-    });
+    // Sin llave fija: cada intento abre su pago (uno abandonado no atora el siguiente).
+    expect(api.post).toHaveBeenLastCalledWith(`${URL}/pagar`, { t: "tok" });
     expect(asignar).toHaveBeenCalledWith("https://pago.test/c/1");
     vi.unstubAllGlobals();
   });

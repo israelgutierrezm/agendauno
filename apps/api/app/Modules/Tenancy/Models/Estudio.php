@@ -174,6 +174,20 @@ class Estudio extends Model
      */
     protected static function booted(): void
     {
+        // Cuándo estuvo suspendido, para no cobrarle esos días de renta (ADR 0231).
+        static::updated(static function (Estudio $estudio): void {
+            if (! $estudio->wasChanged('estado')) {
+                return;
+            }
+            if ($estudio->estado === EstadoEstudio::Suspended) {
+                SuspensionEstudio::query()->create(['estudio_id' => $estudio->getKey(), 'desde' => now()]);
+
+                return;
+            }
+            if ($estudio->getOriginal('estado') === EstadoEstudio::Suspended) {
+                SuspensionEstudio::query()->where('estudio_id', $estudio->getKey())->whereNull('hasta')->update(['hasta' => now()]);
+            }
+        });
         static::creating(static function (Estudio $estudio): void {
             if ($estudio->getAttribute('modalidad') === null) {
                 $estudio->setAttribute('modalidad', $estudio->modalidad());

@@ -576,6 +576,7 @@ async function guardarProducto(): Promise<void> {
 
 // ---- Movimiento de stock (entrada o ajuste) ----
 const moviendo = ref<Articulo | null>(null);
+let claveMovimiento = crypto.randomUUID();
 // Un ajuste a mano dice por qué (queda en su historial con quién lo hizo); una
 // entrada puede llevar una nota (proveedor, factura).
 const MOTIVOS_AJUSTE = [
@@ -659,7 +660,10 @@ async function guardarMovimiento(): Promise<void> {
       tipo: movimiento.value.tipo,
       cantidad: Number(movimiento.value.cantidad),
       ...(motivoTexto.value !== "" ? { motivo: motivoTexto.value } : {}),
+      // Reintentar (doble clic, red) no lo aplica dos veces (ADR 0231).
+      clave_intento: claveMovimiento,
     });
+    claveMovimiento = crypto.randomUUID();
     toast.exito(t("inventarioVisual.movido"));
     descartarMovimiento.fijar();
     moviendo.value = null;

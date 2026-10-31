@@ -75,6 +75,17 @@ return [
             'after_commit' => false,
         ],
 
+        // Los trabajos largos (ADR 0232), con su worker: `retry_after` mayor que su
+        // --timeout (1900 s en docker-compose.yml) para que nunca se reentreguen en curso.
+        'redis-pesados' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'pesados',
+            'retry_after' => 2000,
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

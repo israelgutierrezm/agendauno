@@ -21,6 +21,7 @@ use Throwable;
  */
 class AprovisionarNegocioRegistrado implements ShouldBeUnique, ShouldQueue
 {
+    use EnColaPesada;
     use Queueable;
 
     public int $tries = 4;
@@ -30,7 +31,10 @@ class AprovisionarNegocioRegistrado implements ShouldBeUnique, ShouldQueue
     /** @var list<int> */
     public array $backoff = [30, 300, 1800];
 
-    public function __construct(public readonly int $estudioId) {}
+    public function __construct(public readonly int $estudioId)
+    {
+        $this->aColaPesada();
+    }
 
     public function uniqueId(): string
     {

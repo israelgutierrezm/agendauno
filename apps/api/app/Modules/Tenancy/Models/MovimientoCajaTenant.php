@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $reembolso_id
  * @property int|null $usuario_id
  * @property string|null $motivo
+ * @property bool $requiere_revision
  */
 class MovimientoCajaTenant extends Model
 {
@@ -48,7 +49,7 @@ class MovimientoCajaTenant extends Model
     protected $table = 'movimientos_caja';
 
     protected $fillable = [
-        'turno_caja_id', 'tipo', 'metodo', 'monto_minor', 'pago_id', 'venta_pos_id', 'reembolso_id', 'usuario_id', 'motivo', 'clave',
+        'turno_caja_id', 'tipo', 'metodo', 'monto_minor', 'pago_id', 'venta_pos_id', 'reembolso_id', 'usuario_id', 'motivo', 'clave', 'requiere_revision',
     ];
 
     /**
@@ -56,6 +57,7 @@ class MovimientoCajaTenant extends Model
      */
     protected $casts = [
         'monto_minor' => 'integer',
+        'requiere_revision' => 'boolean',
     ];
 
     /** @return BelongsTo<TurnoCajaTenant, $this> */

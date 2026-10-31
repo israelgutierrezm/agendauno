@@ -103,6 +103,8 @@ class BajaDeNegocio
             'suspendido_por' => null,
             'suspendido_en' => null,
         ]);
+        // Se fue: los meses gratis que su llegada dio y aún no se usan, se retiran (ADR 0231).
+        app(ReferidosSaas::class)->revertirNoAplicados($estudio);
         // Los pagos automáticos de sus clientes y las sesiones del equipo, en cola: la
         // pasarela puede tardar y la baja ya quedó.
         CerrarNegocioDadoDeBaja::dispatch((int) $estudio->getKey());
@@ -187,7 +189,7 @@ class BajaDeNegocio
         // Y sus descargas de datos.
         DiscosDeArchivos::privado()->deleteDirectory('exportaciones/'.$estudio->getKey());
         ExportacionNegocio::query()->where('estudio_id', $estudio->getKey())->delete();
-        $this->volcado->disco()->deleteDirectory($this->volcado->carpeta((string) $estudio->slug));
+        $this->volcado->borrarCarpeta($this->volcado->carpeta((string) $estudio->slug));
         if ($this->gestor->baseDeDatosExiste($estudio)) {
             $this->gestor->borrarBaseDeDatos($estudio);
         }

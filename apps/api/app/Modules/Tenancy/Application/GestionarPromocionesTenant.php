@@ -6,8 +6,10 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PromocionTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\PromocionInvalida;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 
 /**
  * Promociones / cupones tenant-local (R22): alta y edición de códigos, y su aplicación
@@ -83,14 +85,17 @@ class GestionarPromocionesTenant
         if (! $promocion->vigente()) {
             throw new PromocionInvalida('La promoción no está vigente.');
         }
-        // Con tope de usos, también cuentan las compras con el código aún por pagar de
-        // las últimas horas: si no, varias órdenes a la vez lo usarían de más al pagarse.
-        // Una compra abandonada deja de apartarlo pasado ese tiempo.
+        // Con tope de usos, también cuentan las compras con el código aún por pagar: las
+        // de una reserva viva, sin caducidad (ya se le prometió ese precio; ADR 0231), y
+        // las demás de las últimas horas (una compra abandonada deja de apartarlo).
         if ($promocion->usos_maximos !== null) {
             $apartados = OrdenTenant::query()
                 ->where('promocion_id', $promocion->getKey())
                 ->where('estado', EstadoOrden::Pendiente->value)
-                ->where('created_at', '>=', now()->subHours(self::HORAS_APARTADO))
+                ->where(fn ($q) => $q
+                    ->where('created_at', '>=', now()->subHours(self::HORAS_APARTADO))
+                    ->orWhereIn('id', ReservaTenant::query()->select('orden_id')->whereNotNull('orden_id')->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value]))
+                    ->orWhereIn('id', ReservaTenant::query()->select('saldo_orden_id')->whereNotNull('saldo_orden_id')->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])))
                 ->count();
             if ((int) $promocion->usos + $apartados >= (int) $promocion->usos_maximos) {
                 throw new PromocionInvalida('La promoción ya no tiene usos disponibles.');
@@ -101,6 +106,26 @@ class GestionarPromocionesTenant
         }
 
         return $promocion;
+    }
+
+    /**
+     * El tope opcional por persona (ADR 0231): sus compras pagadas con el código y las
+     * que tiene por pagar, sin contar la orden que lo está usando.
+     */
+    public function exigirTopePorPersona(PromocionTenant $promocion, int $personaId, ?int $exceptoOrden = null): void
+    {
+        if ($promocion->usos_por_persona === null) {
+            return;
+        }
+        $usos = OrdenTenant::query()
+            ->where('promocion_id', $promocion->getKey())
+            ->where('persona_id', $personaId)
+            ->whereIn('estado', [EstadoOrden::Pendiente->value, EstadoOrden::Pagada->value])
+            ->when($exceptoOrden !== null, static fn ($q) => $q->whereKeyNot($exceptoOrden))
+            ->count();
+        if ($usos >= $promocion->usos_por_persona) {
+            throw new PromocionInvalida('Ya usaste esta promoción las veces que permite.');
+        }
     }
 
     /** Cuánto tiempo aparta un uso una compra por pagar con el código. */

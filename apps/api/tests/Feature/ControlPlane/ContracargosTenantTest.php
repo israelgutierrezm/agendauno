@@ -138,6 +138,22 @@ function disputaDeStripe(): array
         'evidence_details' => ['due_by' => now()->addDays(7)->getTimestamp()]];
 }
 
+it('Stripe: una consulta cerrada sin disputa cierra el contracargo sin pérdida y deja devolver', function (): void {
+    $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
+    $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";
+    $this->postJson($url, ['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_1', 'payment_status' => 'paid']]])->assertOk();
+    $consulta = ['id' => 'dp_consulta', 'amount' => 89900, 'currency' => 'mxn', 'reason' => 'general', 'payment_intent' => 'pi_1'];
+    $this->postJson($url, ['type' => 'charge.dispute.created', 'data' => ['object' => [...$consulta, 'status' => 'warning_needs_response']]])->assertOk();
+    expect(estadoDelContracargo($c['slug'], $c['pago'])['pago']->contracargo_estado)->toBe('abierto');
+
+    $this->postJson($url, ['type' => 'charge.dispute.closed', 'data' => ['object' => [...$consulta, 'status' => 'warning_closed']]])->assertOk();
+
+    $estado = estadoDelContracargo($c['slug'], $c['pago']);
+    expect($estado['pago']->contracargo_estado)->toBe('ganado')
+        ->and($estado['pago']->estado->value)->toBe('aprobado')
+        ->and($estado['incidencias'][0]['estado'])->toBe('resuelta');
+});
+
 it('Stripe: la disputa abre el contracargo en «por conciliar»; perdido, cuenta como devolución una sola vez', function (): void {
     $c = pagoParaContracargo('stripe', ['secret_key' => 'sk_test_x']);
     $url = "/api/v1/webhooks/tenant/{$c['slug']}/stripe";

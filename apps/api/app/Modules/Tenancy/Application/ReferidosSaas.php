@@ -90,6 +90,19 @@ class ReferidosSaas
     }
 
     /**
+     * El invitado se fue: los meses gratis que aún no se aplican, por él, se retiran. Lo
+     * ya aplicado se queda (ADR 0231). Cuántos.
+     */
+    public function revertirNoAplicados(Estudio $invitado): int
+    {
+        return BeneficioRenta::query()
+            ->where('origen_estudio_id', $invitado->getKey())
+            ->where('tipo', self::MES_GRATIS)
+            ->whereNull('aplicado_en')
+            ->delete();
+    }
+
+    /**
      * Un cargo de renta recién emitido: si el negocio tiene un mes gratis pendiente, el
      * cargo queda sin cargo y dice por qué.
      */
@@ -136,6 +149,19 @@ class ReferidosSaas
             ['motivo' => mb_substr($motivo, 0, 200)],
         );
         if (! $beneficio->wasRecentlyCreated) {
+            return;
+        }
+        // Tope por año calendario: lo que pase de ahí no se gana (ADR 0231).
+        $tope = app(ParametrosTenant::class)->entero('referidos.meses_gratis_por_anio');
+        $ganados = BeneficioRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('tipo', self::MES_GRATIS)
+            ->whereKeyNot($beneficio->getKey())
+            ->whereYear('created_at', (int) now()->format('Y'))
+            ->count();
+        if ($ganados >= $tope) {
+            $beneficio->delete();
+
             return;
         }
         // Con plan por adelantado (citas): un mes más cubierto, ya.

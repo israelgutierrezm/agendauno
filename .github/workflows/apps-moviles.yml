@@ -164,7 +164,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: '3.44.0'
@@ -250,7 +250,7 @@ jobs:
           done
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: '3.44.0'
@@ -307,4 +307,6 @@ jobs:
             || { echo "::error::El App Group del widget no es group.$id."; exit 1; }
           test "$(leerw AppProducto)" = "$APP" \
             || { echo "::error::El widget no es de $APP."; exit 1; }
+          test -f "$widget/PrivacyInfo.xcprivacy" \
+            || { echo "::error::Falta PrivacyInfo.xcprivacy en el widget."; exit 1; }
           echo "iOS $APP: $id, $nombre, $icono, solo iPhone, $esquema://, widget y manifiesto de privacidad."

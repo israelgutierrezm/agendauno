@@ -95,8 +95,12 @@ class DevolverVentaPosTenant
                 if ($cantidad < 1 || $cantidad > $quedan) {
                     throw new VentaNoDevolvible("De «{$linea->articulo?->nombre}» quedan {$quedan} por devolver.");
                 }
-                // Su precio por pieza (con extras) es exacto: el subtotal es precio × cantidad.
-                $importe = intdiv((int) $linea->subtotal_minor, max(1, (int) $linea->cantidad)) * $cantidad;
+                // Su precio por pieza; con un cupón el subtotal puede no dividirse exacto: las
+                // últimas piezas llevan lo que falte, para no perder centavos (ADR 0231).
+                $porPieza = intdiv((int) $linea->subtotal_minor, max(1, (int) $linea->cantidad));
+                $importe = $cantidad === $quedan
+                    ? (int) $linea->subtotal_minor - $porPieza * (int) $linea->cantidad_devuelta
+                    : $porPieza * $cantidad;
                 $regresan[] = [$linea, $cantidad, $importe];
                 $monto += $importe;
             }

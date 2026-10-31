@@ -184,8 +184,9 @@ class NotificacionesStripe
         $monto = (int) ($disputa['amount'] ?? 0);
         if ($tipo === 'charge.dispute.closed') {
             $estado = (string) ($disputa['status'] ?? '');
-            if (in_array($estado, ['won', 'lost'], true)) {
-                $this->contracargos->cerrado($pago, $referencia, $estado === 'won', $monto);
+            // Una consulta (inquiry) cerrada sin disputa no le quita dinero al negocio.
+            if (in_array($estado, ['won', 'lost', 'warning_closed'], true)) {
+                $this->contracargos->cerrado($pago, $referencia, $estado !== 'lost', $monto);
             }
 
             return;

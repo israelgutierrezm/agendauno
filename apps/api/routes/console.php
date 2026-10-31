@@ -13,6 +13,10 @@ Schedule::command('agendauno:latido')->everyMinute()->evenInMaintenanceMode();
 // Resumen de alertas de la plataforma al superadmin (ALERTAS_CORREO), agrupado.
 Schedule::command('agendauno:enviar-alertas')->everyTenMinutes()->withoutOverlapping();
 
+// Mide lo que espera en la base de cada negocio (outbox y avisos de pasarela): lo lee
+// agendauno:verificar-produccion y alerta lo atascado (ADR 0232).
+Schedule::command('agendauno:revisar-pendientes')->everyTenMinutes()->withoutOverlapping();
+
 // Reanuda las membresías cuya pausa terminó (antes de renovar ciclos y cobrar). Cada
 // hora: el día termina en la zona de cada negocio, no a medianoche UTC; reanudar una
 // pausa que ya se reanudó no hace nada.
@@ -22,35 +26,41 @@ Schedule::command('agendauno:reanudar-pausas')->hourlyAt(5)->withoutOverlapping(
 // su último día en el negocio (por eso cada hora; un ciclo ya renovado no se repite).
 Schedule::command('agendauno:generar-ciclos')->hourlyAt(15)->withoutOverlapping();
 
+// Las tareas con llamadas externas que se pueden retomar (pasarelas, Google, Meta…) corren
+// en segundo plano (ADR 0232): un proveedor lento no retrasa a las demás de esa corrida,
+// como vencer ofertas o apartados. Al detener el programador nadie las espera; sus candados
+// se limpian al arrancar y al desplegar. Cobrar, facturar, emitir cargos y respaldar siguen
+// en primer plano (van al final de su corrida): un despliegue espera a que terminen.
+
 // Publica los eventos de dominio pendientes del outbox de cada estudio (R39).
 // Frecuente para baja latencia; withoutOverlapping evita relays solapados.
 Schedule::command('agendauno:despachar-outbox')->everyMinute()->withoutOverlapping();
 
 // Retoma los avisos de Wellhub y TotalPass pendientes de cada negocio: el check-in
 // automático que no se procesó al llegar o que se reintenta (ADR 0148).
-Schedule::command('agendauno:procesar-plataformas')->everyMinute()->withoutOverlapping();
+Schedule::command('agendauno:procesar-plataformas')->everyMinute()->withoutOverlapping()->runInBackground();
 
 // Retoma los avisos de Stripe, Mercado Pago y OpenPay pendientes de cada negocio: los
 // que no se procesaron al llegar y los que toca reintentar (ADR 0173).
-Schedule::command('agendauno:procesar-avisos-pasarela')->everyMinute()->withoutOverlapping();
+Schedule::command('agendauno:procesar-avisos-pasarela')->everyMinute()->withoutOverlapping()->runInBackground();
 
 // Mantiene al día las clases publicadas en Wellhub y TotalPass (lugares, cambios y lo que
 // se retira) y cierra las reservas de la plataforma sin check-in (ADR 0149).
-Schedule::command('agendauno:sincronizar-plataformas')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('agendauno:sincronizar-plataformas')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 
 // Renueva las llaves de Instagram de la bandeja antes de que venzan (ADR 0200).
-Schedule::command('agendauno:renovar-instagram')->dailyAt('04:30')->withoutOverlapping();
+Schedule::command('agendauno:renovar-instagram')->dailyAt('04:30')->withoutOverlapping()->runInBackground();
 
 // Publica las clases y citas de cada quien en su Google Calendar u Outlook y trae lo que
 // tiene ocupado como bloqueos de su agenda (ADR 0199).
-Schedule::command('agendauno:sincronizar-calendarios')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('agendauno:sincronizar-calendarios')->everyTenMinutes()->withoutOverlapping()->runInBackground();
 
 // Reintenta las entregas de webhook fallidas de cada estudio (R40).
-Schedule::command('agendauno:reintentar-webhooks')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('agendauno:reintentar-webhooks')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 
 // Manda a GA4 y Meta las conversiones confirmadas del SaaS y de los negocios, con sus
 // reintentos (ADR 0143). Aparte de la operación: nada espera a Google ni a Meta.
-Schedule::command('agendauno:enviar-conversiones')->everyMinute()->withoutOverlapping();
+Schedule::command('agendauno:enviar-conversiones')->everyMinute()->withoutOverlapping()->runInBackground();
 
 // Envia los mensajes encolados (y reintenta los fallidos) de cada estudio (R28).
 Schedule::command('agendauno:enviar-mensajes')->everyMinute()->withoutOverlapping();
@@ -74,37 +84,37 @@ Schedule::command('agendauno:marcar-inasistencias')->everyFiveMinutes()->without
 Schedule::command('agendauno:expirar-reservas-pago')->everyMinute()->withoutOverlapping();
 
 // Vuelve a consultar, con la misma llave, las devoluciones que la pasarela no confirmó.
-Schedule::command('agendauno:conciliar-reembolsos')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('agendauno:conciliar-reembolsos')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 
 // Pide y confirma con la pasarela la cancelación de los pagos automáticos que aún no
 // se confirma (ADR 0134): mientras tanto la suscripción podría seguir cobrando.
-Schedule::command('agendauno:confirmar-cancelaciones')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('agendauno:confirmar-cancelaciones')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 
 // Pregunta a la pasarela por los cobros cuyo aviso (webhook) no llegó y aplica lo que
 // habría aplicado el aviso. Antes de que venza el apartado de una cita (30 min).
-Schedule::command('agendauno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('agendauno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 
 // Cancelaciones de facturas (CFDI) que esperan al cliente o al SAT (ADR 0180): el
 // cliente tiene días para responder, así que basta cada media hora.
-Schedule::command('agendauno:conciliar-cancelaciones-cfdi')->everyThirtyMinutes()->withoutOverlapping();
+Schedule::command('agendauno:conciliar-cancelaciones-cfdi')->everyThirtyMinutes()->withoutOverlapping()->runInBackground();
 
 // Renta del SaaS pagada cuyo aviso de Stripe no llegó: se confirma antes de que el
 // negocio se suspenda por renta vencida.
-Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOverlapping()->runInBackground();
 
 // Dominios propios de los negocios (ADR 0189): revisa su DNS y deja al día los que
 // Traefik sirve con su certificado.
-Schedule::command('agendauno:dominios-propios')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('agendauno:dominios-propios')->everyTenMinutes()->withoutOverlapping()->runInBackground();
 // Recordatorios de las demos agendadas en la landing: un día y una hora antes (ADR 0193).
 Schedule::command('agendauno:recordar-demos')->everyFiveMinutes()->withoutOverlapping();
 // Los pases de la cartera que cambiaron (plan, vigencia, saldo): se avisa a Apple Wallet
 // y se actualiza Google Wallet (ADR 0195).
-Schedule::command('agendauno:actualizar-pases-wallet')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('agendauno:actualizar-pases-wallet')->everyTenMinutes()->withoutOverlapping()->runInBackground();
 // Facturas automáticas de citas que no se timbraron y anticipos por aplicar.
 Schedule::command('agendauno:facturar-citas')->hourlyAt(35)->withoutOverlapping();
 
 // Plantillas de WhatsApp de los negocios (ADR 0190): cómo van en Meta.
-Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('agendauno:revisar-plantillas-whatsapp')->everyFifteenMinutes()->withoutOverlapping()->runInBackground();
 
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2), a
 // las 00:45 de CDMX (ya empezó el día del cobro en el negocio). Una vez al día: es la

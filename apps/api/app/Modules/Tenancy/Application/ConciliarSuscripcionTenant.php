@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
+use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
@@ -174,12 +175,14 @@ class ConciliarSuscripcionTenant
             }
 
             $vigente = $bloqueada->estado === DomiciliacionTenant::ACTIVA;
+            // Una membresía cancelada no se renueva: lo que cobre va a Por conciliar (ADR 0231).
+            $cancelada = $acuerdo->estado === EstadoAcuerdo::Cancelado;
             if (! $cobro->aprobado) {
                 // Un intento rechazado de una suscripción que ya se cancela no cobró nada.
-                return $vigente ? $this->rechazo($bloqueada, $acuerdo, $cobro) : [null, []];
+                return $vigente && ! $cancelada ? $this->rechazo($bloqueada, $acuerdo, $cobro) : [null, []];
             }
 
-            return $vigente || ! $this->trasCancelar($bloqueada, $cobro)
+            return ! $cancelada && ($vigente || ! $this->trasCancelar($bloqueada, $cobro))
                 ? $this->aprobado($bloqueada, $acuerdo, $cobro)
                 : $this->trasCancelacion($bloqueada, $acuerdo, $cobro);
         });
@@ -225,6 +228,10 @@ class ConciliarSuscripcionTenant
      */
     private function aprobado(DomiciliacionTenant $domiciliacion, AcuerdoTenant $acuerdo, CobroDeSuscripcion $cobro): array
     {
+        $duplicado = $this->cobroDeUnPeriodoYaPagado($domiciliacion, $acuerdo, $cobro);
+        if ($duplicado !== null) {
+            return $duplicado;
+        }
         $orden = $this->deudas->de($acuerdo);
         if ($orden === null) {
             return [null, []];
@@ -337,6 +344,46 @@ class ConciliarSuscripcionTenant
             'domiciliacion_id' => $domiciliacion->getKey(),
             'aprobado_en' => $cobro->aprobado ? now() : null,
         ]);
+    }
+
+    /**
+     * La pasarela cobró y el periodo ya estaba pagado a mano (rechazó, pagó con otra
+     * tarjeta y la pasarela reintentó): no es otro mes. Sin renovación pendiente y con la
+     * siguiente lejos, el cobro se registra en su última renovación y queda en Por
+     * conciliar para devolverlo (ADR 0231). Null si es un cobro normal.
+     *
+     * @return array{0: string|null, 1: list<array{tipo: string, detalle: string, datos: array<string, mixed>, pago: PagoTenant|null}>}|null
+     */
+    private function cobroDeUnPeriodoYaPagado(DomiciliacionTenant $domiciliacion, AcuerdoTenant $acuerdo, CobroDeSuscripcion $cobro): ?array
+    {
+        $hayPendiente = OrdenTenant::query()
+            ->where('renueva_acuerdo_id', $acuerdo->getKey())
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->exists();
+        $siguiente = $acuerdo->proxima_cobro_en?->toDateString();
+        $margen = Carbon::parse(app(FechasNegocioTenant::class)->hoy())
+            ->addDays(app(ParametrosTenant::class)->entero('cobranza.dias_gracia_pago_automatico'))
+            ->toDateString();
+        if ($hayPendiente || $siguiente === null || $siguiente <= $margen) {
+            return null;
+        }
+        $ultima = OrdenTenant::query()
+            ->where('renueva_acuerdo_id', $acuerdo->getKey())
+            ->where('estado', EstadoOrden::Pagada->value)
+            ->latest('id')
+            ->first();
+        if (! $ultima instanceof OrdenTenant) {
+            return null;
+        }
+        [$monto, $moneda] = $this->importe($cobro, $ultima);
+        $pago = $this->registrarPago($domiciliacion, $ultima, $cobro, $monto, $moneda);
+
+        return ['por_revisar', [[
+            'tipo' => IncidenciaCobroTenant::PAGO_DUPLICADO,
+            'detalle' => 'La pasarela cobró '.DatosDeOrden::dinero($monto, $moneda).' de un periodo que ya se había pagado. No se tomó como otro mes: devuélvelo.',
+            'datos' => ['esperado_minor' => 0, 'moneda_esperada' => $ultima->moneda, 'cobrado_minor' => $monto, 'moneda_cobrada' => $moneda, 'excedente_minor' => $monto],
+            'pago' => $pago,
+        ]]];
     }
 
     /**

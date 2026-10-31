@@ -131,6 +131,8 @@ class VerificarConcurrencia extends Command
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
             $this->caso('Cancelar una reserva mientras el negocio cancela la clase', fn () => $this->cancelarContraCancelarSesion($escenarios, $rondas));
             $this->caso('Un invitado y una reserva por el último lugar', fn () => $this->invitadoContraReserva($escenarios, $rondas));
+            $this->caso('El mismo cobro confirmado a la vez por el aviso y la conciliación', fn () => $this->avisoYConciliacion($escenarios, $rondas));
+            $this->caso('Aceptar una oferta mientras se vence', fn () => $this->aceptarMientrasVence($escenarios, $rondas));
             $this->caso('Cambios de grupo a la vez en sentidos opuestos', fn () => $this->cambiosDeGrupoOpuestos($escenarios, $rondas));
             $this->caso('Ajustes de inventario y una venta a la vez con poco stock', fn () => $this->inventarioSinNegativos($escenarios, $rondas));
             $this->caso('Ventas del mostrador a la vez por la última pieza', fn () => $this->ultimaPieza($escenarios, $rondas, $procesos));
@@ -294,6 +296,65 @@ class VerificarConcurrencia extends Command
             $this->comprobar($fallas, $cobros['pagos'] === 1, "{$cobros['pagos']} pagos del servicio");
             $this->inesperados($fallas, $res);
             $this->detalle('ronda '.($r + 1).": 2 intentos → {$hechos} con el mismo cobro, {$cobros['pagos']} pago", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * El aviso de la pasarela y la conciliación confirman el mismo cobro a la vez: la
+     * venta se paga una vez y el paquete se entrega una sola vez.
+     *
+     * @return list<string>
+     */
+    private function avisoYConciliacion(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            ['pago' => $pago, 'persona' => $persona] = $e->cobroPorConfirmar($this->base['sucursal']);
+            $res = $this->competir([
+                ['accion' => 'confirmar-pago', 'pago' => $pago, 'referencia' => "aviso-{$pago}"],
+                ['accion' => 'confirmar-pago', 'pago' => $pago, 'referencia' => "conciliacion-{$pago}"],
+            ]);
+
+            $entrega = $e->entregaDelCobro($pago, $persona);
+            $this->comprobar($fallas, $this->hechos($res) === 2, $this->hechos($res).' de 2 confirmaciones terminaron');
+            $this->comprobar($fallas, $entrega['estado'] === 'aprobado', "el cobro quedó {$entrega['estado']}");
+            $this->comprobar($fallas, $entrega['orden'] === 'pagada', "la venta quedó {$entrega['orden']}");
+            $this->comprobar($fallas, $entrega['derechos'] === 1, "{$entrega['derechos']} paquetes entregados por un cobro");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": aviso y conciliación → {$entrega['derechos']} paquete entregado", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Quien acepta su oferta justo cuando vence: o la toma (y el lugar es suyo) o venció
+     * (y pasa al siguiente). Nunca las dos, y la clase no se sobrevende.
+     *
+     * @return list<string>
+     */
+    private function aceptarMientrasVence(EscenariosConcurrencia $e, int $rondas): array
+    {
+        $fallas = [];
+        for ($r = 0; $r < $rondas; $r++) {
+            $caso = $e->ofertaPorVencer($this->base['clase'], $this->base['sucursal'], 75 + $r, (int) ceil($this->espera + 1));
+            [$aceptar, $vencer] = $res = $this->competir([
+                ['accion' => 'aceptar-oferta', 'reserva' => $caso['oferta']],
+                ['accion' => 'vencer-ofertas', 'reserva' => $caso['oferta']],
+            ]);
+
+            $oferta = $e->estadoDeReserva($caso['oferta']);
+            $siguiente = $e->estadoDeReserva($caso['siguiente']);
+            $ocupadas = $e->ocupadas($caso['sesion']);
+            $this->comprobar($fallas, ! ($aceptar['hecho'] && $vencer['detalle'] === 'vencida'), 'la oferta se aceptó y también venció');
+            $this->comprobar($fallas, $aceptar['hecho'] === ($oferta === EstadoReserva::Confirmada->value), 'aceptar respondió '.($aceptar['hecho'] ? 'sí' : 'no')." y la oferta quedó {$oferta}");
+            $this->comprobar($fallas, $aceptar['hecho'] || ($oferta === EstadoReserva::Expirada->value && $siguiente === EstadoReserva::Ofrecida->value), "venció, pero la oferta quedó {$oferta} y el siguiente {$siguiente}");
+            $this->comprobar($fallas, ! $aceptar['hecho'] || $siguiente === EstadoReserva::EnEspera->value, "se aceptó, pero el siguiente quedó {$siguiente}");
+            $this->comprobar($fallas, $ocupadas === 1, "{$ocupadas} lugares ocupados en una clase de 1");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).': aceptar y vencer → '.$oferta, $res);
         }
 
         return $fallas;

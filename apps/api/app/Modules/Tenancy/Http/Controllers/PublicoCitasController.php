@@ -354,7 +354,7 @@ class PublicoCitasController
         $validado = $request->validate([
             'orden_id' => ['required', 'string'],
             'proveedor' => ['nullable', 'string'],
-            'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
+            'metodo' => ['nullable', Rule::in([MetodoPago::Tarjeta->value, MetodoPago::Oxxo->value, MetodoPago::Spei->value])],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
 

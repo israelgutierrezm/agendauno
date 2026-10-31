@@ -40,9 +40,21 @@ export default {
   cancelarCanjeAceptar: "Cancelar canje",
   ajustarPuntos: "¿Ajustar {puntos} puntos? Queda en su historial.",
   ajustar: "Ajustar",
-  regularizar:
-    "¿Registrar que {persona} ya pagó su adeudo? Se cierra su proceso de cobranza.",
   regularizarAceptar: "Registrar pago",
+  quitarCompra:
+    "¿Quitar esta compra sin pagar? Puedes volver a comprarla cuando quieras.",
+  quitarCompraAceptar: "Quitar compra",
+  moraTrayendo: "Abriendo…",
+  promoUsosPorPersona: "Usos por persona (opcional)",
+  cambioTardio:
+    "Falta poco para tu horario: si cambias y después cancelas, cuenta como cancelación tardía.",
+  movimientoPorRevisar: "Por revisar: corrige un turno cerrado",
+  condonar: "Condonar",
+  condonarTitulo: "Condonar el adeudo",
+  condonarExplica:
+    "El periodo de {persona} se perdona sin cobrarlo: no entra a la caja, se anula su renovación por cobrar y se cierra la mora. Queda en la bitácora.",
+  condonarMotivo: "Motivo",
+  condonarAceptar: "Condonar el adeudo",
   promover:
     "¿Ofrecer los lugares libres a la lista de espera? Se avisa a quienes siguen en la fila.",
   promoverAceptar: "Ofrecer lugares",

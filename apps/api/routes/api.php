@@ -268,7 +268,7 @@ Route::prefix('v1')->group(function (): void {
     // cancelarla con el enlace de su correo.
     Route::get('/demos', [DemosController::class, 'horarios'])->middleware('throttle:publico')->name('api.v1.demos.horarios');
     Route::post('/demos', [DemosController::class, 'agendar'])->middleware('throttle:demos')->name('api.v1.demos.agendar');
-    Route::post('/demos/{demo}/cancelar', [DemosController::class, 'cancelar'])->middleware('throttle:login')->name('api.v1.demos.cancelar');
+    Route::post('/demos/{demo}/cancelar', [DemosController::class, 'cancelar'])->middleware('throttle:accion-publica')->name('api.v1.demos.cancelar');
     // Servicio web de los pases de Apple Wallet (ADR 0195): el teléfono registra el pase,
     // pregunta qué cambió y pide el pase nuevo (con el token del pase, sin sesión).
     Route::prefix('/wallet/apple/v1')->middleware('throttle:wallet')->group(function (): void {
@@ -432,7 +432,7 @@ Route::prefix('v1')->group(function (): void {
         // Reenvío del correo de activación (público: el dueño aún no puede entrar).
         Route::post('/reenviar-activacion', [AuthTenantController::class, 'reenviarActivacion'])->middleware('throttle:login')->name('reenviar-activacion');
         // Abrir la web con la sesión de la app (ADR 0211): canjea el enlace de un solo uso.
-        Route::post('/enlace-web/canjear', [AuthTenantController::class, 'canjearEnlaceWeb'])->middleware('throttle:login')->name('enlace-web.canjear');
+        Route::post('/enlace-web/canjear', [AuthTenantController::class, 'canjearEnlaceWeb'])->middleware('throttle:accion-publica')->name('enlace-web.canjear');
         Route::post('/recuperar-contrasena', [AuthTenantController::class, 'recuperarContrasena'])->middleware('throttle:recuperacion')->name('recuperar-contrasena');
         Route::post('/restablecer-contrasena', [AuthTenantController::class, 'restablecerContrasena'])->middleware('throttle:recuperacion')->name('restablecer-contrasena');
         Route::post('/confirmar-correo', [AuthTenantController::class, 'confirmarCorreo'])->middleware('throttle:login')->name('confirmar-correo');
@@ -454,9 +454,9 @@ Route::prefix('v1')->group(function (): void {
         // Presupuestos en línea desde el enlace del correo (`?t=`): verlo, aceptarlo o
         // rechazarlo y pagarlo.
         Route::get('/presupuestos-en-linea/{presupuesto}', [PresupuestoEnLineaController::class, 'ver'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('presupuestos-en-linea.ver');
-        Route::post('/presupuestos-en-linea/{presupuesto}/aceptar', [PresupuestoEnLineaController::class, 'aceptar'])->middleware(['throttle:login', 'modalidad:citas'])->name('presupuestos-en-linea.aceptar');
-        Route::post('/presupuestos-en-linea/{presupuesto}/rechazar', [PresupuestoEnLineaController::class, 'rechazar'])->middleware(['throttle:login', 'modalidad:citas'])->name('presupuestos-en-linea.rechazar');
-        Route::post('/presupuestos-en-linea/{presupuesto}/pagar', [PresupuestoEnLineaController::class, 'pagar'])->middleware(['throttle:login', 'modalidad:citas'])->name('presupuestos-en-linea.pagar');
+        Route::post('/presupuestos-en-linea/{presupuesto}/aceptar', [PresupuestoEnLineaController::class, 'aceptar'])->middleware(['throttle:accion-publica', 'modalidad:citas'])->name('presupuestos-en-linea.aceptar');
+        Route::post('/presupuestos-en-linea/{presupuesto}/rechazar', [PresupuestoEnLineaController::class, 'rechazar'])->middleware(['throttle:accion-publica', 'modalidad:citas'])->name('presupuestos-en-linea.rechazar');
+        Route::post('/presupuestos-en-linea/{presupuesto}/pagar', [PresupuestoEnLineaController::class, 'pagar'])->middleware(['throttle:accion-publica', 'modalidad:citas'])->name('presupuestos-en-linea.pagar');
         // Kiosco de llegada (ADR 0183): la tableta de recepción, con su propia llave.
         Route::middleware(['kiosco', 'throttle:negocio-publico'])->prefix('kiosco')->name('kiosco.')->group(function (): void {
             Route::get('/', [KioscosTenantController::class, 'mostrar'])->name('mostrar');
@@ -494,14 +494,14 @@ Route::prefix('v1')->group(function (): void {
         // La cita desde el enlace firmado de sus avisos, sin cuenta (ADR 0221): verla,
         // cancelarla y cambiarla con las reglas de siempre.
         Route::get('/citas/enlace/{reserva}', [CitaSinCuentaController::class, 'mostrar'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.enlace');
-        Route::post('/citas/enlace/{reserva}/cancelar', [CitaSinCuentaController::class, 'cancelar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.enlace.cancelar');
+        Route::post('/citas/enlace/{reserva}/cancelar', [CitaSinCuentaController::class, 'cancelar'])->middleware(['throttle:accion-publica', 'modalidad:citas'])->name('citas.enlace.cancelar');
         Route::get('/citas/enlace/{reserva}/reprogramar', [ReprogramarCitaSinCuentaController::class, 'opciones'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.enlace.reprogramar.opciones');
-        Route::post('/citas/enlace/{reserva}/reprogramar', [ReprogramarCitaSinCuentaController::class, 'reprogramar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.enlace.reprogramar');
+        Route::post('/citas/enlace/{reserva}/reprogramar', [ReprogramarCitaSinCuentaController::class, 'reprogramar'])->middleware(['throttle:accion-publica', 'modalidad:citas'])->name('citas.enlace.reprogramar');
         // Cuánto descuenta un cupón antes de agendar (ADR 0220).
         Route::get('/citas/cupon', [PublicoCitasController::class, 'cupon'])->middleware(['throttle:20,1,cupon-citas', 'modalidad:citas'])->name('citas.cupon');
         // Pagar y ver la orden de una sesión por el enlace del correo: también la clase
         // de pago suelto (ADR 0065), así que son del núcleo, sin modalidad.
-        Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
+        Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:accion-publica')->name('citas.pagar');
         // La cita por pagar del enlace del correo de apartado (el ULID de la orden es la capacidad).
         Route::get('/citas/orden/{orden}', [PublicoCitasController::class, 'orden'])->middleware('throttle:negocio-publico')->name('citas.orden');
         // Al volver de la pasarela: si el pago ya se confirmó (el ULID va en la URL de regreso).
@@ -650,6 +650,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/ordenes/pendientes', [MiTenantController::class, 'ordenesPendientes'])->name('mi.ordenes.pendientes');
             Route::post('/mi/ordenes', [MiTenantController::class, 'comprar'])->middleware('plan:venta_en_linea')->name('mi.ordenes.store');
             Route::post('/mi/ordenes/{orden}/cobrar', [MiTenantController::class, 'cobrar'])->name('mi.ordenes.cobrar');
+            Route::delete('/mi/ordenes/{orden}', [MiTenantController::class, 'quitarCompra'])->name('mi.ordenes.destroy');
             // Pago automático: qué membresías se cobran solas y con qué tarjeta; activar,
             // quitar o cambiar la tarjeta (se autoriza en la página de la pasarela).
             Route::get('/mi/pago-automatico', [MiPagoAutomaticoTenantController::class, 'mostrar'])->name('mi.pago-automatico');
@@ -1115,7 +1116,10 @@ Route::prefix('v1')->group(function (): void {
             // Lo que ya se debe (compras sin pagar y citas pasadas sin pagar), como en el Inicio.
             Route::get('/cobranza/pendientes', PorCobrarTenantController::class)->middleware('puede:facturacion.ver')->name('cobranza.pendientes');
             Route::post('/acuerdos/{acuerdo}/cobro-fallido', [DunningTenantController::class, 'registrarFallo'])->middleware('puede:ordenes.gestionar')->name('acuerdos.cobro-fallido');
-            Route::post('/acuerdos/{acuerdo}/regularizar', [DunningTenantController::class, 'regularizar'])->middleware('puede:ordenes.gestionar')->name('acuerdos.regularizar');
+            // Registrar pago: la renovación por cobrar, para cobrarla en caja (ADR 0231).
+            Route::post('/acuerdos/{acuerdo}/deuda', [DunningTenantController::class, 'deuda'])->middleware('puede:ordenes.gestionar')->name('acuerdos.deuda');
+            // Condonar: perdona la renovación con motivo, sin cobrar.
+            Route::post('/acuerdos/{acuerdo}/condonar', [DunningTenantController::class, 'condonar'])->middleware('puede:cobranza.condonar')->name('acuerdos.condonar');
             // Pausar (congelar) y reanudar una membresía o paquete.
             Route::post('/acuerdos/{acuerdo}/pausar', [PausasMembresiaTenantController::class, 'pausar'])->middleware('puede:membresias.gestionar')->name('acuerdos.pausar');
             Route::post('/acuerdos/{acuerdo}/reanudar', [PausasMembresiaTenantController::class, 'reanudar'])->middleware('puede:membresias.gestionar')->name('acuerdos.reanudar');

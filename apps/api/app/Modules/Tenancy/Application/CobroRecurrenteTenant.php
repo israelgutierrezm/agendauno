@@ -246,6 +246,45 @@ class CobroRecurrenteTenant
     }
 
     /**
+     * Un negocio que solo cobra en caja no intenta nada: el día de la renovación, si la
+     * orden sigue pendiente, abre la mora. Al vencer la gracia, `escalar-dunning` suspende
+     * (ADR 0231). Cuántas entraron a mora.
+     */
+    public function moraDeVencidasEnCaja(): int
+    {
+        $conDunning = ProcesoDunningTenant::query()
+            ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+            ->pluck('acuerdo_id')->all();
+
+        $acuerdos = AcuerdoTenant::query()
+            ->where('estado', EstadoAcuerdo::Activo->value)
+            ->whereNotNull('proxima_cobro_en')
+            ->whereDate('proxima_cobro_en', '<=', app(FechasNegocioTenant::class)->hoy())
+            ->when($conDunning !== [], fn ($q) => $q->whereNotIn('id', $conDunning))
+            ->with(['persona', 'producto'])
+            ->get();
+
+        $enMora = 0;
+        foreach ($acuerdos as $acuerdo) {
+            try {
+                if ($this->modalidades->enCitas() && $acuerdo->dia_ancla !== null && $acuerdo->baja_efectiva_el === null) {
+                    $this->retiro->terminarEnSuFecha($acuerdo);
+
+                    continue;
+                }
+                if ($this->deudas->de($acuerdo) !== null) {
+                    $this->dunning->registrarFallo($acuerdo, MotivoFalloCobro::SinPagoEnCaja, 'La renovación venció sin pagarse en caja.');
+                    $enMora++;
+                }
+            } catch (Throwable $e) {
+                ReporteDeErrores::reportarAtrapado($e);
+            }
+        }
+
+        return $enMora;
+    }
+
+    /**
      * Reintenta a los morosos (EN MORA) cuyo próximo intento ya venció.
      *
      * @return Resumen

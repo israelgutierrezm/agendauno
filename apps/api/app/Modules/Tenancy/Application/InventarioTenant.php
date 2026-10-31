@@ -87,14 +87,25 @@ class InventarioTenant
         TipoMovimientoInventario $tipo,
         ?string $motivo = null,
         ?Usuario $actor = null,
+        ?string $claveIntento = null,
     ): MovimientoInventarioTenant {
-        return DB::connection('tenant')->transaction(function () use ($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor): MovimientoInventarioTenant {
+        return DB::connection('tenant')->transaction(function () use ($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor, $claveIntento): MovimientoInventarioTenant {
             ArticuloTenant::query()->whereKey($articuloId)->lockForUpdate()->firstOrFail();
+            // Ya bajo candado: el mismo intento (doble clic, red) es el mismo ajuste.
+            $previo = $claveIntento !== null ? MovimientoInventarioTenant::query()->where('clave_intento', $claveIntento)->first() : null;
+            if ($previo instanceof MovimientoInventarioTenant) {
+                return $previo;
+            }
             if ($delta < 0 && $this->stock($articuloId, $sucursalId) + $delta < 0) {
                 throw new StockInsuficiente('El ajuste dejaría el stock en negativo.');
             }
 
-            return $this->registrar($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor);
+            $movimiento = $this->registrar($articuloId, $sucursalId, $delta, $tipo, $motivo, $actor);
+            if ($claveIntento !== null) {
+                $movimiento->update(['clave_intento' => $claveIntento]);
+            }
+
+            return $movimiento;
         });
     }
 

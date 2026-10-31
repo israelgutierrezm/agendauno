@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -47,6 +48,9 @@ use Throwable;
 class AsistenteNegocioTenant
 {
     private const VUELTAS = 6;
+
+    /** Con menos de estos segundos del presupuesto ya no se llama otra vez al modelo. */
+    private const SEGUNDOS_MINIMOS = 5;
 
     private const MINUTOS_PROPUESTA = 30;
 
@@ -91,9 +95,17 @@ class AsistenteNegocioTenant
         $propuestas = [];
         $texto = '';
         $paro = '';
+        // Toda la pregunta cabe en la petición: nginx corta a los 60 s (ADR 0232).
+        $limite = microtime(true) + (int) config('agendauno.asistente.presupuesto', 45);
+        $sinTiempo = false;
 
         for ($vuelta = 0; $vuelta < self::VUELTAS; $vuelta++) {
-            $respuesta = $this->llamarModelo($estudio, $usuario, $conversacion);
+            $quedan = (int) floor($limite - microtime(true));
+            if ($quedan < self::SEGUNDOS_MINIMOS) {
+                $sinTiempo = true;
+                break;
+            }
+            $respuesta = $this->llamarModelo($estudio, $usuario, $conversacion, $quedan);
             $bloques = (array) ($respuesta['content'] ?? []);
             $usos = array_values(array_filter($bloques, static fn (mixed $b): bool => is_array($b) && ($b['type'] ?? '') === 'tool_use'));
             $texto = trim(implode("\n", array_map(
@@ -126,6 +138,7 @@ class AsistenteNegocioTenant
         // Si el modelo se niega (`refusal`), se dice con claridad en lugar de quedar a medias.
         return [
             'respuesta' => match (true) {
+                $sinTiempo => 'Esa pregunta tomó demasiado tiempo. Intenta con una más concreta.',
                 $paro === 'refusal' => 'No puedo ayudarte con eso. Pregúntame por los datos y la operación de tu negocio.',
                 $texto !== '' => $texto,
                 default => 'No pude contestar eso. Intenta con otra pregunta.',
@@ -369,7 +382,7 @@ class AsistenteNegocioTenant
      * @param  list<array<string, mixed>>  $conversacion
      * @return array<string, mixed>
      */
-    private function llamarModelo(Estudio $estudio, Usuario $usuario, array $conversacion): array
+    private function llamarModelo(Estudio $estudio, Usuario $usuario, array $conversacion, int $segundos): array
     {
         $hoy = CarbonImmutable::now($this->fechas->zona());
         $sistema = 'Eres el asistente de '.$estudio->nombre.', un negocio de '.($this->modalidad->esClases() ? 'clases' : 'citas')
@@ -380,17 +393,21 @@ class AsistenteNegocioTenant
             .' Si piden hacer algo, usa proponer_accion y explica que deben revisarla y aplicarla; tú no la aplicas.'
             .' No pidas ni muestres datos personales de clientes.';
 
-        $respuesta = Http::withHeaders([
-            'x-api-key' => (string) config('agendauno.asistente.llave'),
-            'anthropic-version' => '2023-06-01',
-        ])->timeout((int) config('agendauno.asistente.timeout', 60))
-            ->post((string) config('agendauno.asistente.url'), [
-                'model' => (string) config('agendauno.asistente.modelo'),
-                'max_tokens' => 1500,
-                'system' => $sistema,
-                'tools' => self::herramientas(),
-                'messages' => $conversacion,
-            ]);
+        try {
+            $respuesta = Http::withHeaders([
+                'x-api-key' => (string) config('agendauno.asistente.llave'),
+                'anthropic-version' => '2023-06-01',
+            ])->timeout(min($segundos, (int) config('agendauno.asistente.timeout', 60)))
+                ->post((string) config('agendauno.asistente.url'), [
+                    'model' => (string) config('agendauno.asistente.modelo'),
+                    'max_tokens' => 1500,
+                    'system' => $sistema,
+                    'tools' => self::herramientas(),
+                    'messages' => $conversacion,
+                ]);
+        } catch (ConnectionException) {
+            throw new HttpException(502, 'El asistente no respondió. Intenta en un momento.');
+        }
         if (! $respuesta->successful()) {
             throw new HttpException(502, 'El asistente no respondió. Intenta en un momento.');
         }

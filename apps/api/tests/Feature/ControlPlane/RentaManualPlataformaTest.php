@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 
 /*
 | La renta a mano desde el superadmin (ADR 0214): registrar un pago recibido fuera de
@@ -35,6 +36,27 @@ function timbradoDeRentaManual(ArrayObject $enviadas): void
         }
     });
 }
+
+it('registrar un pago a mano cierra el intento en línea abierto; si ya se cobró, no se registra otro', function (): void {
+    $e = estudioConSesion('estudio-intento', 'dueno@intento.mx');
+    $cargo = cargoRentaPendiente($e);
+    CargoRenta::query()->where('ulid', $cargo)->update(['metodo_pago' => 'openpay', 'referencia_pago' => 'trx_abierta']);
+    // OpenPay no deja cerrarla: su estado dice si se puede.
+    $estado = new ArrayObject(['status' => 'completed']);
+    Http::fake(['*openpay*' => fn () => Http::response(['id' => 'trx_abierta', 'status' => $estado['status'], 'amount' => 100.0])]);
+    $this->putJson('/api/v1/plataforma/pasarelas/openpay', [
+        'activa' => true, 'modo' => 'test',
+        'credenciales' => ['merchant_id' => 'm1', 'private_key' => 'sk_openpay', 'webhook_user' => 'agendauno', 'webhook_password' => 'clave-del-aviso'],
+    ], conPlataforma())->assertOk();
+
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/pago", ['metodo' => 'transferencia'], conPlataforma())->assertStatus(422);
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('estado')->value)->toBe('pendiente');
+
+    // Sin cobrar: se registra y la página se sigue vigilando.
+    $estado['status'] = 'charge_pending';
+    $this->postJson("/api/v1/plataforma/cargos/{$cargo}/pago", ['metodo' => 'transferencia'], conPlataforma())->assertOk();
+    expect(CargoRenta::query()->where('ulid', $cargo)->value('referencia_condonada'))->toBe('trx_abierta');
+});
 
 it('el superadmin registra un pago por transferencia: reactiva al negocio y su CFDI sale con esa forma de pago', function (): void {
     $enviadas = new ArrayObject;

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
+use App\Modules\Tenancy\Pasarelas\PasarelaConContracargos;
 use App\Modules\Tenancy\Pasarelas\PasarelaConDevoluciones;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Support\Carbon;
@@ -64,6 +65,7 @@ class ConciliarReembolsosTenant
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly IncidenciasCobroTenant $incidencias,
         private readonly RegistroDePasarelasTenant $registro,
+        private readonly ContracargosTenant $contracargos,
     ) {}
 
     public function ejecutar(): int
@@ -118,6 +120,10 @@ class ConciliarReembolsosTenant
     public function revisarPago(PagoTenant $pago): int
     {
         $pasarela = $this->registro->resolver($pago->proveedor);
+        // Un contracargo cuyo aviso se perdió también se recupera aquí (ADR 0231).
+        if ($pasarela instanceof PasarelaConContracargos) {
+            $this->revisarContracargo($pasarela, $pago);
+        }
         if (! $pasarela instanceof PasarelaConDevoluciones) {
             return 0;
         }
@@ -136,6 +142,28 @@ class ConciliarReembolsosTenant
         }
 
         return $registradas;
+    }
+
+    /** Lo que diga la pasarela, si cambia algo (abrir y cerrar son idempotentes). */
+    private function revisarContracargo(PasarelaConContracargos $pasarela, PagoTenant $pago): void
+    {
+        try {
+            $contracargo = $pasarela->contracargo($pago, $this->registro->llaves($pago->proveedor));
+        } catch (Throwable $e) {
+            // Sin respuesta: se vuelve a preguntar en la próxima revisión; no impide ver las devoluciones.
+            Log::warning('No se pudo consultar el contracargo del cobro.', ['pago' => $pago->ulid, 'error' => $e->getMessage()]);
+
+            return;
+        }
+        if ($contracargo === null) {
+            return;
+        }
+        if ($contracargo['estado'] === 'abierto') {
+            $this->contracargos->abierto($pago, $contracargo['id'], $contracargo['monto_minor'], $contracargo['motivo']);
+
+            return;
+        }
+        $this->contracargos->cerrado($pago, $contracargo['id'], $contracargo['estado'] === 'ganado', $contracargo['monto_minor']);
     }
 
     private function aclararPendientes(): int

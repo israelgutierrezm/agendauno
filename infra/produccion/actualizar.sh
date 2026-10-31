@@ -93,6 +93,9 @@ principal() {
 
   EN_MARCHA="$(VERSION="$ANTERIOR" $COMPOSE ps -q api 2>/dev/null || true)"
   if [ -n "$EN_MARCHA" ]; then
+    # Antes del mantenimiento: un trabajo largo (hasta 30 min) espera con el servicio abierto.
+    echo "==> Esperando a que el worker de trabajos largos termine (el servicio sigue abierto)"
+    VERSION="$ANTERIOR" $COMPOSE stop worker-pesados || true
     echo "==> Punto de corte: mantenimiento y sin tareas en curso"
     VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan down --retry=60 --secret="$SECRETO"
     echo "    esperando a que la cola y el programador terminen lo que están haciendo…"
@@ -320,7 +323,7 @@ cola_procesa() {
 
 reabrir_anterior() {
   echo "   Reabriendo la versión en marcha ($ANTERIOR) sin actualizar."
-  VERSION="$ANTERIOR" $COMPOSE start worker scheduler || true
+  VERSION="$ANTERIOR" $COMPOSE start worker worker-pesados scheduler || true
   VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan up || true
 }
 

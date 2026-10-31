@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\Exceptions\CobroNoCorregible;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pagos\PartesCobro;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -228,6 +229,44 @@ class CajasTenant
             ->exists();
 
         return $entro ? $this->turnoParaMovimiento($this->sucursalDelCobro($pago)) : null;
+    }
+
+    /**
+     * ¿El cobro entró por un turno ya contado o cerrado? Corregirlo mueve la caja de hoy
+     * y puede cuadrar un faltante: solo quien supervisa la caja, y queda marcado para
+     * revisarlo en el corte (ADR 0231). Devuelve si hay que marcarlo.
+     *
+     * @param  array{pago_id?: int, venta_pos_id?: int}  $origen
+     */
+    public function exigirSupervisorSiTurnoCerrado(array $origen, ?Usuario $actor): bool
+    {
+        $cerrado = MovimientoCajaTenant::query()
+            ->where($origen)
+            ->whereIn('tipo', [MovimientoCajaTenant::COBRO, MovimientoCajaTenant::VENTA, MovimientoCajaTenant::PROPINA])
+            ->whereHas('turno', static fn ($q) => $q->where('estado', '!=', TurnoCajaTenant::ABIERTA))
+            ->exists();
+        if ($cerrado && $actor !== null && ! $actor->puede('caja.supervisar')) {
+            throw new CobroNoCorregible('Ese cobro es de un turno ya cerrado: lo corrige quien supervisa la caja.');
+        }
+
+        return $cerrado;
+    }
+
+    /**
+     * Los ajustes de ese cobro, en ese turno, quedan por revisar en el corte.
+     *
+     * @param  array{pago_id?: int, venta_pos_id?: int}  $origen
+     */
+    public function marcarParaRevision(?TurnoCajaTenant $turno, array $origen): void
+    {
+        if ($turno === null) {
+            return;
+        }
+        MovimientoCajaTenant::query()
+            ->where('turno_caja_id', $turno->getKey())
+            ->where($origen)
+            ->whereIn('tipo', [MovimientoCajaTenant::CORRECCION, MovimientoCajaTenant::ANULACION])
+            ->update(['requiere_revision' => true]);
     }
 
     /**

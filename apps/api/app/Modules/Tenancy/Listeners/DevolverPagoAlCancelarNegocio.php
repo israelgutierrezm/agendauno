@@ -12,7 +12,6 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
-use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -78,17 +77,8 @@ class DevolverPagoAlCancelarNegocio implements ShouldQueue
             ->whereIn('proveedor', ProveedorPasarela::enLinea())
             ->get();
         foreach ($pagos as $pago) {
-            try {
-                $this->reembolsar->ejecutar(
-                    $pago,
-                    null,
-                    'El negocio canceló la reserva.',
-                    // Una por pago: el anticipo y el resto son devoluciones distintas.
-                    llave: 'cancelacion-negocio:'.$reserva->ulid.':'.$pago->ulid,
-                );
-            } catch (PagoNoReembolsable) {
-                // Ya devuelto, o la pasarela no devuelve en línea: lo resuelve el negocio.
-            }
+            // Una por pago: el anticipo y el resto son devoluciones distintas.
+            $this->reembolsar->automatica($pago, null, 'El negocio canceló la reserva.', 'cancelacion-negocio:'.$reserva->ulid.':'.$pago->ulid, true);
         }
     }
 }

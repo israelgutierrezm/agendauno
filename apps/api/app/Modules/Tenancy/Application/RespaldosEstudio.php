@@ -53,6 +53,9 @@ class RespaldosEstudio
      */
     public function limpiar(Estudio $estudio, int $dias): int
     {
+        if ($this->volcado->retencionEnBucket()) {
+            return 0;
+        }
         $limite = Carbon::now()->subDays($dias)->getTimestamp();
         $borrados = 0;
 
@@ -109,7 +112,8 @@ class RespaldosEstudio
      */
     public function restaurar(Estudio $estudio, string $ruta): void
     {
-        if (! $this->volcado->disco()->exists($ruta) || ! str_starts_with($ruta, $this->carpeta($estudio).'/')) {
+        $suyo = str_starts_with($ruta, $this->carpeta($estudio).'/') || $this->volcado->esCopiaMensualDe($ruta, (string) $estudio->slug);
+        if (! $suyo || ! $this->volcado->disco()->exists($ruta)) {
             throw new RuntimeException('Ese respaldo no existe o no es de este negocio.');
         }
 

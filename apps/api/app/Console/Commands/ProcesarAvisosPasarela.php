@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class ProcesarAvisosPasarela extends Command
 {
-    protected $signature = 'agendauno:procesar-avisos-pasarela';
+    protected $signature = 'agendauno:procesar-avisos-pasarela {--reintentar-fallidos : Vuelve a poner en cola los que agotaron sus intentos}';
 
     protected $description = 'Procesa los avisos pendientes de las pasarelas de cobro de cada negocio';
 
@@ -36,8 +36,13 @@ class ProcesarAvisosPasarela extends Command
                     }
                     $terminados += $gestor->ejecutarAislado($estudio, function () use ($avisos): int {
                         // Un negocio sin avisos (o sin la migración aún) no hace nada.
-                        if (! Schema::connection('tenant')->hasTable('avisos_pasarela')
-                            || ! AvisoPasarelaTenant::query()->where('estado', AvisoPasarelaTenant::PENDIENTE)->exists()) {
+                        if (! Schema::connection('tenant')->hasTable('avisos_pasarela')) {
+                            return 0;
+                        }
+                        if ($this->option('reintentar-fallidos')) {
+                            $avisos->reintentarFallidos();
+                        }
+                        if (! AvisoPasarelaTenant::query()->where('estado', AvisoPasarelaTenant::PENDIENTE)->exists()) {
                             return 0;
                         }
 

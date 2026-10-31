@@ -25,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 class PromocionesTenantController
 {
     /** Lo que se compara al editar (para decir qué cambió en la bitácora). */
-    private const CAMPOS_BITACORA = ['codigo', 'descripcion', 'tipo', 'valor', 'monto_minimo_minor', 'usos_maximos', 'vence_en', 'activa'];
+    private const CAMPOS_BITACORA = ['codigo', 'descripcion', 'tipo', 'valor', 'monto_minimo_minor', 'usos_maximos', 'usos_por_persona', 'vence_en', 'activa'];
 
     public function __construct(
         private readonly GestionarPromocionesTenant $promociones,
@@ -54,7 +54,8 @@ class PromocionesTenantController
         // El código era de una promoción eliminada: se restaura con los datos nuevos.
         if ($existente instanceof PromocionTenant) {
             $existente->restore();
-            $promocion = $this->promociones->actualizar($existente, $datos);
+            // Es otra promoción con el mismo código: sus usos empiezan de cero (ADR 0231).
+            $promocion = $this->promociones->actualizar($existente, [...$datos, 'usos' => 0]);
             $eliminaciones->restaurado($promocion, 'promocion', $promocion->only(['codigo', 'descripcion', 'tipo', 'valor']));
 
             return response()->json(['data' => [...$this->presentar($promocion), 'restaurada' => true]], 201);
@@ -159,6 +160,7 @@ class PromocionesTenantController
             'valor' => $promocion->valor,
             'monto_minimo_minor' => $promocion->monto_minimo_minor,
             'usos_maximos' => $promocion->usos_maximos,
+            'usos_por_persona' => $promocion->usos_por_persona,
             'usos' => $promocion->usos,
             'vence_en' => $promocion->vence_en?->toDateString(),
             'activa' => $promocion->activa,
@@ -178,6 +180,7 @@ class PromocionesTenantController
             'valor' => ['required', 'integer', 'min:1'],
             'monto_minimo_minor' => ['nullable', 'integer', 'min:0'],
             'usos_maximos' => ['nullable', 'integer', 'min:1'],
+            'usos_por_persona' => ['nullable', 'integer', 'min:1'],
             'vence_en' => ['nullable', 'date'],
             'activa' => ['boolean'],
         ];
@@ -204,6 +207,7 @@ class PromocionesTenantController
             'valor' => (int) $v['valor'],
             'monto_minimo_minor' => isset($v['monto_minimo_minor']) ? (int) $v['monto_minimo_minor'] : null,
             'usos_maximos' => isset($v['usos_maximos']) ? (int) $v['usos_maximos'] : null,
+            'usos_por_persona' => isset($v['usos_por_persona']) ? (int) $v['usos_por_persona'] : null,
             'vence_en' => $v['vence_en'] ?? null,
             'activa' => (bool) ($v['activa'] ?? true),
         ];

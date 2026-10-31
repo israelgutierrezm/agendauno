@@ -42,8 +42,9 @@ it('el profesional gana su porcentaje de lo cobrado y sus propinas, y lo ve en s
     );
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cobro", ['metodo' => 'efectivo', 'propina_minor' => 5000], conBearer($e['bearer']))->assertCreated();
 
-    // Pasada la cita: 40 % de $800 y $50 de propina.
+    // Pasada la cita, y con que llegó: 40 % de $800 y $50 de propina.
     $this->travelTo(now()->addDays(2));
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))->assertSuccessful();
     $periodo = ['desde' => now()->subDays(5)->toDateString(), 'hasta' => now()->toDateString()];
     $filas = collect($this->getJson("/api/v1/app/{$e['slug']}/nomina?".http_build_query($periodo), conBearer($e['bearer']))->assertOk()->json('data'))
         ->where('usuario_id', $pro);

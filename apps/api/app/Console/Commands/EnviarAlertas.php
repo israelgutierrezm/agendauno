@@ -6,11 +6,13 @@ namespace App\Console\Commands;
 
 use App\Modules\Platform\Operacion\AlertaPlataforma;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Platform\Operacion\AlertasTelegram;
 use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -31,7 +33,23 @@ class EnviarAlertas extends Command
 
     private const DIAS_HISTORIAL = 30;
 
-    public function handle(AlertasPlataforma $alertas, LatidoOperacion $latido): int
+    /** Cómo se llama cada tipo en el resumen. */
+    private const TITULOS = [
+        'error' => 'Errores',
+        'cobro_fallido' => 'Cobros',
+        'incidencia_cobro' => 'Incidencias de cobro',
+        'aviso_pasarela_fallido' => 'Avisos de pasarelas que no se procesaron',
+        'evento_outbox_aparcado' => 'Eventos que no se despacharon',
+        'pendientes_atascados' => 'Eventos y avisos atascados en los negocios',
+        'correo_fallido' => 'Correos que no salieron',
+        'webhook_saliente_fallido' => 'Webhooks de los negocios',
+        'respaldo_fallido' => 'Respaldos',
+        'cola_detenida' => 'Cola',
+        'trabajos_fallidos' => 'Cola',
+        'trabajo_fallido' => 'Trabajos de la cola',
+    ];
+
+    public function handle(AlertasPlataforma $alertas, LatidoOperacion $latido, AlertasTelegram $telegram): int
     {
         $this->revisarProcesos($alertas, $latido);
 
@@ -46,6 +64,7 @@ class EnviarAlertas extends Command
         if ($pendientes->isEmpty()) {
             return self::SUCCESS;
         }
+        $this->avisarPorTelegram($telegram, $pendientes);
         // El que capturó el superadmin en su panel o, si no, ALERTAS_CORREO.
         $correo = (string) ConfiguracionPlataforma::correoAlertas();
         if (filter_var($correo, FILTER_VALIDATE_EMAIL) === false) {
@@ -62,6 +81,7 @@ class EnviarAlertas extends Command
             ));
         } catch (Throwable $e) {
             $this->error('No se pudo enviar el resumen de alertas: '.$e->getMessage());
+            $telegram->enviarUnaVez('correo', 'AgendaUno: no salió el correo de las alertas de la plataforma. Revisa el SMTP y el superadmin.');
 
             return self::FAILURE;
         }
@@ -71,6 +91,26 @@ class EnviarAlertas extends Command
         $this->info("Resumen enviado a {$correo} ({$pendientes->count()} alerta(s)).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Las críticas por el segundo canal: solo cuántas de cada tipo, nunca su mensaje (un
+     * error puede traer datos de un cliente). Si el correo falla, siguen pendientes:
+     * la misma combinación de tipos no se repite en cada vuelta.
+     *
+     * @param  Collection<int, AlertaPlataforma>  $pendientes
+     */
+    private function avisarPorTelegram(AlertasTelegram $telegram, Collection $pendientes): void
+    {
+        $criticas = $pendientes->whereIn('tipo', AlertasPlataforma::CRITICAS);
+        if ($criticas->isEmpty()) {
+            return;
+        }
+        $lineas = $criticas->groupBy(fn (AlertaPlataforma $a): string => self::TITULOS[$a->tipo] ?? ucfirst(str_replace('_', ' ', $a->tipo)))
+            ->map(fn (Collection $grupo, string $titulo): string => "- {$titulo}: {$grupo->count()}")
+            ->implode("\n");
+        $tipos = $criticas->pluck('tipo')->unique()->sort()->implode(',');
+        $telegram->enviarUnaVez('resumen:'.md5($tipos), "AgendaUno: {$criticas->count()} alerta(s) crítica(s) de la plataforma.\n{$lineas}\nEl detalle está en el correo de alertas y en el superadmin.");
     }
 
     /** La cola sin latido y los trabajos que fallaron: también son alertas. */
@@ -93,23 +133,10 @@ class EnviarAlertas extends Command
      */
     private function cuerpo(array $pendientes): string
     {
-        $titulos = [
-            'error' => 'Errores',
-            'cobro_fallido' => 'Cobros',
-            'incidencia_cobro' => 'Incidencias de cobro',
-            'aviso_pasarela_fallido' => 'Avisos de pasarelas que no se procesaron',
-            'evento_outbox_aparcado' => 'Eventos que no se despacharon',
-            'correo_fallido' => 'Correos que no salieron',
-            'webhook_saliente_fallido' => 'Webhooks de los negocios',
-            'respaldo_fallido' => 'Respaldos',
-            'cola_detenida' => 'Cola',
-            'trabajos_fallidos' => 'Cola',
-            'trabajo_fallido' => 'Trabajos de la cola',
-        ];
         $lineas = ["Esto falló en la operación de AgendaUno desde el último aviso:\n"];
         $actual = null;
         foreach ($pendientes as $a) {
-            $titulo = $titulos[$a->tipo] ?? ucfirst(str_replace('_', ' ', $a->tipo));
+            $titulo = self::TITULOS[$a->tipo] ?? ucfirst(str_replace('_', ' ', $a->tipo));
             if ($titulo !== $actual) {
                 $actual = $titulo;
                 $lineas[] = "\n{$titulo}";

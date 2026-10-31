@@ -193,6 +193,8 @@ class CajasTenantController
                     'fecha' => $m->created_at?->toIso8601String(),
                     'pago' => $m->pago?->ulid,
                     'venta' => $m->venta?->ulid,
+                    // Corrige un cobro de un turno ya cerrado (ADR 0231).
+                    'requiere_revision' => $m->requiere_revision,
                 ])->values()->all();
         }
 

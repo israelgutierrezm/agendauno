@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $articulo_id
  * @property int $sucursal_id
  * @property int $cantidad
+ * @property string|null $clave_intento
  */
 class MovimientoInventarioTenant extends Model
 {
@@ -24,7 +25,7 @@ class MovimientoInventarioTenant extends Model
 
     protected $table = 'movimientos_inventario';
 
-    protected $fillable = ['articulo_id', 'sucursal_id', 'tipo', 'cantidad', 'motivo', 'venta_pos_id', 'usuario_id'];
+    protected $fillable = ['articulo_id', 'sucursal_id', 'tipo', 'cantidad', 'motivo', 'venta_pos_id', 'usuario_id', 'clave_intento'];
 
     /**
      * @var array<string, string>

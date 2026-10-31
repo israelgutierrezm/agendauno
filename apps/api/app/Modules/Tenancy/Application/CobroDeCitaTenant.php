@@ -99,12 +99,13 @@ class CobroDeCitaTenant
                 if (! $ultima instanceof OrdenTenant) {
                     throw ValidationException::withMessages(['cupon' => ['Esta cita ya está cobrada: el cupón no se aplica.']]);
                 }
-                $conCupon = $this->ordenes->aplicarCupon($ultima, $cupon);
+                $conCupon = $this->ordenes->aplicarCupon($ultima, $cupon, (int) $principal?->total_minor + (int) $resto?->total_minor);
                 $aCobrar = $aCobrar->map(static fn (OrdenTenant $o): OrdenTenant => $o->is($conCupon) ? $conCupon : $o);
             }
             $orden = $aCobrar->first() ?? $resto ?? $principal;
             $servicio = (int) $aCobrar->sum('total_minor');
-            if ($servicio === 0 && $items === [] && $propinaMinor <= 0) {
+            // Un cupón del 100 % sí deja algo que cerrar: su orden en $0.
+            if ($aCobrar->isEmpty() && $items === [] && $propinaMinor <= 0) {
                 throw ValidationException::withMessages(['reserva' => ['Esta cita ya está cobrada: agrega un producto o una propina para cobrar algo más.']]);
             }
 
@@ -128,7 +129,7 @@ class CobroDeCitaTenant
                 $enEfectivo = PartesCobro::efectivo($partes);
             }
 
-            if ($servicio > 0) {
+            if ($aCobrar->isNotEmpty()) {
                 // Con anticipo y resto, cada orden con lo suyo de las formas (en orden).
                 $porOrden = $partesServicio !== null
                     ? PartesCobro::repartir($partesServicio, $aCobrar->map(static fn (OrdenTenant $o): int => (int) $o->total_minor)->all())

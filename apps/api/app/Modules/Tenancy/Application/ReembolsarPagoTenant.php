@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\MovimientoCajaTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -169,6 +170,11 @@ class ReembolsarPagoTenant
             if ($monto === $restante && $revertirCreditos && $orden !== null) {
                 $this->exigirCitaCancelada($orden);
             }
+            // Una parcial de servicios prepagados quita las veces que devuelve: tienen que
+            // quedar libres.
+            if ($monto < $restante && $revertirCreditos && $orden !== null && ! $this->alcanzanLasVeces($orden, $bloqueado, $monto)) {
+                throw new PagoNoReembolsable('Esa devolución cubre veces del servicio que ya se usaron o están agendadas. Devuelve menos, cancela esas citas o quita la opción de revertir lo comprado.');
+            }
 
             $via = $this->via($bloqueado, $manual);
 
@@ -219,6 +225,37 @@ class ReembolsarPagoTenant
         }
 
         return $reembolso->refresh();
+    }
+
+    /**
+     * Una devolución que hace el sistema (ya se le prometió al cliente): si no se puede,
+     * no queda en silencio, sino en Por conciliar con el monto y el motivo (ADR 0231).
+     */
+    public function automatica(PagoTenant $pago, ?int $montoMinor, string $motivo, string $llave, bool $revertirCreditos): void
+    {
+        try {
+            $reembolso = $this->ejecutar($pago, $montoMinor, $motivo, null, $revertirCreditos, false, $llave);
+            if ($reembolso->estado === EstadoReembolso::Fallido) {
+                $this->pendienteDeDevolver($pago, (int) $reembolso->monto_minor, (string) $reembolso->motivo_fallo);
+            }
+        } catch (PagoNoReembolsable $e) {
+            $libre = (int) $pago->monto_minor - (int) $pago->reembolsos()->whereIn('estado', EstadoReembolso::comprometidos())->sum('monto_minor');
+            // Ya devuelto: no falta nada.
+            if ($libre > 0) {
+                $this->pendienteDeDevolver($pago, min($montoMinor ?? $libre, $libre), $e->getMessage());
+            }
+        }
+    }
+
+    private function pendienteDeDevolver(PagoTenant $pago, int $montoMinor, string $porque): void
+    {
+        $dinero = DatosDeOrden::dinero($montoMinor, (string) $pago->moneda);
+        $this->incidencias->porPago(
+            IncidenciaCobroTenant::DEVOLUCION_PENDIENTE,
+            $pago,
+            "No se pudo devolver {$dinero} sola. Devuélvelo por otro medio y anota aquí qué hiciste.",
+            ['excedente_minor' => $montoMinor, 'motivo' => $porque],
+        );
     }
 
     /**
@@ -426,7 +463,8 @@ class ReembolsarPagoTenant
             $completa = $montoMinor >= $restante;
             $porque = match (true) {
                 $montoMinor > $restante => 'devolvió más de lo que quedaba por devolver de este pago',
-                $soloDinero || ! $completa => null,
+                $soloDinero => null,
+                ! $completa => $this->alcanzanLasVeces($orden, $bloqueado, $montoMinor) ? null : 'cubre veces del servicio que ya se usaron o están agendadas',
                 $this->derechos->algunoUsado($orden) => 'lo que compró ya se usó',
                 $this->citaVigente($orden) => 'su cita sigue en pie',
                 default => null,
@@ -587,6 +625,8 @@ class ReembolsarPagoTenant
             'total' => $esTotal,
             'revirtio_creditos' => $revertir,
             'via' => $metadata['via'] ?? null,
+            'orden_id' => $orden?->ulid,
+            'persona_id' => $orden?->persona?->ulid,
         ]);
     }
 
@@ -629,6 +669,14 @@ class ReembolsarPagoTenant
      */
     private function revertirTotal(OrdenTenant $orden, PagoTenant $pago, ReembolsoTenant $reembolso, ?Usuario $actor): void
     {
+        // Las clases extra pagadas aparte solo valen con su paquete: quedan inservibles.
+        if ($this->derechos->extrasConSaldo($orden) > 0) {
+            $this->incidencias->porReembolso(
+                IncidenciaCobroTenant::REEMBOLSO_INCIERTO,
+                $reembolso,
+                'Se devolvió el paquete y tiene clases extra pagadas aparte que ya no se pueden usar. Revisa si también se las devuelves.',
+            );
+        }
         $huboUso = $this->derechos->retirarTodo($orden, $this->contexto($pago, $actor), 'Reembolso total del pago', $actor);
 
         // Una devolución en línea se confirma después: si mientras tanto el plan se usó,
@@ -657,11 +705,8 @@ class ReembolsarPagoTenant
         }
         // Solo cuentan las devoluciones que revirtieron: una compensación (solo dinero) o
         // un contracargo no hacen que la siguiente revierta de más.
-        $devuelto = min($total, (int) $pago->reembolsos()
-            ->where('estado', EstadoReembolso::Aprobado->value)
-            ->get()
-            ->filter(fn (ReembolsoTenant $r): bool => (bool) ($r->metadata['revertir_creditos'] ?? false))
-            ->sum('monto_minor'));
+        $devuelto = $this->devueltoQueRevierte($pago);
+        $this->retirarVeces($orden, $total, $devuelto);
 
         foreach ($this->derechos->acuerdosDe($orden) as $acuerdo) {
             foreach ($acuerdo->derechos as $derecho) {
@@ -677,6 +722,51 @@ class ReembolsarPagoTenant
                 if ($revertir > 0) {
                     $this->libro->registrar($bloqueado, TipoMovimiento::Reverso, -$revertir, 'Reembolso parcial del pago', $this->contexto($pago, $actor));
                 }
+            }
+        }
+    }
+
+    /** Lo aprobado de este pago que sí revirtió lo comprado. */
+    private function devueltoQueRevierte(PagoTenant $pago): int
+    {
+        return min((int) $pago->monto_minor, (int) $pago->reembolsos()
+            ->where('estado', EstadoReembolso::Aprobado->value)
+            ->get()
+            ->filter(fn (ReembolsoTenant $r): bool => (bool) ($r->metadata['revertir_creditos'] ?? false))
+            ->sum('monto_minor'));
+    }
+
+    /** Las veces de ese servicio que cubre lo devuelto, en proporción y sin redondear hacia arriba. */
+    private static function vecesCubiertas(LineaOrdenTenant $linea, int $total, int $devuelto): int
+    {
+        return $total > 0 ? intdiv((int) $linea->cantidad * $devuelto, $total) : 0;
+    }
+
+    /**
+     * ¿Devolver ese monto más deja libres las veces que cubre, en cada servicio prepagado
+     * de la orden?
+     */
+    private function alcanzanLasVeces(OrdenTenant $orden, PagoTenant $pago, int $monto): bool
+    {
+        $prepagados = app(ServiciosPrepagadosTenant::class);
+        $devuelto = min((int) $pago->monto_minor, $this->devueltoQueRevierte($pago) + $monto);
+        foreach ($orden->lineas()->whereNotNull('oferta_id')->get() as $linea) {
+            if (self::vecesCubiertas($linea, (int) $pago->monto_minor, $devuelto) > (int) $linea->cantidad - $prepagados->usadas($linea)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Lo devuelto en parte quita de cada servicio prepagado las veces que cubre (nunca las ya usadas). */
+    private function retirarVeces(OrdenTenant $orden, int $total, int $devuelto): void
+    {
+        $prepagados = app(ServiciosPrepagadosTenant::class);
+        foreach ($orden->lineas()->whereNotNull('oferta_id')->lockForUpdate()->get() as $linea) {
+            $veces = min((int) $linea->cantidad - $prepagados->usadas($linea), self::vecesCubiertas($linea, $total, $devuelto));
+            if ($veces > (int) $linea->veces_devueltas) {
+                $linea->update(['veces_devueltas' => $veces]);
             }
         }
     }
@@ -698,7 +788,7 @@ class ReembolsarPagoTenant
     private function exigirDerechosIntactos(OrdenTenant $orden): void
     {
         if ($this->derechos->algunoUsado($orden)) {
-            throw new DerechoYaUsado('El derecho ya tuvo uso; no se puede reembolsar el pago completo.');
+            throw new DerechoYaUsado('Lo comprado ya tuvo uso; no se puede reembolsar el pago completo.');
         }
     }
 
@@ -720,8 +810,10 @@ class ReembolsarPagoTenant
     /** ¿La orden es de una cita (o clase de pago suelto) confirmada o apartada que no ha empezado? */
     private function citaVigente(OrdenTenant $orden): bool
     {
+        $prepagos = $orden->lineas()->whereNotNull('oferta_id')->pluck('id');
+
         return ReservaTenant::query()
-            ->where(fn ($q) => $q->where('orden_id', $orden->getKey())->orWhere('saldo_orden_id', $orden->getKey()))
+            ->where(fn ($q) => $q->where('orden_id', $orden->getKey())->orWhere('saldo_orden_id', $orden->getKey())->orWhereIn('linea_orden_id', $prepagos))
             ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
             ->exists();

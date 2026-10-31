@@ -28,6 +28,9 @@ enum MotivoFalloCobro: string
     /** La suscripción de la pasarela no cobró en los días de espera. */
     case SuscripcionSinCobro = 'suscripcion_sin_cobro';
 
+    /** El negocio solo cobra en caja y la renovación venció sin pagarse (ADR 0231). */
+    case SinPagoEnCaja = 'sin_pago_en_caja';
+
     /**
      * Lo que se le dice al alumno en el aviso: en sus palabras, sin el detalle interno
      * (M07). Solo el rechazo del pago automático dice la tarjeta y el motivo del banco.
@@ -42,6 +45,7 @@ enum MotivoFalloCobro: string
                 .(trim((string) $tarjeta) !== '' ? ' a la tarjeta '.trim((string) $tarjeta) : '')
                 .': '.(trim((string) $detalle) !== '' ? trim((string) $detalle) : 'El banco rechazó el cargo.'),
             self::SuscripcionSinCobro => 'No hemos recibido el cobro automático de tu suscripción.',
+            self::SinPagoEnCaja => 'Tu renovación venció y sigue pendiente de pago. Puedes pagarla en el negocio.',
         };
     }
 }

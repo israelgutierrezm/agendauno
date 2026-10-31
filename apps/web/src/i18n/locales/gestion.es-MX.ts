@@ -552,6 +552,11 @@ export const porConciliar = {
   primeraVezRepetida: "Clase de prueba ya usada: {monto}",
   // El banco del cliente disputa el pago (ADR 0168).
   contracargo: "Contracargo de {monto}",
+  // Se prometió devolver y no se pudo; o se devuelve en caja, a mano (ADR 0231).
+  pagoSinConfirmar: "Pago de {monto} sin confirmar desde hace días.",
+  devolucionPendiente:
+    "Falta devolver {monto}: no se pudo hacer en automático.",
+  devolverEnCaja: "Falta devolver {monto} en caja: canceló su cita.",
   // Nadie registró si llegó y pagó de más: no se devuelve solo (ADR 0231).
   revisarSiVino:
     "Revisa si llegó a su cita: pagó {monto} de más. Si no llegó, márcalo en la agenda.",

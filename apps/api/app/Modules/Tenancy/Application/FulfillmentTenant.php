@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Fulfillment de una orden tenant-local: la marca pagada y concede un derecho por
@@ -47,6 +48,11 @@ class FulfillmentTenant
         // nadie paga): así una compra abandonada no agota sus usos.
         if ($orden->promocion_id !== null) {
             PromocionTenant::query()->whereKey($orden->promocion_id)->increment('usos');
+            // Un descuento ya prometido se respeta aunque rebase el tope; queda registrado (ADR 0231).
+            $promocion = PromocionTenant::query()->find($orden->promocion_id);
+            if ($promocion instanceof PromocionTenant && $promocion->usos_maximos !== null && $promocion->usos > $promocion->usos_maximos) {
+                Log::warning('Un cupón rebasó su tope por descuentos ya prometidos.', ['promocion' => $promocion->codigo, 'usos' => $promocion->usos, 'tope' => $promocion->usos_maximos]);
+            }
         }
         $this->emitirPagada($orden);
 

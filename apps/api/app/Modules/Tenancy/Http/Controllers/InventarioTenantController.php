@@ -272,6 +272,8 @@ class InventarioTenantController
             'sucursal_id' => ['required', 'string'],
             'tipo' => ['required', 'in:entrada,ajuste'],
             'cantidad' => ['required', 'integer', 'not_in:0'],
+            // La del intento: repetir (doble clic, red) no lo aplica dos veces (ADR 0231).
+            'clave_intento' => ['nullable', 'string', 'max:64'],
             // Un ajuste a mano dice por qué (conteo, merma, caducidad…): queda en su
             // historial con quién lo hizo.
             'motivo' => ['nullable', 'required_if:tipo,ajuste', 'string', 'min:3', 'max:255'],
@@ -303,6 +305,7 @@ class InventarioTenantController
             $tipo,
             $validado['motivo'] ?? null,
             $this->actor($request),
+            $validado['clave_intento'] ?? null,
         );
 
         // Con el mismo alcance que el listado: un acotado no ve el stock de otras sedes.

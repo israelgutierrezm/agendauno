@@ -11,7 +11,6 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
-use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 
 /**
@@ -61,12 +60,42 @@ class AnticipoDeCitaTenant
         }
         $deMas = $this->pagadoDeMas($reserva)['de_mas_minor'];
         foreach ($this->porDevolverEnLinea($reserva, $deMas) as ['pago' => $pago, 'monto' => $monto]) {
-            try {
-                // Solo dinero: la cita ya se canceló o no se atendió.
-                $this->reembolsar->ejecutar($pago, $monto, $motivo, null, false, false, $llave.':'.$pago->ulid);
-            } catch (PagoNoReembolsable) {
-                // Ya devuelto, o la pasarela no devuelve en línea: lo resuelve el negocio.
+            // Solo dinero: la cita ya se canceló o no se atendió.
+            $this->reembolsar->automatica($pago, $monto, $motivo, $llave.':'.$pago->ulid, false);
+        }
+        // Lo que entró por la caja se devuelve en caja, a mano.
+        $this->pedirDevolverEnCaja($reserva, $deMas - $this->pagadoDeMas($reserva)['en_linea_minor']);
+    }
+
+    /**
+     * Lo que debe salir de la caja queda en Por conciliar: quien canceló ya leyó «se
+     * devuelve en el negocio» (ADR 0231). Sin `$monto`, todo lo cobrado en caja.
+     */
+    public function pedirDevolverEnCaja(ReservaTenant $reserva, ?int $monto = null): void
+    {
+        $ordenes = $monto !== null && $reserva->saldo_orden_id !== null
+            ? [(int) $reserva->saldo_orden_id]
+            : array_values(array_filter([$reserva->orden_id, $reserva->saldo_orden_id]));
+        $falta = $monto ?? PHP_INT_MAX;
+        $pagos = PagoTenant::query()
+            ->whereIn('orden_id', $ordenes)
+            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+            ->whereNotIn('proveedor', ProveedorPasarela::enLinea())
+            ->orderBy('id')
+            ->get();
+        foreach ($pagos as $pago) {
+            $libre = (int) $pago->monto_minor - (int) $pago->reembolsos()->whereIn('estado', EstadoReembolso::comprometidos())->sum('monto_minor');
+            $cuanto = min($libre, $falta);
+            if ($cuanto <= 0) {
+                continue;
             }
+            $this->incidencias->porPago(
+                IncidenciaCobroTenant::DEVOLVER_EN_CAJA,
+                $pago,
+                'Canceló su cita y se le dijo que lo pagado en caja se devuelve en el negocio. Devuélvelo desde Movimientos.',
+                ['reserva_id' => $reserva->ulid, 'excedente_minor' => $cuanto],
+            );
+            $falta -= $cuanto;
         }
     }
 

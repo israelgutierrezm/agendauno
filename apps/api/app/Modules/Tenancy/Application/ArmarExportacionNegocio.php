@@ -21,13 +21,17 @@ use Throwable;
  */
 class ArmarExportacionNegocio implements ShouldQueue
 {
+    use EnColaPesada;
     use Queueable;
 
     public int $tries = 1;
 
     public int $timeout = 1800;
 
-    public function __construct(public readonly int $exportacionId) {}
+    public function __construct(public readonly int $exportacionId)
+    {
+        $this->aColaPesada();
+    }
 
     public function handle(ExportacionDeDatosNegocio $exportar): void
     {

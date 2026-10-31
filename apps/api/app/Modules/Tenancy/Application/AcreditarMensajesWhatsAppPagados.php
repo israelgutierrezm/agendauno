@@ -8,7 +8,6 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
-use Throwable;
 
 /**
  * Una compra de mensajes de WhatsApp pagada (cargo `whatsapp` del control plane) se
@@ -33,10 +32,20 @@ class AcreditarMensajesWhatsAppPagados
 
         $cantidad = (int) $cargo->alumnos_activos;
         $acreditar = fn () => $this->mensajes->acreditar($cantidad, 'cargo:'.$cargo->ulid, "Paquete de {$cantidad} mensajes de WhatsApp");
-        try {
-            $this->gestor->actual()?->is($estudio) === true ? $acreditar() : $this->gestor->ejecutarEn($estudio, $acreditar);
-        } catch (Throwable $e) {
-            report($e);
-        }
+        $this->gestor->actual()?->is($estudio) === true ? $acreditar() : $this->gestor->ejecutarEn($estudio, $acreditar);
+    }
+
+    /**
+     * Vuelve a acreditar lo pagado de un negocio, por si algo falló al pagarse: acreditar
+     * es idempotente por el cargo (como los timbres; ADR 0231).
+     */
+    public function sincronizar(Estudio $estudio): void
+    {
+        CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('concepto', 'whatsapp')
+            ->where('estado', EstadoCargoRenta::Pagado->value)
+            ->get()
+            ->each(fn (CargoRenta $cargo) => $this->aplicar($cargo->setRelation('estudio', $estudio)));
     }
 }

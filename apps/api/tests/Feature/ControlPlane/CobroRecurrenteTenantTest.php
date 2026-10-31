@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\File;
@@ -164,15 +165,16 @@ it('lista las suscripciones recurrentes con su próxima fecha de cobro', functio
     expect($subs->first()['precio_minor'])->toBe(129900);
 });
 
-it('el comando cobra-suscripciones se salta estudios sin pasarela en línea', function (): void {
+it('un negocio sin pasarela en línea no intenta cobrar: lo vencido entra a mora (ADR 0231)', function (): void {
     $m = estudioConMembresia();
     enTenant($m, fn () => AcuerdoTenant::query()->where('ulid', $m['acuerdo'])->firstOrFail()
         ->update(['proxima_cobro_en' => now()->subDay()->toDateString()]));
 
     $this->artisan('agendauno:cobrar-suscripciones')->assertSuccessful();
 
-    // Sin pasarela en línea configurada: no cobra ni abre dunning.
-    expect(enTenant($m, fn () => ProcesoDunningTenant::query()->count()))->toBe(0);
+    // Sin pasarela en línea configurada: nada se cobra; la mora da seguimiento.
+    expect(enTenant($m, fn () => ProcesoDunningTenant::query()->count()))->toBe(1)
+        ->and(enTenant($m, fn () => PagoTenant::query()->count()))->toBe(0);
 });
 
 it('si cobrar una renovación truena (la pasarela no responde), las demás se cobran igual', function (): void {

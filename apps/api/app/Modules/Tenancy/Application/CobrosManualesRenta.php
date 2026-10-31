@@ -40,7 +40,15 @@ class CobrosManualesRenta
             if ($bloqueado->estado !== EstadoCargoRenta::Pendiente) {
                 throw new CargoRentaNoPagable('Solo se registra el pago de un cargo pendiente.');
             }
+            // El intento en línea abierto se cierra: si ya se cobró o está en curso, no
+            // se registra otro pago (ADR 0231).
+            $abierto = (string) $bloqueado->referencia_pago;
+            if ($abierto !== '' && ! app(CobrarCargoRenta::class)->cerrarAnterior($bloqueado, $abierto)) {
+                throw new CargoRentaNoPagable('Este cargo tiene un pago en curso; espera su confirmación.');
+            }
             $bloqueado->update([
+                // OpenPay no cierra su página: se vigila por si se paga después.
+                'referencia_condonada' => $bloqueado->metodo_pago === 'openpay' && $abierto !== '' ? $abierto : $bloqueado->referencia_condonada,
                 'estado' => EstadoCargoRenta::Pagado->value,
                 'pagado_en' => $pagadoEn ?? Carbon::now(),
                 'metodo_pago' => $metodo,

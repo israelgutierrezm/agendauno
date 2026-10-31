@@ -36,6 +36,14 @@ class AcumularPuntos
 
             return;
         }
+        // Devolución total (ADR 0231): tampoco se quedan los puntos de esa compra.
+        if ($evento->tipo === 'pago.reembolsado') {
+            if (($evento->payload['total'] ?? false) === true) {
+                $this->retirar($evento);
+            }
+
+            return;
+        }
         if (! in_array($evento->tipo, ['asistencia.marcada', 'orden.pagada'], true)) {
             return;
         }

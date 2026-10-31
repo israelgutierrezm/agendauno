@@ -586,6 +586,14 @@ onMounted(() => void cargar());
                 <span v-if="m.motivo" :style="{ color: 'var(--texto-suave)' }">
                   · {{ m.motivo }}</span
                 >
+                <!-- Corrige un cobro de un turno ya cerrado (ADR 0231). -->
+                <span
+                  v-if="m.requiere_revision"
+                  class="tu-estado"
+                  :style="{ '--tono': 'var(--aviso)' }"
+                  data-prueba="movimiento-por-revisar"
+                  >{{ $t("confirmaciones.movimientoPorRevisar") }}</span
+                >
                 <span
                   class="block text-xs"
                   :style="{ color: 'var(--texto-suave)' }"

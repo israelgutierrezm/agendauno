@@ -175,7 +175,7 @@ class LimpiezaDeAltasSinActivar
         $slug = (string) $estudio->slug;
         $nombre = (string) $estudio->db_database;
 
-        $this->volcado->disco()->deleteDirectory($this->volcado->carpeta($slug));
+        $this->volcado->borrarCarpeta($this->volcado->carpeta($slug));
 
         $this->gestor->borrarBaseDeDatos($estudio);
 

@@ -288,7 +288,14 @@ class AgendarCitaTenant
             if ($cupon !== null && $cupon !== '') {
                 $orden = $reserva->saldo_orden_id !== null ? $reserva->saldoOrden : $reserva->orden;
                 if ($orden !== null) {
-                    $this->ordenes->aplicarCupon($orden, $cupon);
+                    $base = (int) $orden->total_minor + ($reserva->saldo_orden_id !== null ? (int) $reserva->orden?->total_minor : 0);
+                    $conCupon = $this->ordenes->aplicarCupon($orden, $cupon, $base);
+                    app(ReservasTenant::class)->actualizarAvisoApartada($reserva, $conCupon);
+                    // El cupón lo cubrió todo: no hay qué cobrar ni que esperar (ADR 0231).
+                    if ((int) $conCupon->total_minor === 0) {
+                        app(CobrarOrdenTenant::class)->sinCosto($conCupon);
+                        $reserva->refresh();
+                    }
                 }
             }
             // En la misma transacción: si otro intento ya guardó esta clave, el índice
@@ -362,12 +369,14 @@ class AgendarCitaTenant
             'tipo' => $this->modalidad->tipoSesion()->value,
         ]);
 
+        // Ya lo pagó por adelantado (un presupuesto, ADR 0218): no se cobra otra vez ni se
+        // pide un bono, sea cual sea la política del servicio (ADR 0231).
+        $prepago = $sinCuenta ? null : $this->prepagados->disponible($persona, $oferta, bloquear: true);
+        if ($prepago !== null) {
+            return $this->reservas->reservarPrepagada($sesion, $persona, $prepago);
+        }
+
         if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {
-            // Ya lo pagó por adelantado (un presupuesto, ADR 0218): no se cobra otra vez.
-            $prepago = $sinCuenta ? null : $this->prepagados->disponible($persona, $oferta, bloquear: true);
-            if ($prepago !== null) {
-                return $this->reservas->reservarPrepagada($sesion, $persona, $prepago);
-            }
             $precio = (int) ($oferta->precio_clase_minor ?? 0);
             $moneda = app(ParametrosTenant::class)->monedaDe($sucursal);
             // Con anticipo, quien agenda por su cuenta lo paga en línea para confirmar

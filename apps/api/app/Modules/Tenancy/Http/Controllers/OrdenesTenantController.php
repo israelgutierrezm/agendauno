@@ -237,6 +237,10 @@ class OrdenesTenantController
             'sucursal_id' => ['nullable', 'string'],
         ]);
 
+        // Un intento «de ventanilla» no tendría quién lo apruebe: en caja se liquida (ADR 0231).
+        if ($validado['proveedor'] === 'ventanilla') {
+            throw ValidationException::withMessages(['proveedor' => ['Lo de ventanilla se registra con «Registrar pago».']]);
+        }
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
         $key = ($validado['idempotency_key'] ?? '') !== '' ? $validado['idempotency_key'] : null;
 

@@ -11,7 +11,6 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
-use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -83,17 +82,9 @@ class DevolverPagoDeCitaConAnticipo implements ShouldQueue
             ->whereIn('proveedor', ProveedorPasarela::enLinea())
             ->get();
         foreach ($pagos as $pago) {
-            try {
-                $this->reembolsar->ejecutar(
-                    $pago,
-                    null,
-                    'El cliente canceló a tiempo: se devuelve su anticipo.',
-                    llave: 'cancelacion-a-tiempo:'.$reserva->ulid.':'.$pago->ulid,
-                );
-            } catch (PagoNoReembolsable) {
-                // Ya devuelto, o la pasarela no devuelve en línea: lo resuelve el negocio.
-            }
+            $this->reembolsar->automatica($pago, null, 'El cliente canceló a tiempo: se devuelve su anticipo.', 'cancelacion-a-tiempo:'.$reserva->ulid.':'.$pago->ulid, true);
         }
+        $this->anticipos->pedirDevolverEnCaja($reserva);
     }
 
     /**

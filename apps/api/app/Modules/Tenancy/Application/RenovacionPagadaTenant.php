@@ -26,6 +26,13 @@ class RenovacionPagadaTenant
 
     public function registrar(AcuerdoTenant $acuerdo): void
     {
+        // Sin fecha de renovación no es recurrente (p. ej. un paquete con un fallo registrado
+        // a mano): pagada su deuda se cierra la mora, sin volverlo mensual.
+        if ($acuerdo->proxima_cobro_en === null) {
+            $this->dunning->registrarPago($acuerdo);
+
+            return;
+        }
         // Del periodo que se pagó al siguiente aniversario (sin desbordar febrero); si ya
         // pasaron varios (p. ej. estuvo suspendido), salta al próximo futuro (en el día
         // del negocio) sin acumular cobros atrasados.

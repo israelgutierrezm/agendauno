@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\TipoCambio;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -115,8 +116,9 @@ class TiposDeCambio
         if (preg_match('/^\s*(\d{1,4})(?:\.(\d{1,8}))?\s*$/', $valor, $m) !== 1) {
             return null;
         }
-        $decimales = substr(str_pad($m[2] ?? '', 4, '0'), 0, 4);
-        $diezmilesimas = (int) $m[1] * 10000 + (int) $decimales;
+        $texto = str_pad($m[2] ?? '', 5, '0');
+        // Se redondea, no se trunca: la quinta cifra decide.
+        $diezmilesimas = (int) $m[1] * 10000 + (int) substr($texto, 0, 4) + ((int) $texto[4] >= 5 ? 1 : 0);
 
         return $diezmilesimas > 0 ? $diezmilesimas : null;
     }
@@ -171,10 +173,14 @@ class TiposDeCambio
             // Lo que capturó el superadmin para un día se respeta.
             $existente = TipoCambio::query()->where('de', 'USD')->where('a', 'MXN')->whereDate('fecha', $fecha->toDateString())->first();
             if ($existente === null) {
-                TipoCambio::query()->create([
-                    'fecha' => $fecha->toDateString(), 'de' => 'USD', 'a' => 'MXN',
-                    'diezmilesimas' => $valor, 'fuente' => self::FUENTE_BANXICO,
-                ]);
+                try {
+                    TipoCambio::query()->create([
+                        'fecha' => $fecha->toDateString(), 'de' => 'USD', 'a' => 'MXN',
+                        'diezmilesimas' => $valor, 'fuente' => self::FUENTE_BANXICO,
+                    ]);
+                } catch (UniqueConstraintViolationException) {
+                    // Otro proceso lo guardó a la vez: ya está.
+                }
             }
         }
     }

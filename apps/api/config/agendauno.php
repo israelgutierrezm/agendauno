@@ -145,6 +145,9 @@ return [
         'modelo' => env('ASISTENTE_MODELO', 'claude-sonnet-5-5'),
         'url' => env('ASISTENTE_URL', 'https://api.anthropic.com/v1/messages'),
         'timeout' => (int) env('ASISTENTE_TIMEOUT', 60),
+        // Segundos para contestar toda una pregunta, con todas sus vueltas al modelo:
+        // menos que el límite de nginx (60 s), que cortaría con los tokens ya gastados.
+        'presupuesto' => (int) env('ASISTENTE_PRESUPUESTO', 45),
     ],
 
     /*
@@ -275,6 +278,9 @@ return [
     */
     'alertas' => [
         'correo' => env('ALERTAS_CORREO'),
+        // Segundo canal (ADR 0232): si cae el correo, también caen sus alertas.
+        'telegram_token' => env('ALERTAS_TELEGRAM_TOKEN'),
+        'telegram_chat' => env('ALERTAS_TELEGRAM_CHAT'),
     ],
 
     /*
@@ -321,6 +327,10 @@ return [
         'llaves_anteriores' => env('RESPALDOS_LLAVES_ANTERIORES', ''),
         'carpeta' => env('RESPALDOS_CARPETA', 'respaldos'),
         'dias' => (int) env('RESPALDOS_DIAS', 14),
+        // La retención la hace el bucket (ADR 0232, docs/DESPLIEGUE.md): la aplicación no
+        // borra respaldos (su llave no puede) y guarda una copia al mes en su prefijo.
+        'retencion_en_bucket' => (bool) env('RESPALDOS_RETENCION_BUCKET', false),
+        'carpeta_mensual' => env('RESPALDOS_CARPETA_MENSUAL', 'respaldos-mensuales'),
         'mysqldump' => env('RESPALDOS_MYSQLDUMP', 'mysqldump'),
         'mysql' => env('RESPALDOS_MYSQL', 'mysql'),
         'tls' => [
@@ -369,6 +379,8 @@ return [
 
     'operacion' => [
         'apertura_comercial' => (bool) env('APERTURA_COMERCIAL', false),
+        // Por ciento de disco libre que pide agendauno:verificar-produccion.
+        'disco_libre_minimo' => (int) env('DISCO_LIBRE_MINIMO', 10),
     ],
 
     /*

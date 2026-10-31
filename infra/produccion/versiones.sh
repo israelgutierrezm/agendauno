@@ -87,7 +87,7 @@ obtener_imagenes() {
     return
   fi
   for servicio in ${*:-api web landing-agendauno landing-turnouno}; do
-    case "$servicio" in worker | scheduler) servicio=api ;; esac
+    case "$servicio" in worker | worker-pesados | scheduler) servicio=api ;; esac
     variable="$(variable_version "$servicio")"
     eval "etiqueta=\${$variable}"
     echo "    $registro/agendauno-$servicio:$etiqueta"

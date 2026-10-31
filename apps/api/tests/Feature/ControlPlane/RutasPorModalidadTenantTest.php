@@ -358,10 +358,11 @@ it('un negocio de la otra modalidad recibe 403 MODALITY_NOT_AVAILABLE y uno de l
         $obtenido = [];
         $esperado = [];
         foreach (rutasExclusivasPorModalidad() as $nombre => $modalidad) {
-            // Las públicas que cambian algo llevan el límite de «login» (5 por minuto):
-            // cada una en su propio minuto, para que responda su modalidad y no 429.
+            // Las públicas que cambian algo llevan un límite corto («login», 5 por minuto;
+            // «accion-publica», por negocio e IP): cada una en su propio minuto, para que
+            // responda su modalidad y no 429.
             $ruta = app(Router::class)->getRoutes()->getByName('api.v1.app.'.$nombre);
-            if ($ruta !== null && in_array('throttle:login', $ruta->gatherMiddleware(), true)) {
+            if ($ruta !== null && array_intersect(['throttle:login', 'throttle:accion-publica'], $ruta->gatherMiddleware()) !== []) {
                 $this->travel(61)->seconds();
             }
             $obtenido[$nombre] = $negada(llamarRutaDeModalidad($e, $nombre)) ? 'negada' : 'pasa';

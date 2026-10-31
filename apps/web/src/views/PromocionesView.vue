@@ -26,6 +26,7 @@ interface Promo {
   valor: number;
   monto_minimo_minor: number | null;
   usos_maximos: number | null;
+  usos_por_persona?: number | null;
   usos: number;
   vence_en: string | null;
   activa: boolean;
@@ -55,6 +56,7 @@ const form = ref({
   valor: 10,
   minimo: "",
   usosMaximos: "",
+  usosPorPersona: "",
   vence: "",
   activa: true,
 });
@@ -77,6 +79,7 @@ const {
     "valor",
     "monto_minimo_minor",
     "usos_maximos",
+    "usos_por_persona",
     "vence_en",
     "descripcion",
   ],
@@ -116,6 +119,7 @@ function nueva(): void {
     valor: 10,
     minimo: "",
     usosMaximos: "",
+    usosPorPersona: "",
     vence: "",
     activa: true,
   };
@@ -134,6 +138,8 @@ function editar(p: Promo): void {
     minimo:
       p.monto_minimo_minor !== null ? String(p.monto_minimo_minor / 100) : "",
     usosMaximos: p.usos_maximos !== null ? String(p.usos_maximos) : "",
+    usosPorPersona:
+      p.usos_por_persona != null ? String(p.usos_por_persona) : "",
     vence: p.vence_en ?? "",
     activa: p.activa,
   };
@@ -157,6 +163,10 @@ async function guardar(): Promise<void> {
         : null,
     usos_maximos:
       form.value.usosMaximos !== "" ? Number(form.value.usosMaximos) : null,
+    usos_por_persona:
+      form.value.usosPorPersona !== ""
+        ? Number(form.value.usosPorPersona)
+        : null,
     vence_en: form.value.vence !== "" ? form.value.vence : null,
     activa: form.value.activa,
   };
@@ -418,6 +428,25 @@ onMounted(cargar);
             id="p-usos-error"
             class="tu-error-campo"
             >{{ errores.usos_maximos }}</span
+          >
+        </div>
+        <div>
+          <label class="tu-label" for="p-usos-persona">{{
+            $t("confirmaciones.promoUsosPorPersona")
+          }}</label>
+          <input
+            id="p-usos-persona"
+            v-bind="marcar('usos_por_persona', 'p-usos-persona-error')"
+            v-model="form.usosPorPersona"
+            type="number"
+            min="1"
+            class="tu-input"
+          />
+          <span
+            v-if="errores.usos_por_persona"
+            id="p-usos-persona-error"
+            class="tu-error-campo"
+            >{{ errores.usos_por_persona }}</span
           >
         </div>
         <div>

@@ -116,6 +116,8 @@ export interface Producto {
 }
 export interface Orden {
   id: string;
+  // Una compra del portal sin pagar: se puede quitar (ADR 0231).
+  quitable?: boolean;
   estado: string;
   total_minor: number;
   moneda: string;
@@ -240,6 +242,7 @@ const cargando = ref(false);
 const cargado = ref(false);
 const error = ref<string | null>(null);
 const accionando = ref(false);
+const ultimaCompra = ref<string | null>(null);
 // De qué sesión es lo que hay en memoria, y un número que cambia con cada
 // reinicio: una respuesta que vuelve con otro número es de una sesión anterior.
 let identidadCargada: string | null = null;
@@ -509,17 +512,25 @@ export function useMiCuenta() {
             ? { codigo_promo: codigoPromo.trim() }
             : {}),
         };
-        await api.post(`${base.value}/mi/ordenes`, {
-          ...pedido,
-          // Comprar otra vez lo mismo (se perdió la respuesta) no crea otra orden.
-          idempotency_key: intentoCompra.clave(pedido),
-          // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
-          ...(await camposDeMedicion(
-            `negocio:${(sesion.slug ?? "").toLowerCase()}`,
-          )),
-        });
+        const { data } = await api.post<{ data: { id: string } }>(
+          `${base.value}/mi/ordenes`,
+          {
+            ...pedido,
+            // Comprar otra vez lo mismo (se perdió la respuesta) no crea otra orden.
+            idempotency_key: intentoCompra.clave(pedido),
+            // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
+            ...(await camposDeMedicion(
+              `negocio:${(sesion.slug ?? "").toLowerCase()}`,
+            )),
+          },
+        );
         intentoCompra.listo();
+        ultimaCompra.value = data?.data?.id ?? null;
       }),
+    // La orden de la última compra: comprar lleva directo a pagarla.
+    ultimaCompra,
+    quitarCompra: (id: string) =>
+      accion(() => api.delete(`${base.value}/mi/ordenes/${id}`)),
   };
 }
 

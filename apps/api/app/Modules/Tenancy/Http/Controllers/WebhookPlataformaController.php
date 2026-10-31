@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\ConfirmarCargoRenta;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Pasarelas\MercadoPago\VerificarFirmaMercadoPago;
+use App\Modules\Tenancy\Pasarelas\PasarelaStripePlataforma;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
@@ -180,6 +181,11 @@ class WebhookPlataformaController
         if (in_array($tipo, ['charge.refunded', 'charge.dispute.created'], true) && is_array($objeto)) {
             $intent = (string) ($objeto['payment_intent'] ?? '');
             $cargo = $intent !== '' ? CargoRenta::query()->where('referencia_pago', $intent)->first() : null;
+            // Lo cobrado por Checkout guarda la sesión (cs_…), no el pago (pi_…).
+            if ($cargo === null && $intent !== '') {
+                $sesion = app(PasarelaStripePlataforma::class)->sesionDeIntent($intent, app(RegistroDePasarelasPlataforma::class)->llaves('stripe'));
+                $cargo = $sesion !== null ? CargoRenta::query()->where('referencia_pago', $sesion)->first() : null;
+            }
             $monto = (int) ($objeto['amount_refunded'] ?? $objeto['amount'] ?? 0);
             $dinero = number_format($monto / 100, 2, '.', ',').' '.strtoupper((string) ($objeto['currency'] ?? ''));
             app(AlertasPlataforma::class)->registrar(

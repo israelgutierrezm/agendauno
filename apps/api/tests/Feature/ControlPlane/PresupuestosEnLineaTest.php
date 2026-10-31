@@ -108,6 +108,38 @@ it('el cliente lo ve desde su correo, lo acepta y lo paga en línea; el negocio 
     Http::assertSent(fn (Request $r): bool => str_contains((string) $r['success_url'], "/presupuesto/barberia-pl/{$p['id']}?pago=exito&ref_pago="));
 });
 
+it('pagar otra vez con la misma llave: de inmediato repite el mismo intento; abandonado, abre otro', function (): void {
+    $e = estudioConSesion('barberia-reintento', 'b@correo.mx', 'barberia');
+    $sede = agendaSemilla($e);
+    $cliente = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Lalo', 'email' => 'lalo@correo.mx'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $p = presupuestoEnLineaEnviado($e, $cliente, $sede['oferta']);
+    $url = "/api/v1/app/{$e['slug']}/presupuestos-en-linea/{$p['id']}";
+    activarCobroEnLinea($e);
+    $sesiones = 0;
+    Http::fake(function (Request $r) use (&$sesiones) {
+        if (str_ends_with($r->url(), '/expire')) {
+            return Http::response(['id' => 'x', 'status' => 'expired']);
+        }
+        $sesiones++;
+
+        return Http::response(['id' => "cs_r_{$sesiones}", 'url' => "https://checkout.stripe.com/c/pay/cs_r_{$sesiones}"]);
+    });
+    $this->postJson("{$url}/aceptar", ['t' => $p['token'], 'revision' => 1])->assertOk();
+    $llave = 'presupuesto-fijo-de-la-app';
+
+    $uno = $this->postJson("{$url}/pagar", ['t' => $p['token'], 'idempotency_key' => $llave])->assertCreated();
+    $dos = $this->postJson("{$url}/pagar", ['t' => $p['token'], 'idempotency_key' => $llave])->assertCreated();
+    expect($dos->json('data.pago'))->toBe($uno->json('data.pago'))
+        ->and($dos->json('data.checkout.url'))->toBe('https://checkout.stripe.com/c/pay/cs_r_1')
+        ->and($sesiones)->toBe(1);
+
+    // Abandonó la página: más tarde, la misma llave abre otro intento y vence el anterior.
+    $this->travel(20)->minutes();
+    $tres = $this->postJson("{$url}/pagar", ['t' => $p['token'], 'idempotency_key' => $llave])->assertCreated();
+    expect($tres->json('data.pago'))->not->toBe($uno->json('data.pago'))
+        ->and($tres->json('data.checkout.url'))->toBe('https://checkout.stripe.com/c/pay/cs_r_2');
+});
+
 it('desde su cuenta: sus presupuestos, rechazar con motivo; uno vencido no se responde y un enlace nuevo invalida el anterior', function (): void {
     $e = estudioConSesion('barberia-pm', 'b@correo.mx', 'barberia');
     $sede = agendaSemilla($e);

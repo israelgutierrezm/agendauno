@@ -46,6 +46,9 @@ class AppServiceProvider extends ServiceProvider
     /** Enlaces para restablecer la contraseña de una cuenta en una hora, desde cualquier IP. */
     public const RECUPERACIONES_POR_CUENTA_HORA = 10;
 
+    /** Acciones públicas por enlace de un negocio y una IP en un minuto. */
+    public const ACCIONES_PUBLICAS_MINUTO = 30;
+
     /**
      * Register any application services.
      */
@@ -79,6 +82,13 @@ class AppServiceProvider extends ServiceProvider
                 ...self::porCuenta($request, $email, self::INTENTOS_POR_CUENTA_HORA),
             ];
         });
+
+        // Lo que un cliente hace desde un enlace, sin correo ni contraseña (pagar su cita,
+        // cancelarla, aceptar un presupuesto, volver de la app): cada negocio y cada IP
+        // con su contador, sin compartirlo con el login. Detrás de una IP compartida
+        // (datos móviles, wifi del estudio) nadie deja sin pagar a los clientes de otro.
+        RateLimiter::for('accion-publica', fn (Request $request): Limit => Limit::perMinute(self::ACCIONES_PUBLICAS_MINUTO)
+            ->by(self::negocioDe($request).'|'.$request->ip()));
 
         // Recuperación de contraseña: aparte del login (no gasta sus intentos) y más
         // estricta por correo, para que no sirva para inundar un buzón (ni desde muchas IP).

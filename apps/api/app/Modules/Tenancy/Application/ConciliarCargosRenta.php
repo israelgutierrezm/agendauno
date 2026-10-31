@@ -55,8 +55,8 @@ class ConciliarCargosRenta
 
         // Los condonados con su página de OpenPay abierta: si se pagó, el cobro doble se
         // avisa aunque su aviso se haya perdido.
+        // También los pagados a mano o los que cambiaron de intento (ADR 0231).
         CargoRenta::query()
-            ->where('estado', EstadoCargoRenta::Cancelado->value)
             ->whereNotNull('referencia_condonada')
             ->where('updated_at', '>=', Carbon::now()->subDays(self::DIAS_VIGILAR_CONDONADOS))
             ->orderBy('id')

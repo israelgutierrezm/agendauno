@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Exceptions\TipoCambioNoDisponible;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Application\AcreditarMensajesWhatsAppPagados;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Throwable;
@@ -60,6 +61,8 @@ class GenerarCargosRenta extends Command
                         if (! $gestor->baseDeDatosExiste($estudio)) {
                             continue;
                         }
+                        // Los mensajes pagados que no se acreditaron al pagarse (ADR 0231).
+                        app(AcreditarMensajesWhatsAppPagados::class)->sincronizar($estudio);
                         // Sin periodo pedido: el mes anterior y los cerrados que hayan
                         // faltado (p. ej. mientras estuvo suspendido).
                         $periodos = $pedido !== '' ? [$pedido] : $generar->periodosPorEmitir($estudio);

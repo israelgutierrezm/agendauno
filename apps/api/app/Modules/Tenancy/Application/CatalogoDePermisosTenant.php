@@ -31,7 +31,7 @@ class CatalogoDePermisosTenant
                 'productos.ver', 'productos.gestionar', 'productos.eliminar',
                 'membresias.gestionar', 'membresias.cortesia', 'creditos.gestionar', 'derechos.ver',
                 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar', 'checkins.excepcion',
-                'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar',
+                'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar', 'cobranza.condonar',
                 'presupuestos.ver', 'presupuestos.gestionar',
                 'facturacion.ver', 'usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'auditoria.ver',
                 'comunicaciones.gestionar', 'comunicaciones.ver', 'comunicaciones.eliminar',
@@ -98,7 +98,7 @@ class CatalogoDePermisosTenant
             'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'membresias.cortesia', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             // Exentar una cuota (inscripción, anualidad, penalización; B04) va aparte.
             // La caja (ADR 0175): operarla va aparte de supervisarla (ver lo esperado y revisar).
-            'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar', 'facturacion.ver', 'presupuestos.ver', 'presupuestos.gestionar', 'caja.operar', 'caja.supervisar'],
+            'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar', 'cobranza.condonar', 'facturacion.ver', 'presupuestos.ver', 'presupuestos.gestionar', 'caja.operar', 'caja.supervisar'],
             'punto_venta' => ['pos.vender', 'inventario.ver', 'inventario.gestionar'],
             'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar', 'tareas.equipo'],
             'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'comunicaciones.eliminar', 'automatizaciones.gestionar', 'automatizaciones.eliminar', 'lealtad.ver', 'lealtad.gestionar'],
@@ -175,6 +175,7 @@ class CatalogoDePermisosTenant
             'presupuestos.ver' => ['miembros.ver'],
             'presupuestos.gestionar' => ['presupuestos.ver', 'miembros.ver', 'catalogo.ver', 'productos.ver'],
             'cuotas.exentar' => ['ordenes.ver', 'ordenes.gestionar', 'productos.ver', 'miembros.ver', 'derechos.ver'],
+            'cobranza.condonar' => ['ordenes.ver', 'miembros.ver', 'facturacion.ver'],
             'inventario.ver' => ['sucursales.ver'],
             'inventario.gestionar' => ['inventario.ver', 'sucursales.ver'],
             'pos.vender' => ['inventario.ver', 'sucursales.ver'],

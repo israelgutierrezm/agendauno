@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Pasarelas;
 
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\ClientePasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
@@ -23,7 +24,7 @@ use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
  * compra con `domiciliar`) ligada al cliente de la persona en la cuenta del negocio;
  * cada renovación se cobra sin el cliente presente (`off_session`).
  */
-class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConDevoluciones, PasarelaConsultable, PasarelaDomiciliable, PasarelaReembolsable, PasarelaTenant
+class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConContracargos, PasarelaConDevoluciones, PasarelaConsultable, PasarelaDomiciliable, PasarelaReembolsable, PasarelaTenant
 {
     public function nombre(): string
     {
@@ -55,6 +56,7 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConDevolucione
             ['pago' => (string) $pago->ulid],
             $domiciliar ? self::cliente($persona, $api) : null,
             $domiciliar,
+            app(ParametrosTenant::class)->entero('cobranza.dias_pagar_en_tienda'),
         );
 
         return ResultadoPago::pendiente($sesion['id'], [
@@ -127,6 +129,34 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConDevolucione
             static fn (array $r): array => ['id' => $r['id'], 'monto_minor' => $r['monto_minor'], 'moneda' => $r['moneda'], 'llave' => $r['llave']],
             array_filter($cliente->reembolsosDeIntent($intent), static fn (array $r): bool => $r['estado'] === 'succeeded' && $r['id'] !== ''),
         ));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function contracargo(PagoTenant $pago, array $llaves): ?array
+    {
+        $cliente = self::api($llaves);
+        $referencia = (string) $pago->referencia_externa;
+        $intent = str_starts_with($referencia, 'cs_') ? $cliente->paymentIntentDeSesion($referencia) : $referencia;
+        if (! is_string($intent) || ! str_starts_with($intent, 'pi_')) {
+            return null;
+        }
+        $disputa = $cliente->disputaDeIntent($intent);
+        if ($disputa === null || (string) ($disputa['id'] ?? '') === '') {
+            return null;
+        }
+
+        return [
+            'id' => (string) $disputa['id'],
+            'estado' => match ((string) ($disputa['status'] ?? '')) {
+                'won', 'warning_closed' => 'ganado',
+                'lost' => 'perdido',
+                default => 'abierto',
+            },
+            'monto_minor' => (int) ($disputa['amount'] ?? 0),
+            'motivo' => isset($disputa['reason']) ? (string) $disputa['reason'] : null,
+        ];
     }
 
     /**

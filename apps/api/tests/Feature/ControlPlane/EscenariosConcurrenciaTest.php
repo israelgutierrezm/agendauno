@@ -80,6 +80,34 @@ it('una venta facturada ya no se anula y una anulada ya no se factura', function
     expect($e->estadoDeVenta($anulada))->toBe(['anulada' => true, 'facturas' => 0]);
 });
 
+it('el aviso y la conciliación confirman el mismo cobro y el paquete se entrega una vez', function (): void {
+    [, $e, $base] = negocioDeEscenarios('escenarios-confirmar');
+    ['pago' => $pago, 'persona' => $persona] = $e->cobroPorConfirmar($base['sucursal']);
+
+    expect(pasoDeEscenario($e, ['accion' => 'confirmar-pago', 'pago' => $pago, 'referencia' => 'aviso']))->toMatchArray(['hecho' => true]);
+    expect(pasoDeEscenario($e, ['accion' => 'confirmar-pago', 'pago' => $pago, 'referencia' => 'conciliacion']))->toMatchArray(['hecho' => true]);
+    expect($e->entregaDelCobro($pago, $persona))->toBe(['estado' => 'aprobado', 'orden' => 'pagada', 'derechos' => 1]);
+});
+
+it('una oferta aceptada a tiempo no vence y una vencida pasa al siguiente', function (): void {
+    [, $e, $base] = negocioDeEscenarios('escenarios-oferta');
+
+    $aTiempo = $e->ofertaPorVencer($base['clase'], $base['sucursal'], 5, 60);
+    expect(pasoDeEscenario($e, ['accion' => 'aceptar-oferta', 'reserva' => $aTiempo['oferta']]))->toMatchArray(['hecho' => true]);
+    expect(pasoDeEscenario($e, ['accion' => 'vencer-ofertas', 'reserva' => $aTiempo['oferta']]))->toMatchArray(['hecho' => true, 'detalle' => 'ya resuelta']);
+    expect($e->estadoDeReserva($aTiempo['oferta']))->toBe('confirmada')
+        ->and($e->estadoDeReserva($aTiempo['siguiente']))->toBe('en_espera')
+        ->and($e->ocupadas($aTiempo['sesion']))->toBe(1);
+
+    $vencida = $e->ofertaPorVencer($base['clase'], $base['sucursal'], 6, 60);
+    $this->travel(2)->minutes();
+    expect(pasoDeEscenario($e, ['accion' => 'aceptar-oferta', 'reserva' => $vencida['oferta']]))->toMatchArray(['hecho' => false, 'esperado' => true]);
+    expect(pasoDeEscenario($e, ['accion' => 'vencer-ofertas', 'reserva' => $vencida['oferta']]))->toMatchArray(['hecho' => true, 'detalle' => 'vencida']);
+    expect($e->estadoDeReserva($vencida['oferta']))->toBe('expirada')
+        ->and($e->estadoDeReserva($vencida['siguiente']))->toBe('ofrecida')
+        ->and($e->ocupadas($vencida['sesion']))->toBe(1);
+});
+
 it('la misma cita con la misma clave es una sola cita', function (): void {
     [$estudio, $e, $base] = negocioDeEscenarios('escenarios-cita');
     $estudio->forceFill(['modalidad' => ModalidadServicio::Citas])->save();

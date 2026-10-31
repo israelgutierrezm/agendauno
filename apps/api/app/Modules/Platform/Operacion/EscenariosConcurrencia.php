@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\BajasDeGrupoTenant;
 use App\Modules\Tenancy\Application\CajasTenant;
 use App\Modules\Tenancy\Application\CobroDeCitaTenant;
+use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\CorregirVentaPosTenant;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
@@ -63,8 +64,10 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\TurnoCajaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\VentaPosTenant;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\Exceptions\PagoException;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
@@ -112,6 +115,7 @@ class EscenariosConcurrencia
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly CorregirVentaPosTenant $corregirVenta,
         private readonly TimbresTenant $timbres,
+        private readonly ConfirmarPagoTenant $confirmarPago,
     ) {}
 
     /**
@@ -426,6 +430,9 @@ class EscenariosConcurrencia
             'devolver-cobro' => $this->prepararDevolverCobro((int) $paso['pago'], (string) $paso['llave']),
             'facturar-venta' => $this->prepararFacturarVenta((int) $paso['venta']),
             'anular-venta' => $this->prepararAnularVenta((int) $paso['venta']),
+            'confirmar-pago' => $this->prepararConfirmarPago((int) $paso['pago'], (string) $paso['referencia']),
+            'aceptar-oferta' => $this->prepararAceptarOferta((int) $paso['reserva']),
+            'vencer-ofertas' => $this->prepararVencerOfertas((int) $paso['reserva']),
             'cancelar' => $this->prepararCancelar((int) $paso['reserva']),
             'cancelar-sesion' => $this->prepararCancelarSesion((int) $paso['sesion']),
             'invitar' => $this->prepararInvitar((int) $paso['sesion'], (int) $paso['persona']),
@@ -737,6 +744,115 @@ class EscenariosConcurrencia
             ->where('persona_id', $personaId)
             ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
             ->count();
+    }
+
+    /**
+     * Un cobro en línea por confirmar de un paquete (aún sin entregar).
+     *
+     * @return array{pago: int, persona: int}
+     */
+    public function cobroPorConfirmar(int $sucursalId): array
+    {
+        $this->paquetes[1] ??= $this->membresias->crearProducto('Paquete 1', TipoProducto::Paquete, 10000, 'MXN', false, 1000);
+        $persona = $this->alumno(0);
+        $orden = $this->ordenes->crear($persona, [['producto' => $this->paquetes[1], 'cantidad' => 1]], sucursalId: $sucursalId);
+        $pago = PagoTenant::query()->create([
+            'orden_id' => $orden->getKey(),
+            'proveedor' => 'stripe',
+            'metodo' => MetodoPago::Tarjeta->value,
+            'estado' => EstadoPago::Pendiente->value,
+            'monto_minor' => $orden->total_minor,
+            'moneda' => $orden->moneda,
+        ]);
+
+        return ['pago' => (int) $pago->getKey(), 'persona' => (int) $persona->getKey()];
+    }
+
+    /**
+     * En qué quedó el cobro: su estado, el de la venta y los derechos entregados.
+     *
+     * @return array{estado: string, orden: string, derechos: int}
+     */
+    public function entregaDelCobro(int $pagoId, int $personaId): array
+    {
+        $pago = PagoTenant::query()->with('orden')->findOrFail($pagoId);
+
+        return [
+            'estado' => $pago->estado->value,
+            'orden' => (string) $pago->orden?->estado->value,
+            'derechos' => DerechoTenant::query()->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $personaId))->count(),
+        ];
+    }
+
+    /** El aviso de la pasarela y la conciliación terminan aquí, con su referencia. */
+    private function prepararConfirmarPago(int $pagoId, string $referencia): callable
+    {
+        $pago = PagoTenant::query()->findOrFail($pagoId);
+
+        return function () use ($pago, $referencia): string {
+            $this->confirmarPago->aprobar($pago, $referencia);
+
+            return 'confirmado';
+        };
+    }
+
+    /**
+     * Una clase llena con una oferta de lista de espera que vence en `$segundos` y otra
+     * persona esperando detrás de ella.
+     *
+     * @return array{sesion: int, oferta: int, siguiente: int}
+     */
+    public function ofertaPorVencer(int $claseId, int $sucursalId, int $dia, int $segundos): array
+    {
+        $sesion = $this->sesion($claseId, $sucursalId, 1, $dia);
+        $ocupa = $this->reservas->crear($sesion, $this->alumno(1));
+        $oferta = $this->reservas->crear($sesion, $this->alumno(1), permitirEspera: true);
+        $siguiente = $this->reservas->crear($sesion, $this->alumno(1), permitirEspera: true);
+        $this->reservas->cancelar($ocupa);
+        $oferta->refresh()->update(['oferta_expira_en' => now()->addSeconds($segundos)]);
+
+        return ['sesion' => (int) $sesion->getKey(), 'oferta' => (int) $oferta->getKey(), 'siguiente' => (int) $siguiente->getKey()];
+    }
+
+    public function estadoDeReserva(int $reservaId): string
+    {
+        return ReservaTenant::query()->findOrFail($reservaId)->estado->value;
+    }
+
+    /** Acepta justo antes de vencer, cuando la expiración ya está por tomarla. */
+    private function prepararAceptarOferta(int $reservaId): callable
+    {
+        $reserva = ReservaTenant::query()->findOrFail($reservaId);
+        $vence = (float) $reserva->oferta_expira_en?->format('U.u');
+
+        return function () use ($reserva, $vence): string {
+            while (microtime(true) < $vence - 0.005) {
+                usleep(500);
+            }
+
+            return $this->reservas->aceptar($reserva)->estado->value;
+        };
+    }
+
+    /** `agendauno:expirar-ofertas` sin pausa, hasta que esa oferta se resuelva. */
+    private function prepararVencerOfertas(int $reservaId): callable
+    {
+        $reserva = ReservaTenant::query()->findOrFail($reservaId);
+        $hasta = (float) $reserva->oferta_expira_en?->format('U.u') + 2;
+
+        return function () use ($reservaId, $hasta): string {
+            do {
+                if ($this->reservas->expirarOfertasVencidas() > 0) {
+                    return 'vencida';
+                }
+                if ($this->estadoDeReserva($reservaId) !== EstadoReserva::Ofrecida->value) {
+                    return 'ya resuelta';
+                }
+                usleep(1000);
+            } while (microtime(true) < $hasta);
+
+            return 'sin vencer';
+        };
     }
 
     private function prepararCancelar(int $reservaId): callable

@@ -27,6 +27,9 @@ class GestorDeConexionTenant
 
     private const RUTA_TENANTS = 'tenants';
 
+    /** Sin negocio conectado, `tenant` apunta aquí: una base que no existe y falla. */
+    private const BASE_CENTINELA = 'sin_negocio_conectado';
+
     private ?Estudio $actual = null;
 
     /**
@@ -58,8 +61,23 @@ class GestorDeConexionTenant
 
     public function desconectar(): void
     {
-        DB::purge(self::CONEXION);
+        $this->soltar();
         $this->actual = null;
+    }
+
+    /**
+     * Devuelve `tenant` a la base centinela: una consulta sin negocio conectado lanza una
+     * excepción en vez de leer o escribir en la base del último negocio (ADR 0232).
+     */
+    private function soltar(): void
+    {
+        /** @var array<string, mixed> $config */
+        $config = config('database.connections.'.self::CONEXION);
+        $config['database'] = ($config['driver'] ?? null) === 'sqlite'
+            ? storage_path(self::RUTA_TENANTS.'/'.self::BASE_CENTINELA.'.sqlite')
+            : self::BASE_CENTINELA;
+        config()->set('database.connections.'.self::CONEXION, $config);
+        DB::purge(self::CONEXION);
     }
 
     public function actual(): ?Estudio
@@ -103,12 +121,10 @@ class GestorDeConexionTenant
         try {
             return $callback();
         } finally {
-            DB::purge(self::CONEXION);
-
             if ($previo !== null) {
                 $this->conectar($previo);
             } else {
-                $this->actual = null;
+                $this->desconectar();
             }
         }
     }
@@ -218,6 +234,23 @@ class GestorDeConexionTenant
         }
 
         return $resultado;
+    }
+
+    /**
+     * Relee de la base la versión real de su esquema y la anota (tras restaurar un respaldo
+     * viejo, lo anotado ya no es cierto y la verificación diría «al día»). Devuelve cuántas
+     * migraciones de esta versión le faltan.
+     *
+     * @return array{version: string|null, faltan: int}
+     */
+    public function releerEsquema(Estudio $estudio): array
+    {
+        $corridas = $this->ejecutarEn($estudio, static fn (): array => self::migracionesCorridas());
+        $version = $corridas === [] ? null : max($corridas);
+        $estudio->update(['version_migraciones' => $version]);
+        $todas = array_map(static fn ($archivo): string => $archivo->getFilenameWithoutExtension(), File::files(database_path('migrations/tenant')));
+
+        return ['version' => $version, 'faltan' => count(array_diff($todas, $corridas))];
     }
 
     /**

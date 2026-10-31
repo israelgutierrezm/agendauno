@@ -191,6 +191,7 @@ describe("promociones", () => {
       valor: 2000,
       monto_minimo_minor: null,
       usos_maximos: 50,
+      usos_por_persona: null,
       vence_en: "2026-12-31",
       activa: true,
     });

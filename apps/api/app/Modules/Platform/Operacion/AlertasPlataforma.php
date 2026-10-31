@@ -36,6 +36,16 @@ class AlertasPlataforma
     ];
 
     /**
+     * Las que van también por el segundo canal (Telegram, ADR 0232): lo que detiene la
+     * operación o toca dinero. Lo demás (solicitudes, webhooks de un negocio) espera al correo.
+     */
+    public const CRITICAS = [
+        'error', 'cobro_fallido', 'incidencia_cobro', 'aviso_pasarela_fallido', 'evento_outbox_aparcado', 'correo_fallido',
+        'respaldo_fallido', 'cola_detenida', 'trabajos_fallidos', 'trabajo_fallido', 'aprovisionamiento_fallido',
+        'renta_cobrada_dos_veces', 'renta_en_disputa', 'pendientes_atascados',
+    ];
+
+    /**
      * Excepciones ya registradas con su tipo (para no duplicarlas como "error").
      *
      * @var SplObjectStorage<Throwable, null>

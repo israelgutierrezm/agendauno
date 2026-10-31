@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcancePersonaTenant;
+use App\Modules\Tenancy\Application\CondonarAdeudoTenant;
+use App\Modules\Tenancy\Application\DeudaDeRenovacionTenant;
 use App\Modules\Tenancy\Application\GestionarDunningTenant;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,7 +23,11 @@ use Illuminate\Validation\Rule;
  */
 class DunningTenantController
 {
-    public function __construct(private readonly GestionarDunningTenant $dunning) {}
+    public function __construct(
+        private readonly GestionarDunningTenant $dunning,
+        private readonly DeudaDeRenovacionTenant $deudas,
+        private readonly CondonarAdeudoTenant $condonar,
+    ) {}
 
     /**
      * Procesos de morosidad abiertos (en mora o suspendidos), por páginas; se buscan por
@@ -75,17 +82,38 @@ class DunningTenantController
     }
 
     /**
-     * Registra que el pago se resolvió (cierra el dunning y reactiva el acuerdo).
+     * La renovación por cobrar de la membresía en mora (la crea si aún no existe). Se
+     * cobra en caja con `POST /ordenes/{orden}/liquidar`: entra al corte, avanza la
+     * renovación y cierra la mora (ADR 0231).
      */
-    public function regularizar(Request $request): JsonResponse
+    public function deuda(Request $request): JsonResponse
     {
         $acuerdo = $this->acuerdoDe($request);
+        $orden = $this->deudas->de($acuerdo);
+        abort_if($orden === null, 422, 'Ya no tiene titular o producto: no hay qué cobrar.');
+        $acuerdo->loadMissing(['persona', 'producto']);
 
-        $proceso = $this->dunning->registrarPago($acuerdo);
+        return response()->json(['data' => [
+            'id' => $orden->ulid,
+            'persona' => $acuerdo->persona?->nombreCompleto(),
+            'concepto' => $acuerdo->producto?->nombre,
+            'total_minor' => $orden->total_minor,
+            'moneda' => $orden->moneda,
+        ]]);
+    }
 
-        return response()->json([
-            'data' => $proceso !== null ? $this->presentar($proceso->load('acuerdo.persona')) : null,
-        ]);
+    /**
+     * Perdona la renovación sin cobrarla: con motivo, en la bitácora y sin pasar por caja.
+     */
+    public function condonar(Request $request): JsonResponse
+    {
+        $acuerdo = $this->acuerdoDe($request);
+        $validado = $request->validate(['motivo' => ['required', 'string', 'max:255']]);
+        $actor = $request->attributes->get('usuario_tenant');
+
+        $proceso = $this->condonar->ejecutar($acuerdo, (string) $validado['motivo'], $actor instanceof Usuario ? $actor : null);
+
+        return response()->json(['data' => $this->presentar($proceso->load('acuerdo.persona'))]);
     }
 
     private function acuerdoDe(Request $request): AcuerdoTenant

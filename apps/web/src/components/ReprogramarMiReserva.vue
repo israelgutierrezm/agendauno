@@ -16,6 +16,7 @@ interface Opciones {
   tipo: "cita" | "clase";
   restantes: number;
   hasta: string;
+  cambio_tardio?: boolean;
   slots?: { inicia: string; termina: string }[];
   sesiones?: { id: string; inicia_en: string; zona_horaria: string }[];
 }
@@ -162,6 +163,15 @@ onMounted(cargar);
               opciones.restantes,
             )
           }}
+        </p>
+        <!-- Mover dentro del límite cuenta como cancelación tardía si luego cancela (ADR 0231). -->
+        <p
+          v-if="opciones.cambio_tardio"
+          class="text-sm"
+          :style="{ color: 'var(--aviso)' }"
+          data-prueba="aviso-cambio-tardio"
+        >
+          {{ $t("confirmaciones.cambioTardio") }}
         </p>
 
         <!-- Cita: otro horario libre -->

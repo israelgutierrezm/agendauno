@@ -93,7 +93,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.3'
           # pdo_sqlite: las BD por tenant (data plane) usan SQLite en test/CI.
@@ -191,7 +191,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: '3.44.0'
@@ -229,7 +229,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: '3.44.0'
@@ -259,7 +259,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: '3.44.0'
@@ -366,6 +366,8 @@ jobs:
           docker compose --env-file web.env -f docker-compose.yml -f docker-compose.traefik.yml config -q
           docker compose --env-file web.env -f docker-compose.yml -f docker-compose.traefik.yml \
             -f docker-compose.cloudflare.yml config -q
+          DOMINIOS_PROPIOS_DIR=/tmp/dominios docker compose --env-file web.env -f docker-compose.yml \
+            -f docker-compose.traefik.yml -f docker-compose.dominios-propios.yml config -q
           sh -n actualizar.sh && sh -n volver.sh && sh -n versiones.sh && sh -n compose.sh
 
       # nginx de `web` pasa la portada, las páginas por giro, el robots y los recursos de

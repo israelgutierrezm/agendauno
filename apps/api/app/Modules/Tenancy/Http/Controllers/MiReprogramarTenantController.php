@@ -60,6 +60,8 @@ class MiReprogramarTenantController
             'tipo' => $sesion->tipo->value,
             'restantes' => max(0, $this->parametros->entero('reprogramar.maximo_cliente') - (int) $reserva->reprogramaciones_cliente),
             'hasta' => $this->limite($sesion)->toIso8601String(),
+            // Cambiarla ahora la deja como cancelación tardía si luego se cancela (ADR 0231).
+            'cambio_tardio' => (bool) $reserva->cambio_tardio || now()->greaterThan($sesion->inicia_en->copy()->subHours((int) ($reserva->horas_limite ?? $this->parametros->entero('cancelacion.horas_limite')))),
         ];
         if ($motivo !== null) {
             return response()->json(['data' => $base]);
@@ -131,8 +133,14 @@ class MiReprogramarTenantController
 
         // El cambio y su cuenta van juntos: dos cambios a la vez no se saltan el máximo
         // (el segundo deshace su cambio).
-        $movida = DB::connection('tenant')->transaction(function () use ($request, $reserva, $sesion, $actor): ReservaTenant {
+        // Dentro del límite de cancelación: si después la cancela, es cancelación tardía
+        // aunque la nueva fecha quede lejos (ADR 0231).
+        $tardio = now()->greaterThan($sesion->inicia_en->copy()->subHours((int) ($reserva->horas_limite ?? $this->parametros->entero('cancelacion.horas_limite'))));
+        $movida = DB::connection('tenant')->transaction(function () use ($request, $reserva, $sesion, $actor, $tardio): ReservaTenant {
             $movida = $this->mover($request, $reserva, $sesion, $actor);
+            if ($tardio) {
+                $movida->update(['cambio_tardio' => true]);
+            }
             $contada = ReservaTenant::query()
                 ->whereKey($movida->getKey())
                 ->where('reprogramaciones_cliente', '<', $this->parametros->entero('reprogramar.maximo_cliente'))

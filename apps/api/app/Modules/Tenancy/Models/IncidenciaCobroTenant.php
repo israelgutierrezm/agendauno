@@ -54,6 +54,15 @@ class IncidenciaCobroTenant extends Model
      */
     public const REVISAR_SI_VINO = 'revisar_si_vino';
 
+    /** Se prometió devolver solo y no se pudo: alguien tiene que hacerlo (ADR 0231). */
+    public const DEVOLUCION_PENDIENTE = 'devolucion_pendiente';
+
+    /** Lo pagado en caja se devuelve en caja, a mano: queda aquí para no olvidarlo (ADR 0231). */
+    public const DEVOLVER_EN_CAJA = 'devolver_en_caja';
+
+    /** Un intento abierto salió de la ventana de conciliación sin confirmarse (ADR 0231). */
+    public const PAGO_SIN_CONFIRMAR = 'pago_sin_confirmar';
+
     protected $connection = 'tenant';
 
     protected $table = 'incidencias_cobro';

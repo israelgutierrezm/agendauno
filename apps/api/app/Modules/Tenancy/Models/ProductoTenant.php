@@ -186,4 +186,14 @@ class ProductoTenant extends Model
     {
         return $this->belongsToMany(OfertaTenant::class, 'producto_ofertas', 'producto_id', 'oferta_id');
     }
+
+    /**
+     * Los videos que incluye de forma expresa.
+     *
+     * @return BelongsToMany<VideoTenant, $this>
+     */
+    public function videos(): BelongsToMany
+    {
+        return $this->belongsToMany(VideoTenant::class, 'video_producto', 'producto_id', 'video_id');
+    }
 }

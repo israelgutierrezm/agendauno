@@ -20,6 +20,9 @@ use Throwable;
  */
 class AvisosRentaPlataforma
 {
+    /** Un intento de Mercado Pago sin cobro se da por abandonado pasado este tiempo. */
+    private const HORAS_INTENTO_MERCADO_PAGO = 24;
+
     public function __construct(
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly ConfirmarCargoRenta $confirmar,
@@ -68,6 +71,13 @@ class AvisosRentaPlataforma
                 $aprobado = $this->mercadoPago->cobrosDe($cargo, $this->registro->llaves('mercadopago'))['aprobado'];
                 if ($aprobado !== null && $aprobado['id'] !== '') {
                     $this->confirmar->porReferencia($aprobado['id'], 'mercadopago', (string) $cargo->ulid, $aprobado['monto_minor']);
+                } elseif ($cargo->updated_at !== null && $cargo->updated_at->lt(now()->subHours(self::HORAS_INTENTO_MERCADO_PAGO))) {
+                    // Lo abrió y no pagó: el cargo vuelve a poder cobrarse a la tarjeta que
+                    // guarde (ADR 0231); si no, se suspendería con una tarjeta válida.
+                    $referencia = (string) $cargo->referencia_pago;
+                    if ($this->mercadoPago->cancelarIntento($cargo, $this->registro->llaves('mercadopago'))) {
+                        $this->confirmar->intentoTerminado($referencia);
+                    }
                 }
             }
             if ($cargo->metodo_pago === 'openpay' && (string) $cargo->referencia_pago !== '' && $this->registro->activa('openpay')) {

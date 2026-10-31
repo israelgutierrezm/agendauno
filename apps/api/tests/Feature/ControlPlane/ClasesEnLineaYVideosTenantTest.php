@@ -70,6 +70,49 @@ it('los videos se ven con el plan que los incluye; de los demás, solo el títul
     $this->postJson("{$app}/videos", ['titulo' => 'X', 'url' => 'https://x.mx'], $recep)->assertForbidden();
 });
 
+it('un plan 100 % digital no se lista, compra ni cobra desde las apps; en la web sí, y el mixto se sigue vendiendo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    activarCobroEnLinea($e);
+    $semilla = agendaSemilla($e);
+    $app = "/api/v1/app/{$e['slug']}";
+    $bearer = conBearer($e['bearer']);
+    // La oferta de la semilla es presencial: otra, en línea.
+    $programa = (string) $this->postJson("{$app}/programas", ['nombre' => 'En línea'], $bearer)->assertCreated()->json('data.id');
+    $actividad = (string) $this->postJson("{$app}/programas/{$programa}/actividades", ['nombre' => 'Yoga en vivo'], $bearer)->assertCreated()->json('data.id');
+    $enLinea = (string) $this->postJson("{$app}/actividades/{$actividad}/ofertas", ['nombre' => 'En vivo', 'modalidad' => 'grupal', 'capacidad' => 20], $bearer)->assertCreated()->json('data.id');
+    $this->putJson("{$app}/ofertas/{$enLinea}", ['lugares' => 0, 'enlace_en_linea' => 'https://zoom.us/j/9'], $bearer)->assertOk();
+
+    $crear = fn (string $nombre, int $creditos, array $ofertas = []): string => (string) $this->postJson("{$app}/productos", [
+        'nombre' => $nombre, 'tipo' => 'paquete', 'precio_minor' => 50000, 'moneda' => 'MXN', 'ilimitado' => false, 'creditos_incluidos' => $creditos, 'ofertas' => $ofertas,
+    ], $bearer)->assertCreated()->json('data.id');
+    $soloEnLinea = $crear('Solo en vivo', 4000, [$enLinea]);
+    $soloVideos = $crear('Solo videos', 0);
+    $mixto = $crear('Mixto', 4000, [$enLinea, $semilla['oferta']]);
+    $this->postJson("{$app}/videos", ['titulo' => 'Rutina', 'url' => 'https://vimeo.com/1', 'planes' => [$soloVideos, $mixto]], $bearer)->assertCreated();
+
+    $alumna = conBearer(alumnoConSesion($e)['bearer']);
+    $deApp = [...$alumna, 'X-App-Producto' => 'agendauno'];
+
+    // La app no los lista; la web los ve marcados.
+    $enApp = collect($this->getJson("{$app}/mi/productos", $deApp)->assertOk()->json('data'))->pluck('nombre');
+    expect($enApp->all())->toContain('Mixto')->not->toContain('Solo en vivo')->not->toContain('Solo videos');
+    $enWeb = collect($this->getJson("{$app}/mi/productos", $alumna)->assertOk()->json('data'))->keyBy('nombre');
+    expect($enWeb['Solo en vivo']['digital'])->toBeTrue()
+        ->and($enWeb['Solo videos']['digital'])->toBeTrue()
+        ->and($enWeb['Mixto']['digital'])->toBeFalse();
+
+    // Comprarlo desde la app: 422 claro, sin orden. El mixto sí.
+    $comprar = fn (string $producto, array $cabeceras) => $this->postJson("{$app}/mi/ordenes", ['items' => [['producto_id' => $producto, 'cantidad' => 1]]], $cabeceras);
+    $comprar($soloEnLinea, $deApp)->assertUnprocessable()->assertJsonPath('meta.errors.items.0', 'Este plan no se vende desde la app.');
+    $comprar($soloVideos, $deApp)->assertUnprocessable();
+    $comprar($mixto, $deApp)->assertCreated()->assertJsonPath('data.digital', false);
+
+    // Comprado en la web, tampoco se paga desde la app.
+    $orden = $comprar($soloVideos, $alumna)->assertCreated()->assertJsonPath('data.digital', true)->json('data.id');
+    $this->postJson("{$app}/mi/ordenes/{$orden}/cobrar", ['proveedor' => 'stripe', 'metodo' => 'tarjeta'], $deApp)
+        ->assertUnprocessable()->assertJsonPath('meta.errors.orden.0', 'Este pago no se hace desde la app.');
+});
+
 it('una clase en línea de pago se marca digital y no se cobra desde la app de las tiendas', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     activarCobroEnLinea($e);

@@ -55,6 +55,8 @@ class GestionarDunningTenant
         ];
 
         return DB::connection('tenant')->transaction(function () use ($acuerdo, $porQue): ProcesoDunningTenant {
+            // La membresía primero: bloquear un proceso que aún no existe no impide abrir dos.
+            $this->bloquearAcuerdo($acuerdo);
             $proceso = $this->procesoAbierto($acuerdo, bloquear: true);
 
             if ($proceso === null) {
@@ -96,10 +98,18 @@ class GestionarDunningTenant
     public function registrarPago(AcuerdoTenant $acuerdo): ?ProcesoDunningTenant
     {
         return DB::connection('tenant')->transaction(function () use ($acuerdo): ?ProcesoDunningTenant {
+            $this->bloquearAcuerdo($acuerdo);
             $proceso = $this->procesoAbierto($acuerdo, bloquear: true);
             if ($proceso === null) {
                 return null;
             }
+
+            // Todas las abiertas, por si quedó más de una de antes del candado.
+            ProcesoDunningTenant::query()
+                ->where('acuerdo_id', $acuerdo->getKey())
+                ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+                ->whereKeyNot($proceso->getKey())
+                ->update(['estado' => EstadoDunning::Regularizado->value, 'regularizado_en' => Carbon::now(), 'proximo_intento_en' => null]);
 
             $proceso->estado = EstadoDunning::Regularizado;
             $proceso->regularizado_en = Carbon::now();
@@ -136,6 +146,7 @@ class GestionarDunningTenant
                 }
 
                 DB::connection('tenant')->transaction(function () use ($proceso, $acuerdo, &$suspendidos): void {
+                    $this->bloquearAcuerdo($acuerdo);
                     $bloqueado = ProcesoDunningTenant::query()->whereKey($proceso->getKey())->lockForUpdate()->first();
                     if (! $bloqueado instanceof ProcesoDunningTenant
                         || $bloqueado->estado !== EstadoDunning::EnMora
@@ -151,6 +162,15 @@ class GestionarDunningTenant
             });
 
         return $suspendidos;
+    }
+
+    /** Bajo candado y con su estado de ahora: lo que sigue decide con él. */
+    private function bloquearAcuerdo(AcuerdoTenant $acuerdo): void
+    {
+        $bloqueado = AcuerdoTenant::query()->whereKey($acuerdo->getKey())->lockForUpdate()->first();
+        if ($bloqueado instanceof AcuerdoTenant) {
+            $acuerdo->setAttribute('estado', $bloqueado->estado);
+        }
     }
 
     /**

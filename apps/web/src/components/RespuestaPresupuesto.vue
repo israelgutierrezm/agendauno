@@ -101,10 +101,7 @@ async function pagar(): Promise<void> {
   try {
     const { data } = await api.post<{
       data: { checkout: { url?: string } | null };
-    }>(`${props.url}/pagar`, {
-      ...conToken.value,
-      idempotency_key: `presupuesto-${props.presupuesto.id}-${props.presupuesto.orden?.id ?? ""}`,
-    });
+    }>(`${props.url}/pagar`, conToken.value);
     const destino = data.data.checkout?.url;
     if (destino) {
       window.location.assign(destino);

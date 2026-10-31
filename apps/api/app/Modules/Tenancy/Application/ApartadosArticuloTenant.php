@@ -141,6 +141,20 @@ class ApartadosArticuloTenant
             ->update(['estado' => 'cancelado']);
     }
 
+    /**
+     * Lo que nadie recogió: pasadas las horas del parámetro desde que terminó su clase
+     * vuelve a estar disponible (ADR 0231). Cuántos se liberaron.
+     */
+    public function liberarNoRecogidos(): int
+    {
+        $horas = app(ParametrosTenant::class)->entero('apartados.horas_para_recoger');
+
+        return ApartadoArticuloTenant::query()
+            ->where('estado', 'apartado')
+            ->whereIn('sesion_id', SesionTenant::query()->select('id')->where('termina_en', '<', now()->subHours($horas)))
+            ->update(['estado' => 'cancelado']);
+    }
+
     /** La clase se canceló: lo apartado para ella se libera. */
     public function liberarDeSesion(SesionTenant $sesion): int
     {

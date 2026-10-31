@@ -30,6 +30,7 @@ use App\Modules\Tenancy\Application\PoliticaCancelacion;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\PrimeraVezTenant;
+use App\Modules\Tenancy\Application\ProductosDigitalesTenant;
 use App\Modules\Tenancy\Application\PuestaEnMarchaTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverDerechoTenant;
@@ -61,6 +62,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -981,6 +983,11 @@ class MiTenantController
         $productos = app(MembresiasPorModalidadTenant::class)
             ->vendibles(ProductoTenant::query()->with(['actividad', 'ofertas'])->where('archivado', false))
             ->orderBy('precio_minor')->get();
+        // Lo 100 % digital no se ofrece en las apps de las tiendas (ADR 0233).
+        $digitales = app(ProductosDigitalesTenant::class);
+        if ($request->hasHeader('X-App-Producto')) {
+            $productos = $productos->reject(static fn (ProductoTenant $p): bool => $digitales->esDigital($p))->values();
+        }
         // La clase de prueba solo se ofrece a quien nunca vino (B03).
         $persona = $this->persona($request);
         $primeraVez = $persona instanceof PersonaTenant && app(PrimeraVezTenant::class)->elegible($persona);
@@ -996,6 +1003,7 @@ class MiTenantController
                 'id' => $p->ulid,
                 'nombre' => $p->nombre,
                 'tipo' => $p->tipo->value,
+                'digital' => $digitales->esDigital($p),
                 'precio_minor' => $p->precio_minor,
                 'moneda' => $p->moneda,
                 'ilimitado' => $p->ilimitado,
@@ -1113,8 +1121,13 @@ class MiTenantController
         $paraOtro = ! $titular->is($persona);
 
         $items = [];
+        $digitales = app(ProductosDigitalesTenant::class);
         foreach ($validado['items'] as $item) {
             $producto = ProductoTenant::query()->where('ulid', $item['producto_id'])->firstOrFail();
+            // Lo 100 % digital no se compra desde las apps de las tiendas (ADR 0233).
+            if ($request->hasHeader('X-App-Producto') && $digitales->esDigital($producto)) {
+                throw ValidationException::withMessages(['items' => ['Este plan no se vende desde la app.']]);
+            }
             // Para sí: beneficiario = comprador (sin beneficiario explícito).
             $items[] = ['producto' => $producto, 'cantidad' => (int) $item['cantidad'], 'beneficiario' => $paraOtro ? $persona : null];
         }
@@ -1123,6 +1136,13 @@ class MiTenantController
         $sede = $persona->sucursal_id ?? $titular->sucursal_id;
         $sucursalId = $sede !== null ? (int) $sede : null;
         $actor = $request->attributes->get('usuario_tenant');
+        // Comprar otra vez lo que ya dejó sin pagar es esa misma compra (ADR 0231).
+        if (count($validado['items']) === 1 && (int) $validado['items'][0]['cantidad'] === 1) {
+            $abierta = $this->ordenes->compraAbiertaDe($titular, (string) $validado['items'][0]['producto_id'], $paraOtro ? $persona->getKey() : null, $validado['codigo_promo'] ?? null);
+            if ($abierta !== null) {
+                return response()->json(['data' => $this->presentarOrden($abierta)], 201);
+            }
+        }
         $orden = $this->ordenes->crear(
             $titular,
             $items,
@@ -1138,8 +1158,28 @@ class MiTenantController
         if ($contexto !== null) {
             $orden->update(['contexto_medicion_id' => $contexto->getKey()]);
         }
+        // Sin pagar caduca sola: no se queda «por pagar» para siempre (ADR 0231).
+        if ($orden->estado === EstadoOrden::Pendiente) {
+            $orden->update(['caduca_en' => now()->addDays(app(ParametrosTenant::class)->entero('cobranza.dias_compra_sin_pagar'))]);
+        }
 
         return response()->json(['data' => $this->presentarOrden($orden->refresh())], 201);
+    }
+
+    /** Quita del portal una compra suya sin pagar (ADR 0231). */
+    public function quitarCompra(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de cliente en este negocio.');
+        $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
+        abort_unless($this->ordenesDe($request, $persona)->whereKey($orden->getKey())->exists(), 403, 'Esta orden no es tuya.');
+        try {
+            $this->ordenes->quitarCompra($orden);
+        } catch (OrdenNoLiquidable $e) {
+            throw ValidationException::withMessages(['orden' => [$e->getMessage()]]);
+        }
+
+        return response()->json(['data' => $this->presentarOrden($orden->refresh())]);
     }
 
     /**
@@ -1231,13 +1271,24 @@ class MiTenantController
         ]], 201);
     }
 
-    /** ¿Es el pago de una clase en línea (contenido digital para las tiendas)? */
+    /**
+     * ¿Es el pago de contenido digital para las tiendas? Una clase en línea o, por
+     * pagar, un plan 100 % digital (ADR 0233).
+     */
     private static function esDigital(OrdenTenant $orden): bool
     {
         $sesion = $orden->sesion;
+        if ($sesion instanceof SesionTenant && ! $sesion->esCita()
+            && trim((string) $sesion->oferta?->enlace_en_linea) !== '') {
+            return true;
+        }
+        if ($orden->estado !== EstadoOrden::Pendiente) {
+            return false;
+        }
+        $digitales = app(ProductosDigitalesTenant::class);
 
-        return $sesion instanceof SesionTenant && ! $sesion->esCita()
-            && trim((string) $sesion->oferta?->enlace_en_linea) !== '';
+        return $orden->lineas->contains(static fn (LineaOrdenTenant $l): bool => $l->producto instanceof ProductoTenant
+            && $digitales->esDigital($l->producto));
     }
 
     /**
@@ -1251,6 +1302,8 @@ class MiTenantController
 
         return [
             'id' => $orden->ulid,
+            // Una compra del portal sin pagar: se puede quitar (ADR 0231).
+            'quitable' => $orden->estado === EstadoOrden::Pendiente && $orden->caduca_en !== null,
             // Qué se pagó, en una línea: sus productos o, si es una cita, el servicio.
             'concepto' => $productos->isNotEmpty() ? $productos->implode(', ') : $sesion?->oferta?->nombre,
             // Si es el pago de una cita o clase: cuál, con quién, cuándo y dónde.

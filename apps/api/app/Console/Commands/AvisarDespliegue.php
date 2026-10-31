@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Platform\Operacion\AlertasTelegram;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
 /**
  * Avisa al equipo de la plataforma algo del despliegue (ADR 0135), p. ej. que una
  * versión falló y se volvió sola a la anterior: queda como alerta y se manda en el
- * acto al correo de alertas (no por la cola, que podría ser lo que falla).
+ * acto al correo de alertas (no por la cola, que podría ser lo que falla) y, si está
+ * configurado, por Telegram (ADR 0232).
  */
 class AvisarDespliegue extends Command
 {
@@ -19,7 +21,7 @@ class AvisarDespliegue extends Command
 
     protected $description = 'Manda al correo de alertas de la plataforma un aviso del despliegue';
 
-    public function handle(AlertasPlataforma $alertas): int
+    public function handle(AlertasPlataforma $alertas, AlertasTelegram $telegram): int
     {
         $mensaje = trim((string) $this->argument('mensaje'));
         if ($mensaje === '') {
@@ -29,6 +31,8 @@ class AvisarDespliegue extends Command
         }
         // Cada aviso es uno (no se agrupa con el de otro despliegue).
         $alertas->registrar('despliegue', 'despliegue:'.CarbonImmutable::now()->toIso8601String(), $mensaje);
+
+        $telegram->enviar('AgendaUno: '.$mensaje);
 
         return $this->call('agendauno:enviar-alertas');
     }

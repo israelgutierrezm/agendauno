@@ -29,9 +29,7 @@ class CobrarCargoRenta
     public function __construct(
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly PasarelaStripePlataforma $stripe,
-        private readonly SuspensionPorRenta $suspension,
         private readonly ConciliarCargosRenta $conciliar,
-        private readonly AcreditarTimbresPagados $timbres,
         private readonly ConfirmarCargoRenta $confirmar,
         private readonly PasarelaMercadoPagoPlataforma $mercadoPago,
         private readonly PasarelaOpenPayPlataforma $openPay,
@@ -80,6 +78,10 @@ class CobrarCargoRenta
             if ($anterior !== '' && ! $this->cerrarAnterior($bloqueado, $anterior)) {
                 throw new CargoRentaNoPagable('Ya hay un pago en proceso para esta renta; espera su confirmación.');
             }
+            // La página de OpenPay no se cierra: reemplazada se sigue vigilando (ADR 0231).
+            if ($anterior !== '' && $bloqueado->metodo_pago === 'openpay') {
+                $bloqueado->update(['referencia_condonada' => $anterior]);
+            }
 
             $resultado = $this->registro->resolver($proveedor)->cobrar($bloqueado, $this->registro->llaves($proveedor));
             $bloqueado->checkout = $resultado->datos;
@@ -103,9 +105,9 @@ class CobrarCargoRenta
         });
 
         // Pagado al momento: si estaba suspendido por renta y ya no debe, se reactiva.
+        // Lo mismo que tras cualquier otro pago: reactivar, timbres, mensajes y referidos.
         if ($cobrado->estado === EstadoCargoRenta::Pagado) {
-            $this->suspension->reactivarSiPago($cobrado->estudio);
-            $this->timbres->aplicar($cobrado);
+            $this->confirmar->despuesDelPago($cobrado);
         }
 
         return $cobrado;

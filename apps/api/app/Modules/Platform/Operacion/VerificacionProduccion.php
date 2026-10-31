@@ -60,6 +60,8 @@ class VerificacionProduccion
         private readonly TiposDeCambio $tipos,
         private readonly ParametrosTenant $parametros,
         private readonly ColaDeMensajes $mensajes,
+        private readonly PendientesDeNegocios $pendientes,
+        private readonly AlertasTelegram $telegram,
     ) {}
 
     /** Minutos que puede esperar el aviso más antiguo y la campaña más antigua. */
@@ -77,6 +79,8 @@ class VerificacionProduccion
             ...$this->datos(),
             ...$this->migraciones(),
             ...$this->procesos(),
+            ...$this->pendientesDeNegocios(),
+            ...$this->disco(),
             ...$this->correo(),
             ...$this->respaldos(),
             ...$this->archivos(),
@@ -217,13 +221,55 @@ class VerificacionProduccion
         $cola = $this->mensajes->resumen();
         $atascado = fn (string $tipo, int $limite): bool => ($cola[$tipo]['minutos'] ?? null) !== null && $cola[$tipo]['minutos'] > $limite;
         $detalle = fn (string $tipo): string => "{$cola[$tipo]['pendientes']} pendiente(s); el más antiguo espera desde hace {$cola[$tipo]['minutos']} min. "
-            .'Revisa que el worker atienda las colas default, mensajes y campanas, y el servidor de correo.';
+            .'Revisa que el worker atienda las colas latido, default, mensajes y campanas, y el servidor de correo.';
 
         return [
             ...$this->procesosEnMarcha('Procesos'),
             $this->punto('Procesos', 'Sin trabajos fallidos en 24 h', $fallidos === 0, "{$fallidos} trabajo(s) fallido(s): php artisan queue:failed.", critico: false),
             $this->punto('Procesos', 'Avisos y recordatorios saliendo a tiempo', ! $atascado(ColaDeMensajes::AVISOS, self::MINUTOS_AVISOS), $detalle(ColaDeMensajes::AVISOS)),
             $this->punto('Procesos', 'Campañas saliendo a tiempo', ! $atascado(ColaDeMensajes::CAMPANAS, self::MINUTOS_CAMPANAS), $detalle(ColaDeMensajes::CAMPANAS), critico: false),
+        ];
+    }
+
+    /**
+     * Lo que espera en la base de cada negocio, de la última medición
+     * ({@see PendientesDeNegocios}: abrir la pantalla no abre una conexión por negocio).
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    private function pendientesDeNegocios(): array
+    {
+        $medido = $this->pendientes->ultima();
+        $outbox = $medido['outbox'];
+        $avisos = $medido['avisos'];
+        $donde = static fn (array $parte): string => $parte['negocios'] === [] ? '' : ' En: '.implode(', ', $parte['negocios']).'.';
+
+        return [
+            $this->punto('Procesos', 'Outbox al día', $outbox['atrasados'] === 0 && $outbox['aparcados'] === 0,
+                "{$outbox['atrasados']} evento(s) atrasado(s) y {$outbox['aparcados']} aparcado(s).{$donde($outbox)} Revisa el programador; corregida la causa, php artisan agendauno:despachar-outbox --reintentar-aparcados."),
+            $this->punto('Procesos', 'Avisos de pasarela sin atascar', $avisos['atascados'] === 0 && $avisos['fallidos'] === 0,
+                "{$avisos['atascados']} aviso(s) atascado(s) y {$avisos['fallidos']} fallido(s) en 24 h.{$donde($avisos)} Revisa las alertas y agendauno:procesar-avisos-pasarela; la conciliación retoma los cobros."),
+        ];
+    }
+
+    /**
+     * Con el disco lleno fallan Redis, los respaldos y lo que se sube.
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    private function disco(): array
+    {
+        $libre = @disk_free_space(storage_path());
+        $total = @disk_total_space(storage_path());
+        if ($libre === false || $total === false || $total <= 0.0) {
+            return [$this->punto('Procesos', 'Espacio libre en disco', false, 'No se pudo leer el espacio del disco.', critico: false)];
+        }
+        $porCiento = (int) floor($libre * 100 / $total);
+        $minimo = (int) config('agendauno.operacion.disco_libre_minimo', 10);
+
+        return [
+            $this->punto('Procesos', 'Espacio libre en disco', $porCiento >= $minimo,
+                "Queda {$porCiento}% libre (mínimo {$minimo}%, DISCO_LIBRE_MINIMO). Libera espacio: docker system df y docker image prune."),
         ];
     }
 
@@ -315,6 +361,8 @@ class VerificacionProduccion
             // ADR 0171: lo que sale del servidor va cifrado.
             $this->punto('Respaldos', 'Respaldos cifrados', $this->cifradoActivo(),
                 'Define RESPALDOS_LLAVE (openssl rand -base64 32) y guárdala también fuera del servidor: sin ella no se pueden restaurar.'),
+            $this->punto('Respaldos', 'Retención a cargo del bucket', (bool) config('agendauno.respaldos.retencion_en_bucket'),
+                'El servidor puede borrar sus propios respaldos. Configura el bucket (docs/DESPLIEGUE.md → «Retención en el bucket») y pon RESPALDOS_RETENCION_BUCKET=true.', critico: false),
             $this->punto('Respaldos', 'Base central respaldada en las últimas '.self::HORAS_RESPALDO.' h', $plataformaReciente, 'Corre php artisan agendauno:respaldar-plataforma.'),
             $this->punto('Respaldos', 'Archivos subidos respaldados en las últimas '.self::HORAS_RESPALDO.' h', $archivosRecientes, 'Corre php artisan agendauno:respaldar-plataforma.'),
             $this->punto(
@@ -391,6 +439,7 @@ class VerificacionProduccion
     {
         return [
             $this->punto('Alertas', 'Correo para alertas de la plataforma', ConfiguracionPlataforma::correoAlertas() !== null, 'Captúralo en Configuración del superadmin o define ALERTAS_CORREO (quién recibe los avisos de pagos, correos, respaldos, cola y rentas vencidas).'),
+            $this->punto('Alertas', 'Segundo canal de alertas (Telegram)', $this->telegram->configurado(), 'Define ALERTAS_TELEGRAM_TOKEN y ALERTAS_TELEGRAM_CHAT: si cae el correo, también caen sus alertas.', critico: false),
         ];
     }
 

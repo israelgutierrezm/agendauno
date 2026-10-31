@@ -124,6 +124,16 @@ function titulo(i: Incidencia): string {
       return t("porConciliar.primeraVezRepetida", { monto });
     case "contracargo":
       return t("porConciliar.contracargo", { monto });
+    case "pago_sin_confirmar":
+      return t("porConciliar.pagoSinConfirmar", { monto });
+    case "devolucion_pendiente":
+      return t("porConciliar.devolucionPendiente", {
+        monto: dinero(i.excedente_minor ?? 0, i.moneda),
+      });
+    case "devolver_en_caja":
+      return t("porConciliar.devolverEnCaja", {
+        monto: dinero(i.excedente_minor ?? 0, i.moneda),
+      });
     case "revisar_si_vino":
       return t("porConciliar.revisarSiVino", {
         monto: dinero(i.excedente_minor ?? 0, i.moneda),

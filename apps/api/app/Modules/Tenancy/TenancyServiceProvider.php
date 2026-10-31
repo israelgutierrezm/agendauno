@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
+use RuntimeException;
 
 class TenancyServiceProvider extends ServiceProvider
 {
@@ -74,10 +75,12 @@ class TenancyServiceProvider extends ServiceProvider
             $estudioId = $payload['estudio_id'] ?? null;
             if (is_int($estudioId) && $gestor->actual()?->getKey() !== $estudioId) {
                 $estudio = Estudio::query()->find($estudioId);
-                if ($estudio instanceof Estudio) {
-                    $gestor->conectar($estudio);
-                    Log::withContext(['estudio' => $estudio->slug]);
+                // Era de un negocio que ya no existe: falla, no corre sin negocio (ADR 0232).
+                if (! $estudio instanceof Estudio) {
+                    throw new RuntimeException("El negocio {$estudioId} de este trabajo ya no existe.");
                 }
+                $gestor->conectar($estudio);
+                Log::withContext(['estudio' => $estudio->slug]);
             }
         });
 

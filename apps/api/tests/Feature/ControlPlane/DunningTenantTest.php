@@ -58,10 +58,9 @@ it('el primer fallo abre el dunning en gracia; reintenta y se regulariza', funct
     test()->getJson("/api/v1/app/{$e['slug']}/dunning", conBearer($e['bearer']))
         ->assertOk()->assertJsonCount(1, 'data');
 
-    // Regularizar cierra el proceso.
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$v['acuerdo']}/regularizar", [], conBearer($e['bearer']))
-        ->assertOk()
-        ->assertJsonPath('data.estado', 'regularizado');
+    // Cobrar lo que se debe cierra el proceso.
+    $deuda = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$v['acuerdo']}/deuda", [], conBearer($e['bearer']))->assertOk()->json('data.id');
+    test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$deuda}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
 
     test()->getJson("/api/v1/app/{$e['slug']}/dunning", conBearer($e['bearer']))
         ->assertOk()->assertJsonCount(0, 'data');
@@ -115,8 +114,8 @@ it('regularizar reactiva un acuerdo suspendido (vuelve a poder reservar)', funct
     Artisan::call('agendauno:escalar-dunning');
 
     // Regulariza (paga): el acuerdo se reactiva.
-    test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/regularizar", [], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.estado', 'regularizado');
+    $deuda = (string) test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/deuda", [], conBearer($e['bearer']))->assertOk()->json('data.id');
+    test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$deuda}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
 
     $sesion = crearSesionTenant($e, $semilla, cuando: '2026-10-10 19:00:00');
     test()->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))

@@ -79,11 +79,14 @@ services:
       retries: 3
       start_period: 1m
 
-  # Correos y trabajos en cola. Atiende primero `default` (el latido, los correos),
-  # luego `mensajes` (avisos y recordatorios) y al final `campanas` (ADR 0205).
+  # Correos y trabajos en cola. Atiende primero `latido` (prueba de que la cola vive: una
+  # fila cargada no lo retrasa), luego `default` (los correos), `mensajes` (avisos y
+  # recordatorios) y al final `campanas` (ADR 0205). --timeout menor que el retry_after
+  # de su conexión (90): sin eso, otro worker reentregaría lo que sigue corriendo. Lo
+  # largo va en `worker-pesados` (ADR 0232).
   worker:
     <<: *api
-    command: ["php", "artisan", "queue:work", "redis", "--queue=default,mensajes,campanas", "--sleep=1", "--tries=3", "--max-time=3600"]
+    command: ["php", "artisan", "queue:work", "redis", "--queue=latido,default,mensajes,campanas", "--sleep=1", "--tries=3", "--timeout=80", "--max-time=3600"]
     # Al detenerse (actualizar.sh, docker compose stop) termina el trabajo en curso
     # antes de salir; Docker lo mataría a los 10 s por defecto.
     stop_grace_period: 5m
@@ -95,6 +98,16 @@ services:
       timeout: 20s
       retries: 3
       start_period: 3m
+
+  # Solo los trabajos largos (crear la base de un negocio, armar su descarga de datos), con
+  # su propia conexión (retry_after 2000): no detienen los correos ni el latido y no se
+  # reentregan mientras corren (ADR 0232). Si muere, Docker lo reinicia; sin latido propio.
+  worker-pesados:
+    <<: *api
+    command: ["php", "artisan", "queue:work", "redis-pesados", "--queue=pesados", "--sleep=3", "--timeout=1900", "--max-time=3600"]
+    # Mayor que --timeout: al detenerse termina lo que lleva en curso. actualizar.sh lo
+    # detiene antes de poner el mantenimiento, para no alargarlo con esta espera.
+    stop_grace_period: 33m
 
   # Tareas programadas: recordatorios, renovaciones, agenda recurrente, cobros,
   # respaldos… (routes/console.php).
@@ -185,7 +198,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    # Con tope de memoria y sin desalojar: nunca borra trabajos en cola ni candados. Al
+    # llegar al tope, escribir falla (y se nota) en vez de perder trabajos en silencio.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "${REDIS_MAXMEMORY:-512mb}", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis:/data
     healthcheck:

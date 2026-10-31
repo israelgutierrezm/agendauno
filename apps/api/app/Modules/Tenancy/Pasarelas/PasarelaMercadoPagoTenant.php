@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  * cliente autoriza en Mercado Pago; Mercado Pago cobra cada mes (reintenta hasta 4
  * veces en 10 días) y aquí se concilian sus cobros.
  */
-class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConDevoluciones, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
+class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConContracargos, PasarelaConDevoluciones, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -129,6 +129,31 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConDevolu
      * Las devoluciones aprobadas del cobro en Mercado Pago (también las hechas en su
      * panel): vienen en el propio pago, con su monto en decimal.
      */
+    public function contracargo(PagoTenant $pago, array $llaves): ?array
+    {
+        $api = self::api($llaves);
+        $cobro = self::cobroAprobado($api, $pago);
+        if ($cobro === null || $cobro === '') {
+            return null;
+        }
+        $datos = $api->pago($cobro);
+        if ((string) ($datos['status'] ?? '') !== 'charged_back') {
+            return null;
+        }
+
+        // Las mismas reglas que su aviso: «settled» se perdió, «reimbursed» se ganó.
+        return [
+            'id' => $cobro,
+            'estado' => match ((string) ($datos['status_detail'] ?? '')) {
+                'settled' => 'perdido',
+                'reimbursed' => 'ganado',
+                default => 'abierto',
+            },
+            'monto_minor' => MontoDecimal::aCentavos((float) ($datos['transaction_amount'] ?? 0)),
+            'motivo' => 'Contracargo en Mercado Pago',
+        ];
+    }
+
     public function devoluciones(PagoTenant $pago, array $llaves): array
     {
         $api = self::api($llaves);

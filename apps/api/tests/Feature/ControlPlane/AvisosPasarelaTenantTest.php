@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Platform\Operacion\AlertaPlataforma;
+use App\Modules\Tenancy\Application\AvisosPasarelaTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
@@ -130,19 +131,23 @@ it('si procesarlo falla se reintenta cada vez más espaciado y, al pasar, confir
     ]);
 });
 
-it('al quinto intento queda fallido y el superadmin se entera', function (): void {
+it('al agotar sus intentos queda fallido, el superadmin se entera y se puede volver a intentar', function (): void {
     $c = pagoParaAvisoPasarela('mercadopago', ['access_token' => 'APP_USR-prueba']);
     $this->postJson("/api/v1/webhooks/tenant/{$c['slug']}/mercadopago?type=payment&data_id=701")->assertOk();
 
-    foreach ([2, 4, 8, 16] as $minutos) {
-        $this->travel($minutos + 1)->minutes();
+    // Un día de reintentos (ADR 0231): espera doble, hasta una hora.
+    for ($intento = 1; $intento < AvisosPasarelaTenant::MAX_INTENTOS; $intento++) {
+        $this->travel(61)->minutes();
         $this->artisan('agendauno:procesar-avisos-pasarela')->assertSuccessful();
     }
 
-    expect(estadoDeLosAvisos($c['slug'], $c['pago'])['avisos'])->toBe([['estado' => 'fallido', 'intentos' => 5, 'tipo' => 'payment']]);
+    expect(estadoDeLosAvisos($c['slug'], $c['pago'])['avisos'])->toBe([['estado' => 'fallido', 'intentos' => AvisosPasarelaTenant::MAX_INTENTOS, 'tipo' => 'payment']]);
     $alerta = AlertaPlataforma::query()->where('tipo', 'aviso_pasarela_fallido')->firstOrFail();
     expect($alerta->estudio)->toBe('estudio-a')
-        ->and($alerta->mensaje)->toContain('Mercado Pago (payment)')->toContain('5 intentos');
+        ->and($alerta->mensaje)->toContain('Mercado Pago (payment)')->toContain(AvisosPasarelaTenant::MAX_INTENTOS.' intentos');
+
+    $this->artisan('agendauno:procesar-avisos-pasarela --reintentar-fallidos')->assertSuccessful();
+    expect(estadoDeLosAvisos($c['slug'], $c['pago'])['avisos'][0]['intentos'])->toBe(1);
 
     // Ya terminado, no se vuelve a intentar.
     $this->travel(1)->hour();

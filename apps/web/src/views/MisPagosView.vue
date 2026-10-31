@@ -201,6 +201,17 @@ const aceptadas = ref<Record<string, boolean>>({});
 // Cupón (ADR 0220): viaja con la compra; si no vale, el error sale en su plan.
 const conCupon = ref(false);
 const cupon = ref("");
+async function quitarCompra(id: string): Promise<void> {
+  if (
+    !(await confirmar(t("confirmaciones.quitarCompra"), {
+      aceptar: t("confirmaciones.quitarCompraAceptar"),
+      peligro: true,
+    }))
+  ) {
+    return;
+  }
+  await cuenta.quitarCompra(id);
+}
 async function comprar(id: string): Promise<void> {
   const p = cuenta.productos.value.find((x) => x.id === id);
   if (!p || (p.condiciones && !aceptadas.value[id])) {
@@ -215,6 +226,13 @@ async function comprar(id: string): Promise<void> {
     mensaje.value = "comprado";
     cupon.value = "";
     conCupon.value = false;
+    // Con pago en línea, comprar lleva directo a pagar (ADR 0231): si no se completa,
+    // queda en «por pagar», se puede quitar y caduca sola.
+    if (cuenta.pagoEnLinea.value && cuenta.ultimaCompra.value) {
+      comprando.value = null;
+      await pagar(cuenta.ultimaCompra.value);
+      return;
+    }
   } else {
     // El de la compra, en su tarjeta; el aviso de arriba queda para lo que no cargó.
     errorCompra.value = { id, mensaje: cuenta.error.value ?? "" };
@@ -399,6 +417,16 @@ onMounted(() => void cuenta.asegurar());
             class="mt-3 divide-y divide-[var(--borde)] text-sm"
           >
             <li v-for="o in cuenta.porPagar.value" :key="o.id" class="py-3">
+              <button
+                v-if="o.quitable"
+                type="button"
+                class="tu-btn tu-btn-secundario tu-btn-chico float-right"
+                :disabled="pagando !== null"
+                data-prueba="quitar-compra"
+                @click="quitarCompra(o.id)"
+              >
+                {{ $t("confirmaciones.quitarCompraAceptar") }}
+              </button>
               <div class="flex items-baseline justify-between gap-3">
                 <span class="min-w-0">
                   <span class="block font-medium">{{ o.concepto || "—" }}</span>

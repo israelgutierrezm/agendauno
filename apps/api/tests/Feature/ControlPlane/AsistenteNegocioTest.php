@@ -204,6 +204,22 @@ it('quien no ve las finanzas no le pregunta, y el negocio tiene un tope de pregu
         ->assertStatus(429);
 });
 
+it('agotado el presupuesto de tiempo no vuelve a llamar al modelo (ADR 0232)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    asistenteEncendido();
+    Config::set('agendauno.asistente.presupuesto', 6);
+    Http::fake(['api.anthropic.com/*' => function () {
+        sleep(2);
+
+        return Http::response(['stop_reason' => 'tool_use', 'content' => [['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'no_existe', 'input' => []]]]);
+    }]);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/asistente", ['mensajes' => [['rol' => 'usuario', 'texto' => 'Hola']]], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.respuesta', 'Esa pregunta tomó demasiado tiempo. Intenta con una más concreta.');
+    Http::assertSentCount(1);
+});
+
 it('si el modelo se niega, lo dice con claridad (ADR 0224)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     asistenteEncendido();

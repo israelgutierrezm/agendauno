@@ -47,7 +47,8 @@ class CobrarSuscripciones extends Command
                         // cobrarían de verdad).
                         $proveedor = $pasarelas->enLinea();
                         if ($proveedor === null) {
-                            return ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => 0];
+                            // Solo cobra en caja: lo vencido sin pagar entra a mora (ADR 0231).
+                            return ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => $cobro->moraDeVencidasEnCaja()];
                         }
 
                         $vencidas = $cobro->procesarVencidas($proveedor);

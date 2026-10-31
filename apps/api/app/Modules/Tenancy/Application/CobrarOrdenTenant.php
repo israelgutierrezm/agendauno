@@ -33,6 +33,9 @@ use Throwable;
  */
 class CobrarOrdenTenant
 {
+    /** Hasta cuándo la misma llave repite el intento abierto en vez de abrir otro. */
+    private const MINUTOS_MISMO_INTENTO = 15;
+
     public function __construct(
         private readonly RegistroDePasarelasTenant $registro,
         private readonly FulfillmentTenant $fulfillment,
@@ -56,8 +59,8 @@ class CobrarOrdenTenant
             return $previo;
         };
         $previo = $repetido();
-        if ($previo instanceof PagoTenant) {
-            return $previo;
+        if ($previo instanceof PagoTenant && $this->sigueSiendoElMismoCobro($previo)) {
+            return $this->conSuCheckout($previo);
         }
 
         if (! $this->registro->activa($proveedor)) {
@@ -69,7 +72,11 @@ class CobrarOrdenTenant
             // Ya bloqueada, otra vez: dos peticiones a la vez con la misma llave.
             $previo = $repetido();
             if ($previo instanceof PagoTenant) {
-                return $previo;
+                if ($this->sigueSiendoElMismoCobro($previo)) {
+                    return $this->conSuCheckout($previo);
+                }
+                // Ese intento ya terminó o se abandonó: la llave queda libre para el nuevo.
+                $previo->update(['idempotency_key' => null]);
             }
 
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
@@ -80,11 +87,15 @@ class CobrarOrdenTenant
             if ($bloqueada->renueva_acuerdo_id === null) {
                 app(PrimeraVezTenant::class)->exigirEnOrden($bloqueada);
             }
+            // En $0 no hay nada que cobrar: ni pasarela ni caja (ADR 0231).
+            if ((int) $bloqueada->total_minor === 0 && $partes === null) {
+                return $this->cumplirSinCosto($bloqueada, $proveedor, $metodo, $idempotencyKey, $registradoPor);
+            }
 
             // Reintento: el intento anterior aún abierto se anula antes de abrir otro,
             // para que no queden dos formas de pagar lo mismo. Si ya se pagó, se espera
             // su confirmación en vez de cobrar otra vez.
-            $this->anularIntentosAbiertos($bloqueada);
+            $this->anularIntentosAbiertos($bloqueada, in_array($proveedor, ['manual', 'efectivo'], true));
 
             // Con varias formas, solo en caja y sumando el total (ADR 0177).
             if ($partes !== null) {
@@ -113,6 +124,35 @@ class CobrarOrdenTenant
 
             return $pago;
         });
+    }
+
+    /** Una orden que quedó en $0 (un cupón del 100 %): se cumple como cortesía. */
+    public function sinCosto(OrdenTenant $orden): PagoTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($orden): PagoTenant {
+            $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
+
+            return $this->cumplirSinCosto($bloqueada, 'manual');
+        });
+    }
+
+    private function cumplirSinCosto(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?Usuario $registradoPor = null): PagoTenant
+    {
+        $this->anularIntentosAbiertos($orden, true);
+        $pago = PagoTenant::query()->create([
+            'orden_id' => $orden->getKey(),
+            'proveedor' => $proveedor,
+            'metodo' => $metodo?->value,
+            'estado' => EstadoPago::Aprobado->value,
+            'monto_minor' => 0,
+            'moneda' => $orden->moneda,
+            'idempotency_key' => $idempotencyKey,
+            'registrado_por' => $registradoPor?->getKey(),
+            'aprobado_en' => now(),
+        ]);
+        $this->fulfillment->cumplir($orden);
+
+        return $pago;
     }
 
     /**
@@ -220,15 +260,44 @@ class CobrarOrdenTenant
             // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
             $this->fulfillment->cumplir($orden);
         } elseif ($resultado->esPendiente()) {
-            // Queda pendiente; el webhook confirmara y hara el fulfillment.
-            $pago->update(['referencia_externa' => $resultado->referencia]);
+            // Queda pendiente; el webhook confirmara y hara el fulfillment. Sus datos se
+            // guardan para responder igual a la misma llave (doble clic, red).
+            $pago->update(['referencia_externa' => $resultado->referencia, 'checkout_guardado' => $resultado->datos !== [] ? $resultado->datos : null]);
         } else {
             $pago->motivo = $resultado->motivo;
             $pago->update(['estado' => EstadoPago::Rechazado->value, 'referencia_externa' => $resultado->referencia]);
         }
     }
 
-    private function anularIntentosAbiertos(OrdenTenant $orden): void
+    /**
+     * ¿La misma llave sigue siendo este cobro? Un rechazo o una anulación ya terminaron,
+     * y un intento abierto de hace rato se abandonó (su página pudo vencer): se cobra de
+     * nuevo. Uno cobrado o recién abierto es el mismo (doble clic, reintento de red).
+     */
+    private function sigueSiendoElMismoCobro(PagoTenant $previo): bool
+    {
+        if (in_array($previo->estado, [EstadoPago::Rechazado, EstadoPago::Anulado], true)) {
+            return false;
+        }
+
+        return $previo->estado !== EstadoPago::Pendiente
+            || ($previo->created_at !== null && $previo->created_at->gt(now()->subMinutes(self::MINUTOS_MISMO_INTENTO)));
+    }
+
+    private function conSuCheckout(PagoTenant $previo): PagoTenant
+    {
+        $previo->checkout = $previo->estado === EstadoPago::Pendiente ? (array) $previo->checkout_guardado : [];
+
+        return $previo;
+    }
+
+    /**
+     * Anula los intentos abiertos antes de abrir otro. Con `$enCaja`, una pasarela que no
+     * responde no impide cobrar en el mostrador: el intento queda cerrado sin confirmar y
+     * la conciliación revisa si se pagó (un doble cobro raro queda como incidencia). Un
+     * nuevo cobro en línea sí espera a poder cancelarlo.
+     */
+    private function anularIntentosAbiertos(OrdenTenant $orden, bool $enCaja = false): void
     {
         $abiertos = PagoTenant::query()
             ->where('orden_id', $orden->getKey())
@@ -247,7 +316,16 @@ class CobrarOrdenTenant
             if (! $pasarela instanceof PasarelaCancelable) {
                 continue; // p. ej. ventanilla: el comprobante lo aprueba el staff
             }
-            if (! $pasarela->cancelar($previo, $this->registro->llaves($previo->proveedor))) {
+            try {
+                $cancelado = $pasarela->cancelar($previo, $this->registro->llaves($previo->proveedor));
+            } catch (Throwable $e) {
+                if (! $enCaja) {
+                    throw $e;
+                }
+                ReporteDeErrores::reportarAtrapado($e);
+                $cancelado = true;
+            }
+            if (! $cancelado) {
                 throw new OrdenNoLiquidable('Ya hay un pago en proceso para esta compra; espera su confirmación.');
             }
             // Cerrado de este lado: la conciliación confirma con la pasarela que ya no
