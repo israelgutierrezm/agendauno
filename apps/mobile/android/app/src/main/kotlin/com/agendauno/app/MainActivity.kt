@@ -40,6 +40,10 @@ class MainActivity : FlutterActivity() {
                         ),
                     )
                     "elegirPdf" -> elegirPdf(resultado)
+                    "limpiarDocumentos" -> {
+                        File(cacheDir, "compartidos").deleteRecursively()
+                        resultado.success(true)
+                    }
                     else -> resultado.notImplemented()
                 }
             }

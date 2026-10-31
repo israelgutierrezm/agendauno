@@ -11,7 +11,17 @@ import '../../../core/archivos/archivos_nativos.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../data/cuenta_repository.dart';
 
-/// Pase de entrada del alumno: un QR firmado que vence en minutos. Mientras se
+/// Abre el pase: no cabe en 9/16 de pantalla (el tope sin `isScrollControlled`), y
+/// el QR o «Renovar» quedarían recortados en un teléfono chico.
+Future<void> mostrarPase(BuildContext context) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  showDragHandle: true,
+  builder: (_) => const PaseSheet(),
+);
+
+/// Pase de entrada: un QR firmado que vence en minutos. Mientras se
 /// muestra se renueva solo cada minuto (una captura de pantalla deja de servir).
 /// Si el negocio lo permite, también va a la cartera del teléfono (ADR 0195):
 /// Google Wallet en Android y Apple Wallet en iPhone.
@@ -32,6 +42,18 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
   bool _appleWallet = false;
   bool _abriendoWallet = false;
 
+  /// Lo que pasó con la cartera, en la hoja: un SnackBar quedaría detrás.
+  String? _avisoWallet;
+  bool _avisoWalletEsError = false;
+
+  void _avisarWallet(String mensaje, {bool esError = false}) {
+    if (mounted) {
+      setState(() {
+        _avisoWallet = mensaje;
+        _avisoWalletEsError = esError;
+      });
+    }
+  }
   /// Renueva el pase de la cartera (como la web): el anterior deja de servir.
   Future<void> _renovarWallet() async {
     final repo = ref.read(cuentaRepositoryProvider);
@@ -61,21 +83,17 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
     if (seguir != true || !mounted) {
       return;
     }
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _abriendoWallet = true);
+    setState(() {
+      _abriendoWallet = true;
+      _avisoWallet = null;
+    });
     try {
       await repo.renovarPaseWallet();
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Listo: el pase anterior ya no sirve. Vuelve a agregarlo a tu cartera.',
-          ),
-        ),
+      _avisarWallet(
+        'Listo: el pase anterior ya no sirve. Vuelve a agregarlo a tu cartera.',
       );
     } on DioException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No se pudo renovar tu pase.')),
-      );
+      _avisarWallet('No se pudo renovar tu pase.', esError: true);
     } finally {
       if (mounted) {
         setState(() => _abriendoWallet = false);
@@ -120,21 +138,19 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
     if (repo == null) {
       return;
     }
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _abriendoWallet = true);
+    setState(() {
+      _abriendoWallet = true;
+      _avisoWallet = null;
+    });
     try {
       final pase = await repo.paseAppleWallet();
       final abierto =
           pase.isNotEmpty && await ArchivosNativos.agregarPaseWallet(pase);
       if (!abierto) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir Apple Wallet.')),
-        );
+        _avisarWallet('No se pudo abrir Apple Wallet.', esError: true);
       }
     } on DioException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No se pudo preparar tu pase.')),
-      );
+      _avisarWallet('No se pudo preparar tu pase.', esError: true);
     } finally {
       if (mounted) {
         setState(() => _abriendoWallet = false);
@@ -147,23 +163,20 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
     if (repo == null) {
       return;
     }
-    setState(() => _abriendoWallet = true);
+    setState(() {
+      _abriendoWallet = true;
+      _avisoWallet = null;
+    });
     try {
       final url = await repo.urlGoogleWallet();
       final abierto =
           url.isNotEmpty &&
           await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      if (!abierto && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir Google Wallet.')),
-        );
+      if (!abierto) {
+        _avisarWallet('No se pudo abrir Google Wallet.', esError: true);
       }
     } on DioException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo preparar tu pase.')),
-        );
-      }
+      _avisarWallet('No se pudo preparar tu pase.', esError: true);
     } finally {
       if (mounted) {
         setState(() => _abriendoWallet = false);
@@ -204,7 +217,7 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -272,6 +285,18 @@ class _PaseSheetState extends ConsumerState<PaseSheet> {
                 onPressed: _abriendoWallet ? null : _renovarWallet,
                 child: const Text('Renovar el pase de la cartera'),
               ),
+              if (_avisoWallet != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    _avisoWallet!,
+                    key: const Key('pase-aviso-wallet'),
+                    textAlign: TextAlign.center,
+                    style: _avisoWalletEsError
+                        ? TextStyle(color: context.colores.error)
+                        : null,
+                  ),
+                ),
             ],
           ],
         ),

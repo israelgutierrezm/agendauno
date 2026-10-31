@@ -467,7 +467,7 @@ void main() {
     );
     expect(
       h('cancelada', {'por': 'cliente'}).titulo,
-      'Cancelada por el cliente',
+      'Cancelada por la persona',
     );
     expect(
       h('asistencia_corregida', {'estado': 'ausente'}).titulo,

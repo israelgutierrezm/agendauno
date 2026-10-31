@@ -165,7 +165,7 @@ void main() {
 
     expect(find.text('Rutinas'), findsOneWidget);
     expect(
-      find.text('Clases grabadas y rutinas de Estudio Luna.'),
+      find.text('Videos y rutinas de Estudio Luna.'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('ver-video-v1')), findsOneWidget);

@@ -44,6 +44,11 @@ val recursosMarca = file("../../configuraciones/marca_blanca/$negocioMarcaBlanca
 // los de la marca, reemplaza al de AgendaUno (src/main).
 val recursosColorMarca = layout.buildDirectory.dir("generated/marca_blanca/res").get().asFile
 val conColorMarca = negocioValido && Regex("^#[0-9a-fA-F]{6}$").matches(colorMarca)
+// De qué producto es: el sabor con el que se compila (`PRODUCTO` de su archivo; sin él,
+// AgendaUno). Sale de las dos apps oficiales sin duplicar nada (ADR 0111).
+val productoMarcaBlanca = definido("PRODUCTO").ifEmpty { "agendauno" }
+fun deMarca(producto: String, propio: String, oficial: String) =
+    if (productoMarcaBlanca == producto) propio.ifEmpty { oficial } else oficial
 
 // Un applicationId de Android: segmentos separados por puntos (al menos dos), cada uno
 // empieza con letra y sigue con letras, números o «_» (como lo exige Google Play).
@@ -86,24 +91,33 @@ android {
     productFlavors {
         create("agendauno") {
             dimension = "producto"
-            // Una app de marca blanca de AgendaUno lleva su propio id y su nombre.
-            applicationId = idMarcaBlanca.ifEmpty { "com.agendauno.app" }
-            manifestPlaceholders["appNombre"] = nombreMarcaBlanca.ifEmpty { "AgendaUno" }
-            manifestPlaceholders["esquemaApp"] = esquemaMarcaBlanca.ifEmpty { "agendauno" }
+            // Una app de marca blanca de este producto lleva su propio id y su nombre.
+            applicationId = deMarca("agendauno", idMarcaBlanca, "com.agendauno.app")
+            manifestPlaceholders["appNombre"] = deMarca("agendauno", nombreMarcaBlanca, "AgendaUno")
+            manifestPlaceholders["esquemaApp"] = deMarca("agendauno", esquemaMarcaBlanca, "agendauno")
         }
         create("turnouno") {
             dimension = "producto"
-            applicationId = "com.turnouno.app"
-            manifestPlaceholders["appNombre"] = "TurnoUno"
-            manifestPlaceholders["esquemaApp"] = "turnouno"
+            applicationId = deMarca("turnouno", idMarcaBlanca, "com.turnouno.app")
+            manifestPlaceholders["appNombre"] = deMarca("turnouno", nombreMarcaBlanca, "TurnoUno")
+            manifestPlaceholders["esquemaApp"] = deMarca("turnouno", esquemaMarcaBlanca, "turnouno")
         }
     }
 
-    // Los íconos y colores de una marca blanca reemplazan a los de AgendaUno:
+    // Los íconos y colores de una marca blanca reemplazan a los de su producto:
     // configuraciones/marca_blanca/<negocio>/android/res (con un NEGOCIO que no es un
-    // slug no se toma ninguna carpeta: la compilación se detiene abajo).
+    // slug no se toma ninguna carpeta: la compilación se detiene abajo). Los de AgendaUno
+    // están en src/main, así que basta su sabor; los de TurnoUno, en src/turnouno, y dos
+    // carpetas del mismo sabor con el mismo recurso no compilan: van en la de cada
+    // variante, que tiene prioridad sobre el sabor.
+    val conjuntosDeMarca =
+        if (productoMarcaBlanca == "turnouno") {
+            listOf("turnounoDebug", "turnounoProfile", "turnounoRelease").map { sourceSets.maybeCreate(it) }
+        } else {
+            listOf(sourceSets.getByName("agendauno"))
+        }
     if (negocioValido) {
-        sourceSets.getByName("agendauno").res.srcDir(recursosMarca)
+        conjuntosDeMarca.forEach { it.res.srcDir(recursosMarca) }
     }
     if (conColorMarca) {
         File(recursosColorMarca, "values").mkdirs()
@@ -115,7 +129,7 @@ android {
                 "    <color name=\"ic_launcher_background\">$colorMarca</color>\n" +
                 "</resources>\n",
         )
-        sourceSets.getByName("agendauno").res.srcDir(recursosColorMarca)
+        conjuntosDeMarca.forEach { it.res.srcDir(recursosColorMarca) }
     }
 
     signingConfigs {
@@ -138,8 +152,8 @@ android {
     }
 }
 
-// La marca blanca es solo de AgendaUno, nunca con el id de una app oficial y siempre
-// con lo suyo completo: se detiene antes de compilar una app que no se podría (o no se
+// La marca blanca se compila con el sabor de su producto, nunca con el id de una app
+// oficial y siempre con lo suyo completo: se detiene antes de compilar una app que no se podría (o no se
 // debe) publicar, y dice qué falta.
 gradle.taskGraph.whenReady {
     val datosDeMarca =
@@ -162,13 +176,14 @@ gradle.taskGraph.whenReady {
     if (!negocioValido) {
         detener("NEGOCIO debe ser el slug del negocio: minúsculas, números y guiones")
     }
-    // Lo que se pidió compilar (assembleTurnounoRelease…), no todo el grafo.
-    if (gradle.startParameter.taskNames.any { it.contains("Turnouno", ignoreCase = true) }) {
-        detener("la marca blanca es solo de AgendaUno (ADR 0111): compílala con --flavor agendauno")
+    if (productoMarcaBlanca != "agendauno" && productoMarcaBlanca != "turnouno") {
+        detener("PRODUCTO=$productoMarcaBlanca: debe ser agendauno o turnouno")
     }
-    val producto = definido("PRODUCTO")
-    if (producto.isNotEmpty() && producto != "agendauno") {
-        detener("PRODUCTO=$producto: la marca blanca es solo de AgendaUno; quita PRODUCTO de su archivo")
+    // Lo que se pidió compilar (assembleTurnounoRelease…), no todo el grafo. Otro sabor
+    // daría la app con el id oficial y el código del producto de su archivo.
+    val otroSabor = if (productoMarcaBlanca == "turnouno") "Agendauno" else "Turnouno"
+    if (gradle.startParameter.taskNames.any { it.contains(otroSabor, ignoreCase = true) }) {
+        detener("su archivo es de $productoMarcaBlanca (ADR 0111): compílala con --flavor $productoMarcaBlanca")
     }
     if (idMarcaBlanca.isEmpty() ||
         idMarcaBlanca == "com.agendauno.app" ||
@@ -205,7 +220,7 @@ gradle.taskGraph.whenReady {
         )
     }
 
-    // La versión de release: con sus íconos completos (no los de AgendaUno) y su app
+    // La versión de release: con sus íconos completos (no los de su producto) y su app
     // en Firebase (sin ella, no le llegarían las notificaciones).
     if (allTasks.none { it.name.contains("Release") }) {
         return@whenReady

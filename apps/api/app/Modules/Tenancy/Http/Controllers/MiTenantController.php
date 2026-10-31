@@ -56,6 +56,7 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -64,6 +65,7 @@ use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -1319,6 +1321,11 @@ class MiTenantController
             'estado' => $orden->estado->value,
             'total_minor' => $orden->total_minor,
             'descuento_minor' => (int) ($orden->descuento_minor ?? 0),
+            // Lo que ya regresó (devolución total o parcial): sin pagar, nada.
+            'devuelto_minor' => $orden->estado === EstadoOrden::Pendiente ? 0 : (int) ReembolsoTenant::query()
+                ->whereIn('pago_id', PagoTenant::query()->where('orden_id', $orden->getKey())->select('id'))
+                ->where('estado', EstadoReembolso::Aprobado->value)
+                ->sum('monto_minor'),
             'moneda' => $orden->moneda,
             'metodo_pago' => $orden->metodo_pago,
             'fecha' => $orden->created_at?->toIso8601String(),

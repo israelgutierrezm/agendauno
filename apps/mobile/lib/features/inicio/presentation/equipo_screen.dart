@@ -146,6 +146,7 @@ class _InicioNegocio extends ConsumerWidget {
         (sesion?.puede('asistencia.marcar') ?? false);
 
     return estado.when(
+      skipLoadingOnReload: true,
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => ErrorDeCarga(
         mensaje: 'No se pudo cargar el resumen de hoy.',

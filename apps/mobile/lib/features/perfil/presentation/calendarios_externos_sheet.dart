@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../auth/presentation/abrir_en_la_web.dart';
 import '../data/calendarios_externos.dart';
@@ -17,6 +18,8 @@ bool atiende(Sesion sesion) =>
 Future<void> mostrarCalendariosExternos(BuildContext context) =>
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => const CalendariosExternosSheet(),
     );
@@ -27,8 +30,12 @@ class CalendariosExternosSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final estado = ref.watch(calendariosExternosProvider);
+    // Con la terminología del negocio: nunca «clases» fijo en un negocio de citas.
+    final sesiones =
+        ref.watch(sesionProvider.select((s) => s?.terminologia.sesiones)) ??
+        const Terminologia().sesiones;
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -40,7 +47,7 @@ class CalendariosExternosSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Tus clases y citas aparecen en un calendario aparte dentro de tu '
+              'Tus ${sesiones.toLowerCase()} aparecen en un calendario aparte dentro de tu '
               'cuenta, y lo que tengas ocupado en tu calendario principal bloquea '
               'tu agenda aquí. Nadie más ve tus eventos: solo se lee si estás '
               'ocupado.',

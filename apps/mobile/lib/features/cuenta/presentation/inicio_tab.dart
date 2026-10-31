@@ -295,11 +295,7 @@ class InicioTab extends ConsumerWidget {
                     titulo: 'Pase de entrada',
                     tono: TonosAcceso.pase,
                     valor: 'Muéstralo al llegar',
-                    onTap: () => showModalBottomSheet<void>(
-                      context: context,
-                      showDragHandle: true,
-                      builder: (_) => const PaseSheet(),
-                    ),
+                    onTap: () => mostrarPase(context),
                   )
                 : null,
             expediente: (usa?.expediente ?? true) || firmar > 0

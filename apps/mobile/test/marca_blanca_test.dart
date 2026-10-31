@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agendauno/core/config/app_config.dart';
+import 'package:agendauno/core/config/producto_app.dart';
 import 'package:agendauno/core/network/dio_client.dart';
 import 'package:agendauno/core/storage/almacen_sesion.dart';
 import 'package:agendauno/features/auth/application/sesion_controller.dart';
@@ -19,7 +20,8 @@ import 'package:agendauno/main.dart' show colorDeLaApp;
 ///   flutter test test/marca_blanca_test.dart \
 ///     --dart-define-from-file=configuraciones/marca_blanca/ejemplo.json
 ///
-/// Sin el archivo (la suite de siempre, en las dos apps oficiales) se salta.
+/// Sin el archivo (la suite de siempre, en las dos apps oficiales) se salta. También
+/// corre con el de TurnoUno (`ejemplo-citas.json`).
 const _sinMarcaBlanca = AppConfig.marcaBlanca
     ? null
     : 'Solo con --dart-define-from-file=configuraciones/marca_blanca/ejemplo.json';
@@ -63,7 +65,10 @@ void main() {
   test('es la app de su negocio, con su nombre y su id', () {
     expect(AppConfig.negocioFijo, 'ejemplo');
     expect(AppConfig.nombreApp, 'Estudio Ejemplo');
-    expect(AppConfig.idAndroid, 'mx.ejemplo.estudio');
+    expect(
+      AppConfig.idAndroid,
+      ProductoApp.esTurnoUno ? 'mx.ejemplo.citas' : 'mx.ejemplo.estudio',
+    );
     // Sin sesión, el tema ya lleva su color (COLOR_MARCA).
     expect(colorDeLaApp(null), const Color(0xFF0F766E));
   }, skip: _sinMarcaBlanca);
@@ -76,7 +81,7 @@ void main() {
         .catchError((_) => Response<Object>(requestOptions: RequestOptions()));
 
     expect(api.peticiones.single.headers['X-App-Negocio'], 'ejemplo');
-    expect(api.peticiones.single.headers['X-App-Producto'], 'agendauno');
+    expect(api.peticiones.single.headers['X-App-Producto'], ProductoApp.actual.clave);
   }, skip: _sinMarcaBlanca);
 
   test('no busca el negocio en la app del otro producto', () async {

@@ -477,15 +477,15 @@ class CoberturaClase {
 
   /// Por qué no la puede reservar con lo que tiene.
   String? get motivoTexto => estado == 'solo_membresia'
-      ? 'Esta clase solo la incluye una membresía.'
+      ? 'Solo la incluye una membresía.'
       : switch (motivo) {
           'sin_plan' => 'Necesitas un plan para reservarla.',
-          'clase' => 'Tu plan no incluye esta clase.',
+          'clase' => 'Tu plan no la incluye.',
           'pausa' => 'Tu plan está en pausa.',
           'suspendido' => 'Tu plan está suspendido por falta de pago.',
           'vigencia' => 'Tu plan no está vigente ese día.',
           'sucursal' => 'Tu plan no vale en esta sucursal.',
-          'saldo' => 'Ya no te quedan clases en tu plan.',
+          'saldo' => 'Tu plan ya no tiene saldo.',
           _ => null,
         };
 
@@ -1650,7 +1650,7 @@ class AntesDeReservar {
           'Tu lugar queda apartado mientras pagas.';
     }
     if (esListaEspera) {
-      return 'La clase está llena: te anotas en la lista de espera. No se '
+      return 'Ya está llena: te anotas en la lista de espera. No se '
           'descuenta nada hasta que te toque un lugar; te avisamos para que lo '
           'aceptes.';
     }
@@ -1674,7 +1674,7 @@ class AntesDeReservar {
     final despues = !cancelaTarde
         ? 'Después, solo el negocio puede cancelarla.'
         : penalizaTarde
-        ? 'Después, cancelar descuenta la clase.'
+        ? 'Después, cancelar la descuenta de tu plan.'
         : 'Después también se devuelve el crédito.';
     final hasta = Formato.fechaHora(limiteCancelacion, desfaseMin: desfaseMin);
     return limite.isAfter(ahora)
@@ -1689,14 +1689,14 @@ class AntesDeReservar {
     }
     return switch (motivo) {
           'sin_plan' => 'Necesitas un plan para reservarla.',
-          'clase' => 'Tu plan no incluye esta clase.',
+          'clase' => 'Tu plan no la incluye.',
           'pausa' => 'Tu plan está en pausa.',
           'suspendido' => 'Tu plan está suspendido por falta de pago.',
           'vigencia' => 'Tu plan no está vigente ese día.',
           'sucursal' => 'Tu plan no vale en esta sucursal.',
-          'saldo' => 'Ya no te quedan clases en tu plan.',
-          'ya_reservada' => 'Ya tienes esta clase.',
-          'llena' => 'La clase está llena.',
+          'saldo' => 'Tu plan ya no tiene saldo.',
+          'ya_reservada' => 'Ya la tienes reservada.',
+          'llena' => 'Ya está llena.',
           _ => null,
         } ??
         mensaje;

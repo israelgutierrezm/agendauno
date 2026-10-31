@@ -58,9 +58,24 @@ final class ArchivosNativos: NSObject, QLPreviewControllerDataSource,
       abrir(datos?.data, nombre: nombre, resultado)
     case "elegirPdf":
       elegirPdf(resultado)
+    case "limpiarDocumentos":
+      limpiarDocumentos(resultado)
     default:
       resultado(FlutterMethodNotImplemented)
     }
+  }
+
+  /// Borra lo que `abrir` dejó en la carpeta temporal (al cerrar sesión o eliminar la
+  /// cuenta).
+  private func limpiarDocumentos(_ resultado: @escaping FlutterResult) {
+    let carpeta = FileManager.default.temporaryDirectory
+    let archivos =
+      (try? FileManager.default.contentsOfDirectory(at: carpeta, includingPropertiesForKeys: nil))
+      ?? []
+    for archivo in archivos {
+      try? FileManager.default.removeItem(at: archivo)
+    }
+    resultado(true)
   }
 
   /// El selector de Archivos, solo PDF y como copia. Responde `{bytes, nombre}`, nil

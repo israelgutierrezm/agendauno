@@ -814,7 +814,7 @@ void main() {
         expect(servicios.last.duracionMinutos, isNull);
         expect(
           servicios.last.aviso('MXN'),
-          'Queda confirmada y usa un crédito de su membresía.',
+          'Queda confirmada y usa una sesión de su bono.',
         );
       },
     );

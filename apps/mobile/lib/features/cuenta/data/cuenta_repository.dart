@@ -35,6 +35,10 @@ class CuentaRepository {
   final _intentoCita = IntentoUnico();
   final _intentoReserva = IntentoUnico();
 
+  /// Un pago de presupuesto por intento (ADR 0231): el servidor repite el mismo un
+  /// rato y abre otro si quedó rechazado, anulado o abandonado.
+  final _intentoPresupuesto = IntentoUnico();
+
   /// Moneda del negocio: la de los precios y adeudos que no traen la suya.
   final String _moneda;
 
@@ -449,15 +453,25 @@ class CuentaRepository {
   }
 
   /// Inicia el pago en línea del cobro de un presupuesto aceptado (la página de la
-  /// pasarela del negocio).
+  /// pasarela del negocio). Si no devuelve a dónde ir, no hay pago que esperar: el
+  /// siguiente toque es otro intento, no este mismo vacío.
   Future<CheckoutPago> pagarPresupuesto(PresupuestoCliente p) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/presupuestos/${p.id}/pagar',
-      data: {'idempotency_key': p.clavePago},
+      data: {
+        'idempotency_key': _intentoPresupuesto.clave({
+          'presupuesto': p.id,
+          'orden': p.orden?.id,
+        }),
+      },
     );
-    return CheckoutPago.desdeJson(
+    final checkout = CheckoutPago.desdeJson(
       ((res.data?['data'] ?? {}) as Map<String, dynamic>)['checkout'],
     );
+    if (checkout is PagoPorConfirmar) {
+      _intentoPresupuesto.listo();
+    }
+    return checkout;
   }
 
   PresupuestoCliente _presupuesto(Map<String, dynamic>? respuesta) =>
@@ -926,7 +940,8 @@ class CuentaRepository {
 
 /// Repositorio ligado a la sesion activa (null si no hay sesion).
 final cuentaRepositoryProvider = Provider<CuentaRepository?>((ref) {
-  final sesion = ref.watch(sesionProvider);
+  ref.watch(sesionProvider.select((s) => s?.llaveDatos));
+  final sesion = ref.read(sesionProvider);
   if (sesion == null) {
     return null;
   }

@@ -89,7 +89,7 @@ class ComplementosNegocioController
             'clave' => $modulo->value,
             'tipo' => 'modulo',
             'nombre' => $modulo->etiqueta(),
-            'descripcion' => $modulo->descripcion(),
+            'descripcion' => $modulo->descripcion($estudio->producto()),
             'activo' => $activo,
             'solicitado_en' => $solicitud?->ultima_en?->toIso8601String(),
             // Con precio publicado (ADR 0188); sin él, incluido.

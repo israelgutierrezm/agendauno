@@ -2,8 +2,8 @@
 
 `apps/mobile` — un solo código para las dos apps oficiales (ADR 0111): **AgendaUno**
 (`com.agendauno.app`, negocios de clases) y **TurnoUno** (`com.turnouno.app`, negocios
-de citas), para todos los roles. AgendaUno además queda lista para apps de marca blanca
-(solo Android por ahora, ADR 0208).
+de citas), para todos los roles. Las dos quedan listas para apps de marca blanca (solo
+Android por ahora, ADR 0111 y 0208).
 
 ## Quién la usa
 
@@ -121,8 +121,12 @@ app.
 - **Videos:** se abren los que incluye su plan; de los demás solo dice «No está
   incluido en tus planes.» (sin nombrar planes ni «Ver planes»).
 - **Clase en línea de pago** (`clase.en_linea` con `de_pago`, o `en_linea` en
-  antes-de-reservar): no se ofrece reservar ni pagar; dice «Esta clase en línea no se
-  reserva desde la app.». Si su plan la incluye, se reserva como siempre.
+  antes-de-reservar): no se ofrece reservar ni pagar; dice «En línea: no se reserva
+  desde la app.». Si su plan la incluye, se reserva como siempre.
+- **Plan 100 % digital** (ADR 0233; solo clases en línea o solo videos): el servidor lo
+  decide. Con `X-App-Producto`, `/mi/productos` no lo lista, y `POST /mi/ordenes` y
+  `/cobrar` lo niegan con 422. Un plan mixto se sigue vendiendo. En la web se compra
+  igual.
 - **Orden digital** (`digital` en `/mi/ordenes*`): no hay «Pagar» ni OXXO; dice «Este
   pago no se hace desde la app.». El servidor, con `X-App-Producto`, también lo niega.
 
@@ -247,7 +251,9 @@ oficiales no lo usan.
   (una prueba lo vigila); al subir una, se sube la otra. Si es más vieja, la app solo
   muestra «Actualiza AgendaUno para continuar». Se revisa al abrir, al entrar y al
   volver a la app. Es una sola para todas las apps, también las de marca blanca (ver
-  «Marca blanca»).
+  «Marca blanca»), y una sola para Android e iPhone. **Regla de operación: se sube solo
+  cuando las dos tiendas ya tienen la versión nueva publicada.** Antes, quienes usan
+  la plataforma atrasada quedarían bloqueados hasta que su tienda la apruebe.
 
 ## Dos apps oficiales (ADR 0111)
 
@@ -351,24 +357,32 @@ persona puede pedir que se borre (eliminar la cuenta, y ARCO en Privacidad).
 | Id de su cuenta | Identificadores › Id de usuario | Información personal › Ids de usuario |
 | Token de push | Identificadores › Id del dispositivo | Identificadores del dispositivo u otros identificadores |
 | Fallas (sin la persona) | Diagnóstico › Datos de fallas (no ligado) | Información y rendimiento de la app › Registros de fallas |
+| Diagnóstico del escáner de pases (solo Android, ML Kit; ver abajo) | No aplica: en iPhone usa Vision de Apple | Información y rendimiento de la app › Registros de fallas y Otros datos de rendimiento; Identificadores del dispositivo u otros identificadores. Finalidad: analítica. Recolección automática, no ligada a la cuenta |
 
+**El escáner en Android es la excepción a «para que la app funcione».** `mobile_scanner`
+usa ML Kit, y, [según Google](https://developers.google.com/ml-kit/android-data-disclosure),
+ML Kit recolecta datos del dispositivo y de la app, identificadores por instalación y
+métricas, para diagnóstico y analítica de uso. Las imágenes de la cámara se procesan en
+el teléfono. Esta declaración es una propuesta: el dueño la ajusta en Play Console
+contra esa guía, y confirma qué tipo de identificador aplica.
 La app no captura tarjetas (se pagan en la página de la pasarela), no lee la
 ubicación ni los contactos. En Google Play, además: la cuenta se elimina desde la app
 (Perfil) y desde la web; el enlace para pedirlo sin la app es el aviso de privacidad
 del producto.
 
-## Marca blanca (solo AgendaUno, solo Android, preparada, sin publicar)
+## Marca blanca (los dos productos, solo Android, preparada, sin publicar)
 
-La app propia de un negocio de AgendaUno es el sabor `agendauno` con el archivo de ese
-negocio (ejemplo: `configuraciones/marca_blanca/ejemplo.json`):
+La app propia de un negocio es el sabor de su producto con el archivo de ese negocio
+(ejemplos: `configuraciones/marca_blanca/ejemplo.json` de AgendaUno y
+`ejemplo-citas.json` de TurnoUno). Sale del mismo código que la app oficial:
 
 ```bash
-flutter build appbundle --flavor agendauno \
+flutter build appbundle --flavor <producto> \
   --dart-define-from-file=configuraciones/marca_blanca/<negocio>.json
 ```
 
 Abre directo en su negocio (el acceso solo pide correo y contraseña), manda
-`X-App-Negocio` (la API solo le abre ese negocio, y solo si es de AgendaUno), no
+`X-App-Negocio` (la API solo le abre ese negocio, y solo si es de su producto), no
 consulta la app del otro producto y, si su negocio ya no está disponible, dice
 «Esta app no está disponible por ahora. Contacta a <nombre>.».
 
@@ -377,21 +391,21 @@ consulta la app del otro producto y, si su negocio ya no está disponible, dice
 | Clave | Para qué | Obligatoria |
 |---|---|---|
 | `NEGOCIO` | El slug del negocio (`^[a-z0-9-]+$`) | Sí |
+| `PRODUCTO` | `agendauno` o `turnouno`: el del negocio y el sabor con el que se compila | Sí en TurnoUno; sin él, AgendaUno |
 | `APP_NOMBRE` | Su nombre en el teléfono, en el acceso y en los avisos | Sí, no vacío |
 | `ANDROID_ID` | Su `applicationId` (nunca el de una app oficial) | Sí |
 | `COLOR_MARCA` | `#RRGGBB`: el fondo de su ícono adaptativo y el tema antes de entrar | No |
 | `FIREBASE_ANDROID_APP_ID` (o `FIREBASE_APP_ID`), `FIREBASE_API_KEY` (o `FIREBASE_ANDROID_API_KEY`), `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID` | Su app Android en el proyecto de Firebase (push) | En release, sí |
 | `GOOGLE_SERVER_CLIENT_ID` | Entrar con Google (el cliente web, ver abajo) | No |
 
-No lleva `PRODUCTO` (o lleva `agendauno`): la marca blanca es solo de AgendaUno. Tampoco
-lleva claves de iOS (`APP_STORE_ID`, `FIREBASE_IOS_APP_ID`, `GOOGLE_IOS_CLIENT_ID`,
+No lleva claves de iOS (`APP_STORE_ID`, `FIREBASE_IOS_APP_ID`, `GOOGLE_IOS_CLIENT_ID`,
 `APP_GROUP_ID`): son de las apps oficiales mientras la marca blanca no tenga iOS (ver
 «Marca blanca en iOS»).
 
 Gradle (`android/app/build.gradle.kts`) se detiene, con lo que falta, si:
 - vienen `ANDROID_ID`, `APP_NOMBRE` o `COLOR_MARCA` sin `NEGOCIO`;
-- `NEGOCIO` no es un slug, el sabor es `turnouno`, `PRODUCTO` no es `agendauno`,
-  falta `ANDROID_ID` (o es el de una app oficial), `APP_NOMBRE` está vacío o
+- `NEGOCIO` no es un slug, `PRODUCTO` no es `agendauno` ni `turnouno`, el sabor no es
+  el de su `PRODUCTO`, falta `ANDROID_ID` (o es el de una app oficial), `APP_NOMBRE` está vacío o
   `COLOR_MARCA` no es `#RRGGBB`;
 - `ANDROID_ID` no tiene forma de id de Android (segmentos separados por puntos, al
   menos dos, cada uno empieza con letra y sigue con letras, números o «_») o es tan
@@ -552,7 +566,8 @@ Una notificación de otro negocio no cambia la pantalla.
   widget (`PlugIns/ProximoWidget.appex` con su id, su App Group y su sabor) y el
   manifiesto de privacidad.
 - La marca blanca: el flujo revisa antes que su archivo exista, que su `NEGOCIO` sea
-  el pedido y que traiga su Firebase; Gradle revisa lo demás.
+  el pedido, que `app` sea su `PRODUCTO` y que traiga su Firebase; Gradle revisa lo
+  demás.
 
 ## Firma de release (Android)
 
@@ -594,6 +609,34 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
 - Íconos de las tiendas: hoy salen del isotipo de 192 px ampliado (el de 1024 px se
   ve suave y con el trazo cortado). Antes de publicar, generarlos desde el isotipo
   en vector o a 1024 px.
+- **Negocios para la revisión de las tiendas (lo crea el dueño, antes de la primera
+  subida).** Apple (regla 2.1) y Google Play («Acceso a la app») piden con qué entrar, y
+  el registro está cerrado (ADR 0093). Hace falta en producción, **uno por producto**:
+  - un negocio dedicado: `revision-agendauno` (clases, en agendauno.mx) y
+    `revision-turnouno` (citas, en turnouno.mx), con datos de muestra para hoy y los
+    próximos días;
+  - la pasarela en **modo de prueba**;
+  - una cuenta **por rol, con contraseña** (en iPhone no se entra con Google): propietario,
+    recepcionista, instructor o profesional, y miembro o cliente;
+  - **cuentas de repuesto** de cada rol: el revisor puede probar «Eliminar mi cuenta».
+
+  Las contraseñas van solo en las consolas, nunca en el repositorio. Texto para las
+  notas de **App Store Connect** (App Review Information › Notes) y de **Play Console**
+  (Acceso a la app › Instrucciones):
+
+  > El acceso es por invitación de cada negocio, así que dejamos un negocio de prueba.
+  > En la pantalla inicial escriba la dirección del negocio: `<slug del negocio>`.
+  > Después entre con correo y contraseña, según lo que quiera revisar. Cuenta de cliente:
+  > `<correo>` / `<contraseña>`. Equipo (recepción): `<correo>` / `<contraseña>`. Quien
+  > atiende: `<correo>` / `<contraseña>`. Dueño: `<correo>` / `<contraseña>`. La pasarela
+  > de pago está en modo de prueba: use la tarjeta 4242 4242 4242 4242, con cualquier
+  > fecha futura y cualquier CVC; no se hace ningún cobro real. Los pagos son por
+  > servicios presenciales, que se prestan en el negocio (regla 3.1.3(e)); la app no
+  > vende contenido digital. Para probar «Eliminar mi cuenta» use la cuenta de repuesto
+  > `<correo>` / `<contraseña>`.
+
+  La tarjeta del texto es la de prueba de Stripe; si la pasarela de prueba es otra, se
+  cambia por la suya.
 - Publicar las dos apps en Google Play y App Store (requiere autorización).
 
 ## Pruebas
@@ -609,4 +652,4 @@ La suite no depende del producto con que se compila: CI la corre como AgendaUno 
 como TurnoUno (ADR 0133). Una prueba de clases dice `modalidad: Modalidad.clases`;
 sin ella, la sesión toma la de la app (citas en TurnoUno). `marca_blanca_test.dart`
 solo corre con el archivo de una marca blanca (sin él se salta); el CI también compila
-el APK de la de ejemplo y comprueba que con `--flavor turnouno` no compila.
+el APK de los ejemplos de cada producto y comprueba que con el sabor del otro no compila.

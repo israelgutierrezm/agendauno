@@ -207,6 +207,7 @@ jobs:
       # X-App-Negocio, no busca negocios en la app del otro producto y su acceso es
       # el de su negocio. Sin el archivo, esta prueba se salta.
       - run: flutter test test/marca_blanca_test.dart --dart-define-from-file=configuraciones/marca_blanca/ejemplo.json
+      - run: flutter test test/marca_blanca_test.dart --dart-define-from-file=configuraciones/marca_blanca/ejemplo-citas.json
 
   # Las dos apps oficiales (ADR 0111) compilan con su sabor: cada una es otra app en
   # las tiendas (id, nombre, ícono). Sin firma de release: debug basta para probarlo.
@@ -238,9 +239,9 @@ jobs:
       - run: flutter pub get
       - run: flutter build apk --debug --flavor ${{ matrix.sabor }}
 
-  # La marca blanca de ejemplo compila (su id, su nombre y el color de su ícono) y,
-  # con el sabor de TurnoUno, Gradle se niega con su motivo (ADR 0111 y 0208). En
-  # debug: los íconos propios y Firebase solo se exigen en release.
+  # Las marcas blancas de ejemplo de cada producto compilan (su id, su nombre y el
+  # color de su ícono) y, con el sabor del otro, Gradle se niega con su motivo (ADR 0111
+  # y 0208). En debug: los íconos propios y Firebase solo se exigen en release.
   mobile-marca-blanca:
     name: Mobile · APK marca blanca
     runs-on: ubuntu-24.04
@@ -248,8 +249,17 @@ jobs:
     defaults:
       run:
         working-directory: apps/mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { archivo: ejemplo.json, sabor: agendauno, otro: turnouno, id: mx.ejemplo.estudio }
+          - { archivo: ejemplo-citas.json, sabor: turnouno, otro: agendauno, id: mx.ejemplo.citas }
     env:
-      ARCHIVO: configuraciones/marca_blanca/ejemplo.json
+      ARCHIVO: configuraciones/marca_blanca/${{ matrix.archivo }}
+      SABOR: ${{ matrix.sabor }}
+      OTRO: ${{ matrix.otro }}
+      ID: ${{ matrix.id }}
     steps:
       - uses: actions/checkout@v5
 
@@ -268,32 +278,32 @@ jobs:
       - run: flutter pub get
 
       - name: Compilar la de ejemplo
-        run: flutter build apk --debug --flavor agendauno --dart-define-from-file="$ARCHIVO"
+        run: flutter build apk --debug --flavor "$SABOR" --dart-define-from-file="$ARCHIVO"
 
       - name: Su id y su nombre
         run: |
           set -euo pipefail
           aapt2="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2"
-          datos="$("$aapt2" dump badging build/app/outputs/flutter-apk/app-agendauno-debug.apk)"
-          grep -q "^package: name='mx.ejemplo.estudio'" <<<"$datos" \
+          datos="$("$aapt2" dump badging "build/app/outputs/flutter-apk/app-$SABOR-debug.apk")"
+          grep -q "^package: name='$ID'" <<<"$datos" \
             || { echo "::error::La marca blanca no salió con su ANDROID_ID."; exit 1; }
           grep -q "^application-label:'Estudio Ejemplo'" <<<"$datos" \
             || { echo "::error::La marca blanca no salió con su APP_NOMBRE."; exit 1; }
 
-      - name: Con el sabor de TurnoUno no compila
+      - name: Con el sabor del otro producto no compila
         run: |
           set -uo pipefail
-          if flutter build apk --debug --flavor turnouno --dart-define-from-file="$ARCHIVO" > turnouno.log 2>&1; then
-            cat turnouno.log
-            echo "::error::La marca blanca compiló con el sabor de TurnoUno."
+          if flutter build apk --debug --flavor "$OTRO" --dart-define-from-file="$ARCHIVO" > otro.log 2>&1; then
+            cat otro.log
+            echo "::error::La marca blanca compiló con el sabor de $OTRO."
             exit 1
           fi
-          if ! grep -q "solo de AgendaUno" turnouno.log; then
-            cat turnouno.log
-            echo "::error::La compilación falló, pero no por ser de TurnoUno."
+          if ! grep -q "compílala con --flavor $SABOR" otro.log; then
+            cat otro.log
+            echo "::error::La compilación falló, pero no por el sabor."
             exit 1
           fi
-          echo "Gradle se negó, como debe: $(grep -m1 'solo de AgendaUno' turnouno.log)"
+          echo "Gradle se negó, como debe: $(grep -m1 'compílala con --flavor' otro.log)"
 
   imagenes:
     name: Docker · production images

@@ -7,10 +7,11 @@ import 'package:dio/dio.dart';
 ///
 /// 1. el primer texto de `meta.errors`;
 /// 2. 429: que espere un minuto;
-/// 3. sin respuesta (sin red, tiempo agotado): que revise su conexión;
-/// 4. una función que el plan del negocio no incluye: que no está disponible;
-/// 5. el `message` del servidor;
-/// 6. [porDefecto].
+/// 3. 503 (mantenimiento durante una actualización): que vuelva en un minuto;
+/// 4. sin respuesta (sin red, tiempo agotado): que revise su conexión;
+/// 5. una función que el plan del negocio no incluye: que no está disponible;
+/// 6. el `message` del servidor;
+/// 7. [porDefecto].
 String mensajeDeError(
   Object error, {
   String porDefecto = 'No se pudo completar la acción.',
@@ -39,6 +40,9 @@ String mensajeDeError(
   }
   if (respuesta?.statusCode == 429) {
     return 'Demasiados intentos. Espera un minuto y vuelve a intentar.';
+  }
+  if (respuesta?.statusCode == 503) {
+    return 'Estamos actualizando. Vuelve a intentar en un minuto.';
   }
   if (respuesta == null) {
     // Se conectó pero la respuesta tardó: no es falta de internet.

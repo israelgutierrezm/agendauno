@@ -206,6 +206,29 @@ void main() {
     expect(c.read(sesionTerminadaProvider)?.slug, 'demo');
   });
 
+  test('al volver a la app, si /yo trae lo mismo, la sesión no cambia', () async {
+    final (c, _) = await _contenedorRevocada();
+    addTearDown(c.dispose);
+
+    await c.read(sesionProvider.notifier).revisar();
+    final primera = c.read(sesionProvider);
+    await c.read(sesionProvider.notifier).revisar();
+
+    expect(identical(c.read(sesionProvider), primera), isTrue);
+  });
+
+  test('un cambio de nombre no rehace los repositorios; otro rol, sí', () {
+    Sesion con({String nombre = 'Ana', String rol = 'miembro'}) => Sesion(
+      slug: 'demo',
+      bearer: 't',
+      nombre: nombre,
+      rol: rol,
+    );
+
+    expect(con().llaveDatos, con(nombre: 'Ana María').llaveDatos);
+    expect(con().llaveDatos, isNot(con(rol: 'admin').llaveDatos));
+  });
+
   test('al volver a entrar se olvida el aviso', () async {
     final (c, api) = await _contenedorRevocada();
     addTearDown(c.dispose);

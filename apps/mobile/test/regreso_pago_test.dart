@@ -128,13 +128,15 @@ void main() {
     expect(manifiesto, contains(r'android:scheme="${esquemaApp}"'));
     expect(manifiesto, contains('android:host="pagos"'));
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
-    expect(gradle, contains('manifestPlaceholders["esquemaApp"] = "turnouno"'));
-    expect(
-      gradle,
-      contains(
-        'manifestPlaceholders["esquemaApp"] = esquemaMarcaBlanca.ifEmpty { "agendauno" }',
-      ),
-    );
+    for (final app in ['agendauno', 'turnouno']) {
+      expect(
+        gradle,
+        contains(
+          'manifestPlaceholders["esquemaApp"] = '
+          'deMarca("$app", esquemaMarcaBlanca, "$app")',
+        ),
+      );
+    }
 
     final plist = File('ios/Runner/Info.plist').readAsStringSync();
     expect(plist, contains(r'<string>$(APP_URL_SCHEME)</string>'));

@@ -228,7 +228,7 @@ class _TiraSemana extends ConsumerWidget {
                         onTap: () =>
                             ref.read(fechaAgendaProvider.notifier).elegir(d),
                         child: Container(
-                          height: 60,
+                          constraints: const BoxConstraints(minHeight: 60),
                           decoration: BoxDecoration(
                             color: sel
                                 ? context.colores.acento
@@ -739,7 +739,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
         estado == EstadoCita.completada ||
         estado == EstadoCita.noAsistio;
     final (titulo, que) = switch (s.tipo) {
-      TipoSesion.cita => (s.cita?.cliente ?? 'Sin cliente', s.oferta ?? '—'),
+      TipoSesion.cita => (s.cita?.cliente ?? 'Sin nombre', s.oferta ?? '—'),
       TipoSesion.clase => (s.oferta ?? '—', cupoTexto(s)),
     };
     final detalle = '${_hhmm(s.iniciaLocal)}–${_hhmm(s.terminaLocal)} · $que';

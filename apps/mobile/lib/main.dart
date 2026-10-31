@@ -80,7 +80,9 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       ref.read(sesionProvider.notifier).revisar();
       final sesion = ref.read(sesionProvider);
       if (sesion != null) {
-        ref.read(pushProvider).registrar(sesion);
+        // Sin volver a pedir el permiso: el diálogo del sistema también «vuelve» a
+        // la app, y quien dijo que no lo vería otra vez.
+        ref.read(pushProvider).registrar(sesion, pedirPermiso: false);
       }
     },
   );
@@ -225,6 +227,9 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: _avisos,
       navigatorKey: _navegador,
+      // Un enlace con el esquema propio que no es un regreso de pago: a la pantalla
+      // de la sesión, nunca a un error.
+      onUnknownRoute: (_) => MaterialPageRoute<void>(builder: (_) => inicio),
       // Un solo diseño, el del tema AgendaUno de la web (los temas a elegir son solo
       // de la web), en claro y en oscuro: sigue el modo del teléfono. Una app de
       // marca blanca lleva el color de su negocio (ADR 0208).

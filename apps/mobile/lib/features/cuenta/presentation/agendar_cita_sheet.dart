@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,6 +62,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   String? _errorCarga;
   String? _errorHorarios;
   bool _agendando = false;
+  // Por qué no se agendó, en la hoja: un SnackBar quedaría detrás de ella.
+  String? _errorAgendar;
   // Avisos por WhatsApp (ADR 0069): se ofrecen si el negocio los usa, aún no los
   // aceptó y tiene celular.
   bool _ofrecerWhatsapp = false;
@@ -70,6 +74,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   final _nota = TextEditingController();
   // El cupón ya revisado (ADR 0220); se limpia al cambiar de servicio.
   String? _cupon;
+  // Cuánto descuenta el cupón aplicado: el servidor lo resta del resto o del total.
+  int _descuentoCupon = 0;
+  // Escribió un código y no tocó «Aplicar»: no se manda, así que se avisa.
+  bool _cuponSinAplicar = false;
 
   @override
   void initState() {
@@ -225,7 +233,17 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     if (repo == null || hora == null || !_listo) {
       return;
     }
-    setState(() => _agendando = true);
+    if (_cuponSinAplicar && (_servicio?.admiteCupon ?? false)) {
+      setState(
+        () => _errorAgendar =
+            'Escribiste un cupón y no lo aplicaste: toca «Aplicar» o bórralo.',
+      );
+      return;
+    }
+    setState(() {
+      _agendando = true;
+      _errorAgendar = null;
+    });
     final navegador = Navigator.of(context);
     final mensajero = ScaffoldMessenger.of(context);
     // Para «Pagar ahora» en el aviso, que queda cuando esta hoja ya se cerró.
@@ -237,7 +255,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         : _pagarTodo
         ? 'todo'
         : 'anticipo';
-    await hacerConAviso(context, () async {
+    try {
       final cita = await repo.agendarCita(
         servicioId: _servicio!.id,
         sucursalId: _sede!.id,
@@ -287,7 +305,11 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
               : null,
         ),
       );
-    });
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() => _errorAgendar = mensajeDeError(e));
+      }
+    }
     if (mounted) {
       setState(() => _agendando = false);
     }
@@ -410,6 +432,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       // (su campo también, por su `key`).
                       if (v?.id != _servicio?.id) {
                         _cupon = null;
+                        _descuentoCupon = 0;
+                        _cuponSinAplicar = false;
                       }
                       _servicio = v;
                       // Otro servicio, otro anticipo: se vuelve a lo de omisión.
@@ -587,15 +611,35 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       revisar: _revisarCupon,
                       dinero: (minor) =>
                           Formato.dinero(minor, _servicio!.moneda),
-                      alCambiar: (codigo) => _cupon = codigo,
+                      alCambiar: (codigo, descuento) => setState(() {
+                        _cupon = codigo;
+                        _descuentoCupon = descuento;
+                        _cuponSinAplicar = false;
+                      }),
+                      alEscribir: (hayTexto) => setState(() {
+                        _cuponSinAplicar = hayTexto;
+                        if (!hayTexto) {
+                          _errorAgendar = null;
+                        }
+                      }),
                       deshabilitado: _agendando,
                     ),
                   if (_anticipo != null)
                     _ElegirAnticipo(
                       servicio: _servicio!,
                       anticipoMinor: _anticipo!,
+                      descuentoMinor: _descuentoCupon,
                       pagarTodo: _pagarTodo,
                       alCambiar: (todo) => setState(() => _pagarTodo = todo),
+                    ),
+                  if (_errorAgendar != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        _errorAgendar!,
+                        key: const Key('agendar-error'),
+                        style: TextStyle(color: context.colores.error),
+                      ),
                     ),
                   const SizedBox(height: 12),
                   FilledButton(
@@ -638,23 +682,28 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
 
 /// Cuánto pagar ahora en un servicio con anticipo (ADR 0161): el anticipo (por
 /// omisión, con lo que queda para el negocio) o todo. Lo pagado en línea se devuelve
-/// si cancela a tiempo.
+/// si cancela a tiempo. Con cupón, el servidor descuenta del resto o, si paga todo,
+/// del total: los montos ya lo reflejan (ADR 0220).
 class _ElegirAnticipo extends StatelessWidget {
   const _ElegirAnticipo({
     required this.servicio,
     required this.anticipoMinor,
+    required this.descuentoMinor,
     required this.pagarTodo,
     required this.alCambiar,
   });
 
   final OpcionCita servicio;
   final int anticipoMinor;
+  final int descuentoMinor;
   final bool pagarTodo;
   final ValueChanged<bool> alCambiar;
 
   @override
   Widget build(BuildContext context) {
     final precio = servicio.precioMinor ?? anticipoMinor;
+    final total = math.max(0, precio - descuentoMinor);
+    final resto = math.max(0, precio - anticipoMinor - descuentoMinor);
     String dinero(int minor) => Formato.dinero(minor, servicio.moneda);
     return Column(
       key: const Key('elegir-anticipo'),
@@ -676,14 +725,16 @@ class _ElegirAnticipo extends StatelessWidget {
                 value: false,
                 title: Text('Pagar el anticipo: ${dinero(anticipoMinor)}'),
                 subtitle: Text(
-                  'El resto (${dinero(precio - anticipoMinor)}) lo pagas en el negocio.',
+                  resto == 0
+                      ? 'Con tu cupón ya no queda nada por pagar en el negocio.'
+                      : 'El resto (${dinero(resto)}) lo pagas en el negocio.',
                 ),
               ),
               RadioListTile<bool>(
                 key: const Key('pagar-todo'),
                 contentPadding: EdgeInsets.zero,
                 value: true,
-                title: Text('Pagar todo ahora: ${dinero(precio)}'),
+                title: Text('Pagar todo ahora: ${dinero(total)}'),
               ),
             ],
           ),

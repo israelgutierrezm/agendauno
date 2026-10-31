@@ -11,10 +11,11 @@ name: Apps móviles
 # el paquete no se compila: una app publicada sin push no recibiría ningún aviso.
 # Variable opcional: GOOGLE_SERVER_CLIENT_ID.
 #
-# Con `marca_blanca` (el slug de un negocio de AgendaUno) firma el .aab de SU app:
+# Con `marca_blanca` (el slug de un negocio) firma el .aab de SU app, con `app` igual
+# al `PRODUCTO` de su archivo (sin él, agendauno):
 # su archivo configuraciones/marca_blanca/<negocio>.json (con su ANDROID_ID, su nombre
 # y su Firebase), sus íconos y su propio entorno `marca-blanca-<negocio>` con su llave
-# de subida (los mismos cuatro secretos ANDROID_*). Solo Android y solo AgendaUno.
+# de subida (los mismos cuatro secretos ANDROID_*). Solo Android.
 #
 # Con plataforma `ios` compila la app de iOS SIN FIRMAR en una Mac de GitHub (ADR
 # 0208), con lo que llevará en el App Store: el entorno `ios-<app>` con la variable
@@ -42,7 +43,7 @@ on:
         options: [android, ios]
         default: android
       marca_blanca:
-        description: Marca blanca (el slug del negocio; vacío para la app oficial). Solo Android y AgendaUno
+        description: Marca blanca (el slug del negocio; vacío para la app oficial). Solo Android; app debe ser su producto
         type: string
         required: false
         default: ''
@@ -77,13 +78,13 @@ jobs:
             echo "entorno=$PLATAFORMA-$APP" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # La marca blanca: un slug, solo AgendaUno y solo Android (ADR 0111 y 0208).
+          # La marca blanca: un slug, de su producto y solo Android (ADR 0111 y 0208).
           if ! printf '%s' "$MARCA_BLANCA" | grep -Eq '^[a-z0-9-]{1,60}$'; then
             echo "::error::marca_blanca debe ser el slug del negocio: minúsculas, números y guiones."
             exit 1
           fi
-          if [ "$APP" != agendauno ] || [ "$PLATAFORMA" != android ]; then
-            echo "::error::La marca blanca es solo de AgendaUno y solo de Android (docs/MOBILE.md)."
+          if [ "$PLATAFORMA" != android ]; then
+            echo "::error::La marca blanca es solo de Android (docs/MOBILE.md)."
             exit 1
           fi
           archivo="apps/mobile/configuraciones/marca_blanca/$MARCA_BLANCA.json"
@@ -93,6 +94,11 @@ jobs:
           fi
           if [ "$(jq -r '.NEGOCIO // ""' "$archivo")" != "$MARCA_BLANCA" ]; then
             echo "::error::El NEGOCIO de $archivo no es $MARCA_BLANCA."
+            exit 1
+          fi
+          producto="$(jq -r '.PRODUCTO // "agendauno"' "$archivo")"
+          if [ "$producto" != "$APP" ]; then
+            echo "::error::$archivo es de $producto: elige app $producto."
             exit 1
           fi
           # Su app en Firebase: sin ella, la app publicada no recibiría avisos.
@@ -190,7 +196,7 @@ jobs:
           version="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
           if [ -n "$MARCA_BLANCA" ]; then
             # Todo lo suyo sale de su archivo (Gradle revisa que esté completo).
-            flutter build appbundle --release --flavor agendauno --build-number "$NUMERO" \
+            flutter build appbundle --release --flavor "$APP" --build-number "$NUMERO" \
               --dart-define-from-file="configuraciones/marca_blanca/$MARCA_BLANCA.json" \
               --dart-define=APP_VERSION="$version"
           else
@@ -206,7 +212,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.marca_blanca != '' && format('marca-blanca-{0}', inputs.marca_blanca) || inputs.app }}-${{ inputs.numero }}-aab
-          path: apps/mobile/build/app/outputs/bundle/${{ inputs.marca_blanca != '' && 'agendauno' || inputs.app }}Release/*.aab
+          path: apps/mobile/build/app/outputs/bundle/${{ inputs.app }}Release/*.aab
           retention-days: 30
 
       - name: Limpiar llave

@@ -133,7 +133,7 @@ class _ApiPresupuestos implements HttpClientAdapter {
         },
       ];
       cuerpo = {'data': presupuestos.first};
-    } else if (ruta.endsWith('/P1/pagar')) {
+    } else if (ruta.endsWith('/pagar')) {
       estado = 201;
       cuerpo = {
         'data': {
@@ -265,7 +265,7 @@ void main() {
       expect(aceptado.situacion, SituacionPresupuesto.aceptado);
       expect(aceptado.porPagar, isTrue);
       expect(aceptado.puedeAgendar, isTrue);
-      expect(aceptado.clavePago, 'presupuesto-P1-O1');
+
       expect(
         de({
           'estado': 'convertido',
@@ -299,6 +299,34 @@ void main() {
   });
 
   group('las llamadas', () {
+    String clave(RequestOptions pedido) =>
+        (pedido.data as Map)['idempotency_key'] as String;
+
+    test('pagar otra vez repite la llave del intento, por presupuesto', () async {
+      final api = _ApiPresupuestos([_aceptado()]);
+      final repo = CuentaRepository(Dio()..httpClientAdapter = api, 'demo');
+      final aceptado = PresupuestoCliente.desdeJson(_aceptado());
+
+      await repo.pagarPresupuesto(aceptado);
+      await repo.pagarPresupuesto(aceptado);
+      await repo.pagarPresupuesto(
+        PresupuestoCliente.desdeJson({..._aceptado(), 'id': 'P2'}),
+      );
+
+      expect(clave(api.pedidos[0]), clave(api.pedidos[1]));
+      expect(clave(api.pedidos[2]), isNot(clave(api.pedidos[1])));
+    });
+
+    test('sin a dónde ir, el reintento es otro intento', () async {
+      final api = _ApiPresupuestos([_aceptado()], sinCheckout: true);
+      final repo = CuentaRepository(Dio()..httpClientAdapter = api, 'demo');
+      final aceptado = PresupuestoCliente.desdeJson(_aceptado());
+
+      expect(await repo.pagarPresupuesto(aceptado), isA<PagoPorConfirmar>());
+      await repo.pagarPresupuesto(aceptado);
+
+      expect(clave(api.pedidos[0]), isNot(clave(api.pedidos[1])));
+    });
     test('lista, lee, acepta con su revisión, rechaza y paga', () async {
       final api = _ApiPresupuestos([_enviado()]);
       final repo = CuentaRepository(Dio()..httpClientAdapter = api, 'demo');
@@ -321,7 +349,10 @@ void main() {
       expect(api.pedidos[2].data, {'revision': 1});
       expect(api.pedidos[3].data, {'motivo': 'Muy caro'});
       // La misma clave en cada intento: no se inicia otro pago (como la web).
-      expect(api.pedidos[4].data, {'idempotency_key': 'presupuesto-P1-O1'});
+      expect(
+        (api.pedidos[4].data as Map)['idempotency_key'],
+        matches(RegExp(r'^[0-9a-f]{32}$')),
+      );
       expect(checkout, isA<IrAPagarEnLinea>());
       expect((checkout as IrAPagarEnLinea).url, 'https://pago.test/abc');
     });
@@ -492,9 +523,13 @@ void main() {
 
       expect(abiertas, isEmpty);
       expect(
-        find.text('No se pudo abrir el pago en línea: inténtalo de nuevo.'),
+        find
+            .text('No se pudo abrir el pago en línea: inténtalo de nuevo.')
+            .hitTestable(),
         findsOneWidget,
       );
+      // Sigue ahí para reintentar.
+      expect(find.text('Pagar en línea').hitTestable(), findsOneWidget);
     });
 
     testWidgets('si el negocio no cobra en línea, se paga en el negocio', (

@@ -49,14 +49,13 @@ class AppConfig {
     defaultValue: versionApp,
   );
 
-  /// Negocio fijo de una app de marca blanca (ADR 0111; solo AgendaUno): abre
-  /// directo en él, sin pedir la dirección del negocio, y la API no la deja abrir
-  /// otro. Vacío en las apps oficiales. Se compila con su archivo de configuración:
+  /// Negocio fijo de una app de marca blanca (ADR 0111): abre directo en él, sin
+  /// pedir la dirección del negocio, y la API no la deja abrir otro. Vacío en las
+  /// apps oficiales. Se compila con el sabor de su producto y su archivo, que dice
+  /// cuál es (`PRODUCTO`; sin él, AgendaUno):
   ///   flutter build appbundle --flavor agendauno \
   ///     --dart-define-from-file=configuraciones/marca_blanca/NEGOCIO.json
-  static const String negocioFijo = ProductoApp.esTurnoUno
-      ? ''
-      : String.fromEnvironment('NEGOCIO');
+  static const String negocioFijo = String.fromEnvironment('NEGOCIO');
 
   /// ¿Es una app de marca blanca?
   static const bool marcaBlanca = negocioFijo != '';

@@ -64,8 +64,8 @@ class MisVideosScreen extends ConsumerWidget {
             children: [
               Text(
                 estudio == null || estudio.isEmpty
-                    ? 'Clases grabadas y rutinas del negocio.'
-                    : 'Clases grabadas y rutinas de $estudio.',
+                    ? 'Videos y rutinas del negocio.'
+                    : 'Videos y rutinas de $estudio.',
                 style: TextStyle(color: context.colores.textoSuave),
               ),
               if (videos.isEmpty)

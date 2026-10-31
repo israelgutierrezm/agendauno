@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -17,7 +18,7 @@ import 'package:agendauno/features/auth/data/sesion.dart';
 /// cupo que cuadra con la lista (todos ocupan lugar). Cada acción con su permiso.
 /// Datos sintéticos, sin red real.
 
-Map<String, dynamic> _rosterJson({int capacidad = 8}) => {
+Map<String, dynamic> _rosterJson({int capacidad = 8, bool empezo = false}) => {
   'data': [
     {'id': 'r1', 'persona': 'Ana López', 'estado': 'confirmada'},
     {
@@ -30,7 +31,7 @@ Map<String, dynamic> _rosterJson({int capacidad = 8}) => {
     {'id': 'r4', 'persona': 'Dani Paz', 'estado': 'en_espera'},
   ],
   'meta': {
-    'empezo': false,
+    'empezo': empezo,
     'sesion': {'id': 's1', 'capacidad': capacidad, 'estado': 'programada'},
     'invitados': [
       {
@@ -67,14 +68,25 @@ Map<String, dynamic> _rosterJson({int capacidad = 8}) => {
 };
 
 class _RepoLista extends AgendaRepository {
-  _RepoLista({this.capacidad = 8}) : super(Dio(), 'demo');
+  _RepoLista({this.capacidad = 8, this.empezo = false}) : super(Dio(), 'demo');
 
   final int capacidad;
+  final bool empezo;
   final hechas = <String>[];
+
+  /// Cuántas veces se mandó terminar la lista; responde hasta completarlo.
+  var terminadas = 0;
+  final respuestaTerminar = Completer<int>();
+
+  @override
+  Future<int> terminarLista(String sesionId) {
+    terminadas++;
+    return respuestaTerminar.future;
+  }
 
   @override
   Future<ListaClase> roster(String sesionId) async =>
-      ListaClase.desdeJson(_rosterJson(capacidad: capacidad));
+      ListaClase.desdeJson(_rosterJson(capacidad: capacidad, empezo: empezo));
 
   @override
   Future<List<ApartadoClase>> apartados(String sesionId) async =>
@@ -226,6 +238,36 @@ void main() {
     });
     expect(anterior.libres(4), 3);
     expect(anterior.libres(), isNull);
+  });
+
+  testWidgets('«Terminar lista» confirma con cuántos quedan y no se manda dos '
+      'veces', (tester) async {
+    final repo = _RepoLista(empezo: true);
+    await _abrirLista(tester, repo);
+    final boton = find.byKey(const Key('terminar-lista'));
+    await tester.ensureVisible(boton);
+    await tester.pumpAndSettle();
+
+    // Arrepentirse no manda nada.
+    await tester.tap(boton);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('«no vino»'), findsOneWidget);
+    expect(find.textContaining('crédito'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
+    await tester.pumpAndSettle();
+    expect(repo.terminadas, 0);
+
+    await tester.tap(boton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Terminar lista'));
+    await tester.pump();
+    // Mientras responde, el botón no vuelve a mandarlo.
+    await tester.tap(boton, warnIfMissed: false);
+    await tester.pump();
+    expect(repo.terminadas, 1);
+    repo.respuestaTerminar.complete(1);
+    await tester.pumpAndSettle();
+    expect(repo.terminadas, 1);
   });
 
   testWidgets('muestra invitados, plataformas y apartados; el cupo cuadra', (

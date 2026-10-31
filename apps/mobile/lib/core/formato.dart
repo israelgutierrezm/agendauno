@@ -74,8 +74,9 @@ abstract final class Formato {
   /// Lo que se escribió como monto, en centavos y sin punto flotante (lo contrario
   /// de [dinero]): "1,299.50", "\$80" o "80.5". Null si no se entiende o se presta a
   /// confusión (antes que guardar un monto cien veces mayor o menor): más de dos
-  /// decimales, miles mal agrupados («12,50»), letras entre los números o negativo
-  /// sin [negativo].
+  /// decimales, miles mal agrupados («1,25,000»), letras entre los números o negativo
+  /// sin [negativo]. La coma con 1 o 2 dígitos es decimal («150,50»: así la muestra el
+  /// teclado de iOS en varias regiones); con 3, miles («1,500»).
   static int? aMinor(String texto, {bool negativo = false}) {
     var limpio = texto
         .replaceAll(RegExp(r'\s+'), '')
@@ -87,6 +88,9 @@ abstract final class Formato {
       }
       signo = -1;
       limpio = limpio.substring(1).replaceFirst(RegExp(r'^[A-Za-z$]+'), '');
+    }
+    if (RegExp(r'^\d*,\d{1,2}$').hasMatch(limpio)) {
+      limpio = limpio.replaceFirst(',', '.');
     }
     final forma = RegExp(r'^(\d{1,3}(,\d{3})+|\d*)(\.(\d{1,2}))?$');
     final m = forma.firstMatch(limpio);

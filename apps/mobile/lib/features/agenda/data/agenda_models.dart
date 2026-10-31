@@ -150,7 +150,7 @@ class HechoCita {
             : 'Asistencia corregida: llegó',
       'cancelada' =>
         d['por'] == 'cliente'
-            ? 'Cancelada por el cliente'
+            ? 'Cancelada por la persona'
             : 'Cancelada por el negocio',
       _ => tipo,
     };
@@ -515,7 +515,7 @@ class ServicioCita {
   String aviso(String moneda) => seCobraEnCaja
       ? 'Queda confirmada y se cobra en caja: '
             '${Formato.dinero(precioMinor ?? 0, moneda)}.'
-      : 'Queda confirmada y usa un crédito de su membresía.';
+      : 'Queda confirmada y usa una sesión de su bono.';
 
   factory ServicioCita.desdeJson(Map<String, dynamic> j) => ServicioCita(
     id: j['id'] as String,

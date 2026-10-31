@@ -399,7 +399,7 @@ class _NuevaCitaSheetState extends ConsumerState<NuevaCitaSheet> {
           servicio.seCobraEnCaja
               ? '${Formato.dinero(servicio.precioMinor ?? 0, moneda)}, se '
                     'cobra en caja'
-              : 'Usa un crédito de su membresía',
+              : 'Usa una sesión de su bono',
         ),
       ],
       aceptar: 'Agendar',

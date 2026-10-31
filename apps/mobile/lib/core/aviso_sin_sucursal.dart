@@ -33,7 +33,7 @@ class AvisoSinSucursal extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Mientras tanto no verás agenda, clientes ni cobros. Pide al '
+                  'Mientras tanto no verás agenda, personas ni cobros. Pide al '
                   'administrador del negocio que te asigne una.',
                   style: TextStyle(color: context.colores.textoSuave),
                 ),

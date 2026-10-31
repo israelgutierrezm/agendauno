@@ -284,11 +284,15 @@ void main() {
       expect(Formato.aMinor('.75'), 75);
       expect(Formato.aMinor('MXN 12'), 1200);
       expect(Formato.aMinor('0'), 0);
+      // La coma decimal del teclado de iOS, sin confundirla con la de miles.
+      expect(Formato.aMinor('150,50'), 15050);
+      expect(Formato.aMinor('80,5'), 8050);
+      expect(Formato.aMinor('1,500'), 150000);
     });
 
     test('lo que se presta a confusión no se lee', () {
       expect(Formato.aMinor(''), isNull);
-      expect(Formato.aMinor('12,50'), isNull);
+      expect(Formato.aMinor('1.250,50'), isNull);
       expect(Formato.aMinor('1.250'), isNull);
       expect(Formato.aMinor('1,25,000'), isNull);
       expect(Formato.aMinor('12a'), isNull);
@@ -521,7 +525,7 @@ void main() {
       final api = _ApiCaja();
       await _montar(tester, api);
 
-      await tester.enterText(find.byKey(const Key('fondo')), '12,50');
+      await tester.enterText(find.byKey(const Key('fondo')), '1.250,50');
       await tester.tap(find.byKey(const Key('abrir')));
       await tester.pumpAndSettle();
 

@@ -152,7 +152,7 @@ class _ReprogramarCitaSheetState extends ConsumerState<ReprogramarCitaSheet> {
     if (hora == null) {
       return;
     }
-    final cliente = _s.cita?.cliente ?? 'el cliente';
+    final cliente = _s.cita?.cliente ?? 'esta persona';
     final antes =
         '${Formato.diaHora(_s.iniciaLocal)} con ${_s.instructor ?? '—'}';
     final ahora =
@@ -291,7 +291,7 @@ class _ReprogramarCitaSheetState extends ConsumerState<ReprogramarCitaSheet> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Se conserva todo: cliente, pagos e historial. Si el nuevo horario '
+              'Se conserva todo: sus datos, pagos e historial. Si el nuevo horario '
               'ya no está libre, no cambia nada.',
               style: suave,
             ),

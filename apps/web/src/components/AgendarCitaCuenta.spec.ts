@@ -5,6 +5,7 @@ import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
 import perfilPublico from "@/i18n/locales/perfilPublico.es-MX";
 import AgendarCitaCuenta from "./AgendarCitaCuenta.vue";
+import CampoCupon from "./CampoCupon.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
@@ -197,6 +198,39 @@ describe("agendar desde la cuenta", () => {
       "/api/v1/app/demo/mi/citas",
       expect.objectContaining({ oferta_id: "color", pagar: "todo" }),
     );
+  });
+
+  it("con cupón y anticipo, el resto y el total ya llevan el descuento (ADR 0220)", async () => {
+    extraServicios.lista = [
+      {
+        id: "color",
+        nombre: "Color",
+        precio_minor: 100000,
+        moneda: "MXN",
+        duracion_minutos: 30,
+        anticipo_minor: 30000,
+      },
+    ];
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("color");
+    await flushPromises();
+    const eleccion = () => w.get('[data-prueba="elegir-anticipo"]').text();
+    expect(eleccion()).toContain("$700");
+    expect(eleccion()).toContain("$1,000");
+
+    w.findComponent(CampoCupon).vm.$emit("aplicado", 5000);
+    await flushPromises();
+
+    expect(eleccion()).toContain("Pagar el anticipo: $300");
+    expect(eleccion()).toContain("$650");
+    expect(eleccion()).toContain("$950");
+
+    // Con otro servicio, el cupón ya no cuenta.
+    await w.get("#cc-servicio").setValue("corte");
+    await w.get("#cc-servicio").setValue("color");
+    await flushPromises();
+    expect(eleccion()).toContain("$700");
   });
 
   it("con varios profesionales, ve los horarios de todo el equipo o de alguien por su foto", async () => {

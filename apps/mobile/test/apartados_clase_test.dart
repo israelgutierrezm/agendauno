@@ -82,7 +82,7 @@ void main() {
   ) async {
     final repo = _Repo();
     await _montar(tester, repo);
-    expect(find.text('Para recoger en tu clase'), findsOneWidget);
+    expect(find.text('Para recoger cuando vengas'), findsOneWidget);
     expect(find.text('Agotado'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('apartar-agua')));

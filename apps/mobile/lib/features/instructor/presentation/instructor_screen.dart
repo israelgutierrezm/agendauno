@@ -532,7 +532,7 @@ class _MisClases extends ConsumerWidget {
                   ),
                   BotonAgregarCalendario(
                     evento: 'sesion-${s.id}',
-                    titulo: s.oferta ?? 'Clase',
+                    titulo: s.oferta ?? (s.esCita ? 'Cita' : 'Clase'),
                     inicio: s.iniciaEn,
                     fin: s.terminaEn,
                     lugar: s.sucursal,

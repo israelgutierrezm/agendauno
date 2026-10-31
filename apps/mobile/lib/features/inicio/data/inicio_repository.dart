@@ -74,7 +74,8 @@ class InicioRepository {
 }
 
 final inicioRepositoryProvider = Provider<InicioRepository?>((ref) {
-  final sesion = ref.watch(sesionProvider);
+  ref.watch(sesionProvider.select((s) => s?.llaveDatos));
+  final sesion = ref.read(sesionProvider);
   if (sesion == null) {
     return null;
   }

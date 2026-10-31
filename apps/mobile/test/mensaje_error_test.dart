@@ -22,6 +22,21 @@ DioException _error(
 }
 
 void main() {
+  test('503 (actualización): que vuelva en un minuto, no «error inesperado»', () {
+    expect(
+      mensajeDeError(
+        DioException(
+          requestOptions: RequestOptions(path: '/x'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/x'),
+            statusCode: 503,
+            data: {'message': 'Ocurrió un error inesperado.'},
+          ),
+        ),
+      ),
+      'Estamos actualizando. Vuelve a intentar en un minuto.',
+    );
+  });
   test('un 422 dice la razón de meta.errors, no el mensaje fijo', () {
     final e = _error(
       422,

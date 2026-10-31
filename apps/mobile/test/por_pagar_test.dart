@@ -80,12 +80,12 @@ void main() {
     expect(membresia.cobertura!.texto, 'Solo con membresía');
     expect(
       membresia.cobertura!.motivoTexto,
-      'Esta clase solo la incluye una membresía.',
+      'Solo la incluye una membresía.',
     );
     expect(sinSaldo.cobertura!.texto, 'No incluida');
     expect(
       sinSaldo.cobertura!.motivoTexto,
-      'Ya no te quedan clases en tu plan.',
+      'Tu plan ya no tiene saldo.',
     );
     // Un API anterior no lo dice: se intenta reservar.
     expect(sinDato.reservable, isTrue);

@@ -346,6 +346,11 @@ class Sesion {
   /// citas).
   Terminologia get terminologia => _terminologia ?? Terminologia.de(modalidad);
 
+  /// Lo que, si cambia, obliga a rehacer un repositorio (y volver a leer sus datos).
+  /// Lo demás de `/yo` (nombre, foto, permisos…) no: rehacerlo recargaría pantallas
+  /// y perdería la clave de un intento a medias (ADR 0201).
+  Object get llaveDatos => (slug, bearer, rol, moneda, desfaseNegocioMin);
+
   /// El color de la marca del negocio (`estudio.color_marca`, `#RRGGBB`): el del
   /// tema en su app de marca blanca. Null si no lo tiene.
   final String? colorMarca;

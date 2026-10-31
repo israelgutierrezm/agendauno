@@ -108,9 +108,6 @@ class PresupuestoCliente {
     return SituacionPresupuesto.porResponder;
   }
 
-  /// La clave del pago en línea (como la web): reintentar el mismo cobro devuelve
-  /// el pago que ya se inició en vez de crear otro.
-  String get clavePago => 'presupuesto-$id-${orden?.id ?? ''}';
 
   /// [moneda]: la del negocio, si el presupuesto no trae la suya.
   factory PresupuestoCliente.desdeJson(

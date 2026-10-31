@@ -15,14 +15,18 @@ class CampoCupon extends StatefulWidget {
     required this.revisar,
     required this.dinero,
     required this.alCambiar,
+    this.alEscribir,
     this.deshabilitado = false,
   });
 
   final Future<int> Function(String codigo) revisar;
   final String Function(int minor) dinero;
 
-  /// El código aplicado (null: ninguno, o se quitó, o no sirvió).
-  final ValueChanged<String?> alCambiar;
+  /// El código aplicado y cuánto descuenta (null y 0: ninguno, se quitó o no sirvió).
+  final void Function(String? codigo, int descuentoMinor) alCambiar;
+
+  /// Si hay algo escrito sin aplicar todavía.
+  final ValueChanged<bool>? alEscribir;
   final bool deshabilitado;
 
   @override
@@ -63,7 +67,7 @@ class _CampoCuponState extends State<CampoCupon> {
         _descuentoMinor = descuento;
         _revisando = false;
       });
-      widget.alCambiar(codigo);
+      widget.alCambiar(codigo, descuento);
     } on DioException catch (e) {
       if (!mounted) {
         return;
@@ -73,7 +77,7 @@ class _CampoCuponState extends State<CampoCupon> {
         _error = mensajeDeError(e, porDefecto: 'No se pudo revisar el cupón.');
         _revisando = false;
       });
-      widget.alCambiar(null);
+      widget.alCambiar(null, 0);
     }
   }
 
@@ -83,7 +87,7 @@ class _CampoCuponState extends State<CampoCupon> {
       _aplicado = null;
       _error = null;
     });
-    widget.alCambiar(null);
+    widget.alCambiar(null, 0);
   }
 
   @override
@@ -142,7 +146,10 @@ class _CampoCuponState extends State<CampoCupon> {
                     counterText: '',
                   ),
                   // Para habilitar «Aplicar» en cuanto hay algo escrito.
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (texto) {
+                    setState(() {});
+                    widget.alEscribir?.call(texto.trim().isNotEmpty);
+                  },
                   onSubmitted: (_) => _aplicar(),
                 ),
               ),

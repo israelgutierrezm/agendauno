@@ -239,6 +239,8 @@ const intento = intentoUnico();
 
 // Un cupón del negocio (ADR 0220): se revisa antes y se aplica al agendar.
 const cupon = ref("");
+// Cuánto descuenta el cupón aplicado: el servidor lo resta del resto o del total.
+const descuentoCupon = ref(0);
 async function revisarCupon(
   codigo: string,
 ): Promise<{ descuento_minor: number }> {
@@ -250,6 +252,7 @@ async function revisarCupon(
 }
 watch(servicioId, () => {
   cupon.value = "";
+  descuentoCupon.value = 0;
 });
 
 async function agendar(): Promise<void> {
@@ -627,6 +630,7 @@ onMounted(async () => {
         "
         v-model="cupon"
         :revisar="revisarCupon"
+        @aplicado="descuentoCupon = $event"
         :dinero="(m: number) => dinero(m, servicio?.moneda ?? 'MXN')"
         :deshabilitado="agendando"
       />
@@ -658,7 +662,10 @@ onMounted(async () => {
             <span class="block" :style="{ color: 'var(--texto-suave)' }">{{
               $t("perfilPublico.agendar.anticipo.restoEnNegocio", {
                 resto: dinero(
-                  (servicio.precio_minor ?? 0) - anticipo,
+                  Math.max(
+                    0,
+                    (servicio.precio_minor ?? 0) - anticipo - descuentoCupon,
+                  ),
                   servicio.moneda,
                 ),
               })
@@ -675,7 +682,10 @@ onMounted(async () => {
           />
           {{
             $t("perfilPublico.agendar.anticipo.todo", {
-              total: dinero(servicio.precio_minor ?? 0, servicio.moneda),
+              total: dinero(
+                Math.max(0, (servicio.precio_minor ?? 0) - descuentoCupon),
+                servicio.moneda,
+              ),
             })
           }}
         </label>

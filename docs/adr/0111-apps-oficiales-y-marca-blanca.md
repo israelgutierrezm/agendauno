@@ -11,8 +11,15 @@ duplicar el código, ni crear un proyecto o una base de datos por app o por clie
 AgendaUno debe quedar lista para apps de marca blanca (la app propia de un negocio),
 sin publicarlas todavía; TurnoUno no tiene marca blanca.
 
-## Decisión
+> **Nota (2026-10-31):** el dueño decidió que TurnoUno también tenga marca blanca. El
+> archivo de cada negocio declara `PRODUCTO` (sin él, `agendauno`) y se compila con ese
+> sabor; Gradle se niega con el otro. `X-App-Negocio` abre el negocio de cualquiera de
+> los dos productos, siempre que coincida con `X-App-Producto`. Donde abajo dice «solo
+> AgendaUno», vale para los dos. Sigue siendo solo Android (docs/MOBILE.md). Sus recursos
+> van en las carpetas de variante de `turnouno` (`turnounoRelease`, etc.), que tienen
+> prioridad sobre `src/turnouno`, para no chocar con los íconos de ese sabor.
 
+## Decisión
 - **Un proyecto, dos sabores.** `apps/mobile` compila las dos apps con sabores de
   Android (`productFlavors`, dimensión `producto`):
 

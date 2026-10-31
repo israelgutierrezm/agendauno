@@ -391,7 +391,8 @@ class BandejaRepository {
 }
 
 final bandejaRepositoryProvider = Provider<BandejaRepository?>((ref) {
-  final sesion = ref.watch(sesionProvider);
+  ref.watch(sesionProvider.select((s) => s?.llaveDatos));
+  final sesion = ref.read(sesionProvider);
   if (sesion == null) {
     return null;
   }

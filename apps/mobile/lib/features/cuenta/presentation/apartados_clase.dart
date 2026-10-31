@@ -73,7 +73,7 @@ class _ApartadosClaseState extends ConsumerState<ApartadosClase> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Para recoger en tu clase',
+            'Para recoger cuando vengas',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           Text('Lo pagas en el mostrador al recogerlo.', style: suave),
@@ -109,7 +109,7 @@ class _ApartadosClaseState extends ConsumerState<ApartadosClase> {
                       ? null
                       : () => _hacer(
                           () => repo.apartarArticulo(widget.sesionId, art.id),
-                          'Apartado: recógelo en tu clase.',
+                          'Apartado: recógelo cuando vengas.',
                         ),
                   child: Text(art.disponibles < 1 ? 'Agotado' : 'Apartar'),
                 ),

@@ -28,6 +28,14 @@ const _opciones = {
       'prepagados': 0,
     },
     {
+      'id': 'tinte',
+      'nombre': 'Tinte',
+      'duracion_minutos': 60,
+      'precio_minor': 100000,
+      'anticipo_minor': 30000,
+      'moneda': 'MXN',
+    },
+    {
       'id': 'barba',
       'nombre': 'Barba',
       'duracion_minutos': 30,
@@ -397,6 +405,50 @@ void main() {
       expect(find.byKey(const Key('abrir-cupon')), findsNothing);
     });
 
+    testWidgets('con anticipo, el resto y el total ya llevan el descuento', (
+      tester,
+    ) async {
+      final api = _Api();
+      await _abrirHoja(tester, api);
+      await _servicio(tester, 'Tinte');
+      expect(
+        find.text('El resto (\$700.00) lo pagas en el negocio.'),
+        findsOneWidget,
+      );
+      expect(find.text('Pagar todo ahora: \$1,000.00'), findsOneWidget);
+
+      await _ponerCupon(tester, 'VERANO');
+
+      expect(
+        find.text('El resto (\$650.00) lo pagas en el negocio.'),
+        findsOneWidget,
+      );
+      expect(find.text('Pagar todo ahora: \$950.00'), findsOneWidget);
+      // El anticipo no cambia: el servidor descuenta del resto.
+      expect(find.text('Pagar el anticipo: \$300.00'), findsOneWidget);
+    });
+
+    testWidgets('un código escrito sin «Aplicar» se avisa y no agenda', (
+      tester,
+    ) async {
+      final api = _Api();
+      await _abrirHoja(tester, api);
+      await _servicio(tester, 'Corte');
+      await tester.ensureVisible(find.byKey(const Key('abrir-cupon')));
+      await tester.tap(find.byKey(const Key('abrir-cupon')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('codigo-cupon')), 'VERANO');
+      await tester.pump();
+
+      await _agendarCita(tester);
+
+      expect(api.agendadas, isEmpty);
+      expect(
+        find.textContaining('no lo aplicaste').hitTestable(),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('si al agendar el cupón ya no sirve, lo dice y no agenda', (
       tester,
     ) async {
@@ -409,7 +461,7 @@ void main() {
 
       expect(_enviado(api)['cupon'], 'VERANO');
       expect(
-        find.text('La promoción ya no tiene usos disponibles.'),
+        find.text('La promoción ya no tiene usos disponibles.').hitTestable(),
         findsOneWidget,
       );
       // La hoja sigue abierta para quitarlo o cambiarlo.

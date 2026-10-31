@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/archivos/archivos_nativos.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/producto_app.dart';
 import '../../../core/network/auth_token.dart';
@@ -265,7 +267,7 @@ class SesionController extends Notifier<Sesion?> {
       }
       final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
       final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
-      state = Sesion.desdeJson(
+      final nueva = Sesion.desdeJson(
         actual.slug,
         actual.bearer,
         usuario,
@@ -273,7 +275,12 @@ class SesionController extends Notifier<Sesion?> {
         data['app'] as Map<String, dynamic>?,
         // Recién entró con varios roles: sigue eligiendo con cuál.
       ).conUsuario(const {}, eligiendoRol: actual.eligiendoRol);
-      await ref.read(almacenSesionProvider).guardar(state!.aJson());
+      // Si llegó lo mismo, nada cambia: cada vuelta a la app recargaría todo.
+      if (jsonEncode(nueva.aJson()) == jsonEncode(actual.aJson())) {
+        return;
+      }
+      state = nueva;
+      await ref.read(almacenSesionProvider).guardar(nueva.aJson());
     } on DioException catch (e) {
       await _siTerminada(e, actual);
     }
@@ -320,6 +327,7 @@ class SesionController extends Notifier<Sesion?> {
         .read(sesionTerminadaProvider.notifier)
         .avisar(actual.slug, motivo, producto);
     state = null;
+    unawaited(ArchivosNativos.limpiarDocumentos());
     unawaited(ref.read(almacenSesionProvider).borrar());
   }
 
@@ -531,6 +539,7 @@ class SesionController extends Notifier<Sesion?> {
           mensaje ?? 'Tu cuenta quedó eliminada y ya no puedes entrar.',
         );
     state = null;
+    unawaited(ArchivosNativos.limpiarDocumentos());
     // Ya no es un negocio al que se entre con esta cuenta.
     if (!AppConfig.marcaBlanca) {
       unawaited(ref.read(negociosRecientesProvider).olvidar(actual.slug));
@@ -562,21 +571,31 @@ class SesionController extends Notifier<Sesion?> {
   }
 
   /// Cierra la sesión: deja de recibir sus push, revoca el token en el servidor (si
-  /// hay red) y la borra del dispositivo.
+  /// hay red) y la borra del dispositivo, junto con los documentos que bajó para
+  /// verlos. Con mala señal no se espera de más: el tope es por paso.
   Future<void> cerrar() async {
+    const tope = Duration(seconds: 4);
     final actual = state;
     if (actual != null) {
-      await ref.read(pushProvider).olvidar(actual);
+      try {
+        await ref.read(pushProvider).olvidar(actual).timeout(tope);
+      } on TimeoutException {
+        // Sigue en segundo plano; se cierra igual en el dispositivo.
+      }
       try {
         await ref
             .read(dioProvider)
-            .post<Map<String, dynamic>>('/api/v1/app/${actual.slug}/logout');
+            .post<Map<String, dynamic>>('/api/v1/app/${actual.slug}/logout')
+            .timeout(tope);
       } on DioException {
         // Sin red o token ya revocado: se cierra igual en el dispositivo.
+      } on TimeoutException {
+        // Igual: la petición ya salió con su token.
       }
     }
     ref.read(authTokenProvider.notifier).establecer(null);
     state = null;
+    unawaited(ArchivosNativos.limpiarDocumentos());
     await ref.read(almacenSesionProvider).borrar();
   }
 }

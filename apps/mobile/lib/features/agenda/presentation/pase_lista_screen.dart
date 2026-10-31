@@ -60,6 +60,9 @@ class PaseListaScreen extends ConsumerStatefulWidget {
 class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
   final _marcando = <String>{};
 
+  /// Mientras se termina la lista: un segundo toque no manda otro cierre.
+  var _terminando = false;
+
   Terminologia get _terminos =>
       ref.read(sesionProvider)?.terminologia ?? const Terminologia();
 
@@ -72,12 +75,30 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     ref.invalidate(agendaProvider);
   }
 
-  Future<void> _terminarLista() async {
+  /// Quien sigue sin registro queda como «no vino» y, según la política del
+  /// negocio, puede perder su crédito: se confirma diciendo a cuántos afecta.
+  Future<void> _terminarLista(int porMarcar) async {
     final repo = ref.read(agendaRepositoryProvider);
-    if (repo == null) {
+    if (repo == null || _terminando) {
       return;
     }
     final mensajero = ScaffoldMessenger.of(context);
+    setState(() => _terminando = true);
+    final seguir = await _confirmar(
+      porMarcar == 1
+          ? 'Queda 1 persona sin registro. Quedará como «no vino» y, según la '
+                'política del negocio, puede perder su crédito.'
+          : 'Quedan $porMarcar personas sin registro. Quedarán como «no vino» y, '
+                'según la política del negocio, pueden perder su crédito.',
+      'Terminar lista',
+      peligro: true,
+    );
+    if (!seguir || !mounted) {
+      if (mounted) {
+        setState(() => _terminando = false);
+      }
+      return;
+    }
     try {
       final cuantos = await repo.terminarLista(widget.sesion.id);
       _recargar();
@@ -100,6 +121,10 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
           ),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _terminando = false);
+      }
     }
   }
 
@@ -357,6 +382,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
         backgroundColor: context.colores.fondo,
       ),
       body: roster.when(
+        skipLoadingOnReload: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorDeCarga(
           mensaje: 'No se pudo cargar la lista.',
@@ -659,8 +685,19 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: OutlinedButton(
-                    onPressed: _terminarLista,
-                    child: const Text('Terminar lista'),
+                    key: const Key('terminar-lista'),
+                    onPressed: _terminando
+                        ? null
+                        : () => _terminarLista(
+                            enSala
+                                .where(
+                                  (a) =>
+                                      a.estado == 'confirmada' &&
+                                      a.asistencia == null,
+                                )
+                                .length,
+                          ),
+                    child: Text(_terminando ? 'Terminando…' : 'Terminar lista'),
                   ),
                 ),
             ],

@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/hora_negocio.dart';
+import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'agendar_cita_sheet.dart' show textoHorasDeLaSede;
-import 'cuenta_screen.dart';
 
 /// Cambiar el horario de una reserva desde la cuenta (ADR 0044): una cita a otro
 /// horario libre del mismo servicio y profesional, o una clase a otra fecha con
@@ -35,6 +35,9 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   // Por qué no se pudieron cargar las opciones (sin red o una respuesta que esta
   // versión no entiende).
   String? _error;
+
+  /// Por qué no se pudo cambiar, en la hoja: un SnackBar quedaría detrás de ella.
+  String? _errorCambio;
 
   /// Desfase con UTC (minutos) de la sede de la reserva o, si el API no lo manda,
   /// del negocio: los días y las horas son los de allá, no los del teléfono. Con
@@ -124,10 +127,14 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
     if (opciones == null || elegido == null) {
       return;
     }
-    setState(() => _guardando = true);
+    setState(() {
+      _guardando = true;
+      _errorCambio = null;
+    });
     final navegador = Navigator.of(context);
+    final mensajero = ScaffoldMessenger.of(context);
     final notifier = ref.read(cuentaProvider.notifier);
-    await hacerConAviso(context, () async {
+    try {
       switch (opciones.tipo) {
         case TipoSesion.cita:
           // La hora de la sede tal cual (no la del teléfono).
@@ -142,7 +149,14 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
           await notifier.reprogramar(widget.reserva.id, sesionId: elegido);
       }
       navegador.pop();
-    }, exito: 'Listo: cambiamos tu horario.');
+      mensajero.showSnackBar(
+        const SnackBar(content: Text('Listo: cambiamos tu horario.')),
+      );
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() => _errorCambio = mensajeDeError(e));
+      }
+    }
     if (mounted) {
       setState(() => _guardando = false);
     }
@@ -189,6 +203,15 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
                 TipoSesion.cita => _cita(opciones),
                 TipoSesion.clase => [_clase(opciones)],
               },
+              if (_errorCambio != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    _errorCambio!,
+                    key: const Key('reprogramar-error'),
+                    style: TextStyle(color: context.colores.error),
+                  ),
+                ),
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: _elegido == null || _guardando ? null : _cambiar,

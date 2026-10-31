@@ -13,7 +13,7 @@
 		<string>es</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Para elegir tu foto de perfil y para subir documentos que te pida el negocio.</string>
+	<string>Para elegir tu foto de perfil, subir documentos que te pida el negocio y mandar fotos en los mensajes del negocio.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Para tomarte una foto de perfil, fotografiar documentos que te pida el negocio y, en la app del equipo, escanear el pase de entrada de los clientes.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

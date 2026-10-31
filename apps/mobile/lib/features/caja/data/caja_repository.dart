@@ -121,7 +121,8 @@ bool puedeOperarCaja(Sesion? sesion) => sesion?.puede('caja.operar') ?? false;
 
 /// Repositorio ligado a la sesión activa (null si no hay sesión).
 final cajaRepositoryProvider = Provider<CajaRepository?>((ref) {
-  final sesion = ref.watch(sesionProvider);
+  ref.watch(sesionProvider.select((s) => s?.llaveDatos));
+  final sesion = ref.read(sesionProvider);
   if (sesion == null) {
     return null;
   }

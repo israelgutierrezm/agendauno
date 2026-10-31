@@ -85,6 +85,9 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
   var _ocupado = false;
   var _metodo = 'efectivo';
 
+  /// El error va en la hoja: un SnackBar quedaría detrás de ella.
+  String? _error;
+
   /// La clave del intento de cobro: la misma en cada reintento (un cobro que el
   /// servidor ya registró no se repite) hasta que sale bien o cambia la forma.
   String? _claveCobro;
@@ -96,7 +99,10 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     String ok, {
     bool cerrar = false,
   }) async {
-    setState(() => _ocupado = true);
+    setState(() {
+      _ocupado = true;
+      _error = null;
+    });
     final mensajero = ScaffoldMessenger.of(context);
     final navegador = Navigator.of(context);
     try {
@@ -106,11 +112,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
         navegador.pop();
       }
     } on DioException catch (e) {
-      mensajero.showSnackBar(
-        SnackBar(
-          content: Text(mensajeDeError(e, porDefecto: 'No se pudo completar.')),
-        ),
-      );
+      if (mounted) {
+        setState(
+          () => _error = mensajeDeError(e, porDefecto: 'No se pudo completar.'),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _ocupado = false);
@@ -122,7 +128,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
   /// anticipo (ADR 0161) se cobra el saldo y se dice cuánto ya pagó.
   Future<void> _cobrar(SesionAgenda s, String moneda) async {
     final cita = s.cita!;
-    final cliente = cita.cliente ?? 'el cliente';
+    final cliente = cita.cliente ?? 'esta persona';
     String dinero(int minor) => Formato.dinero(minor, moneda);
     final saldo = s.porCobrarMinor;
     final monto = saldo != null ? dinero(saldo) : '';
@@ -143,7 +149,10 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     if (!mounted) {
       return;
     }
-    setState(() => _ocupado = true);
+    setState(() {
+      _ocupado = true;
+      _error = null;
+    });
     final mensajero = ScaffoldMessenger.of(context);
     try {
       _claveCobro ??=
@@ -157,11 +166,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
         mensajero.showSnackBar(const SnackBar(content: Text('Cita cobrada.')));
       }
     } on DioException catch (e) {
-      mensajero.showSnackBar(
-        SnackBar(
-          content: Text(mensajeDeError(e, porDefecto: 'No se pudo cobrar.')),
-        ),
-      );
+      if (mounted) {
+        setState(
+          () => _error = mensajeDeError(e, porDefecto: 'No se pudo cobrar.'),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _ocupado = false);
@@ -177,7 +186,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     bool retardo = false,
   }) async {
     final cita = s.cita!;
-    final cliente = cita.cliente ?? 'el cliente';
+    final cliente = cita.cliente ?? 'esta persona';
     String nombre(String e) => e == 'presente' ? 'Llegó' : 'No asistió';
     final ok = cita.asistencia != null && cita.asistencia != asistencia
         ? 'Asistencia corregida.'
@@ -364,7 +373,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        cita.cliente ?? 'Sin cliente',
+                        cita.cliente ?? 'Sin nombre',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
@@ -415,7 +424,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Nota del cliente',
+                      'Nota que dejó',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -430,6 +439,15 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
             ],
             if (cita.telefono != null || cita.email != null)
               _Contacto(telefono: cita.telefono, email: cita.email),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  _error!,
+                  key: const Key('cita-error'),
+                  style: TextStyle(color: context.colores.error),
+                ),
+              ),
             if (activa) ...[
               const SizedBox(height: 16),
               if (s.porCobrar && puedeCobrar)
@@ -660,7 +678,7 @@ class _DialogoCancelarState extends State<_DialogoCancelar> {
               final efecto = foto.data;
               return Text(
                 foto.hasError || efecto == null
-                    ? 'No se pudo saber qué pasará con su crédito o su pago.'
+                    ? 'No se pudo saber qué pasará con su bono o su pago.'
                     : efecto.mensaje,
                 key: const Key('efecto-cancelar'),
                 style: TextStyle(color: context.colores.textoSuave),

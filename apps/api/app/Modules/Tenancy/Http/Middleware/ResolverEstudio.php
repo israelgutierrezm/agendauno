@@ -20,7 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
  * tenants. Limpia la conexión al terminar.
  *
  * Suspendido por renta vencida (ADR 0073), solo queda abierto lo necesario para
- * entrar y pagarla; todo lo demás (página pública, clientes, equipo) responde 404.
+ * entrar, pagarla, guardar la tarjeta y descargar sus datos; todo lo demás (página pública, clientes, equipo) responde 404.
  *
  * Un negocio solo se abre en el dominio de su producto (ADR 0108): una barbería
  * (TurnoUno) no responde en agendauno.mx ni en `barberia.agendauno.mx`, ni un estudio
@@ -29,18 +29,21 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Las apps móviles dicen de cuál son (ADR 0111): `X-App-Producto` (la de TurnoUno no
  * abre un negocio de AgendaUno ni al revés, también fuera de los dominios) y, una app
- * de marca blanca, `X-App-Negocio`: solo abre ese negocio, y solo si es de AgendaUno.
+ * de marca blanca, `X-App-Negocio`: solo abre ese negocio, de cualquiera de los dos.
  */
 class ResolverEstudio
 {
     /**
      * Rutas (sin el prefijo `api.v1.app.`, `api.v1.sub.` o `api.v1.sub-{producto}.`) que
-     * siguen abiertas con el negocio suspendido por renta.
+     * siguen abiertas con el negocio suspendido por renta: entrar, ver y pagar sus cargos,
+     * guardar su tarjeta y descargar sus datos (no se retienen por una deuda).
      */
     private const ABIERTAS_SUSPENDIDO_POR_RENTA = [
         'login', 'auth.google', 'logout', 'marca', 'recuperar-contrasena', 'restablecer-contrasena',
         'yo', 'yo.rol-activo', 'apariencia',
-        'renta', 'renta.quien-cuenta', 'renta.pagar', 'renta.factura', 'renta.factura.descargar', 'renta.recibo',
+        'renta', 'renta.cargos', 'renta.quien-cuenta', 'renta.pagar', 'renta.confirmacion', 'renta.factura', 'renta.factura.descargar', 'renta.recibo',
+        'renta.tarjeta', 'renta.tarjeta.confirmar', 'renta.tarjeta.quitar',
+        'negocio.exportar', 'negocio.exportar.pedir', 'negocio.exportar.descargar',
         'avisos-plataforma', 'avisos-plataforma.guardar', 'avisos-plataforma.codigo', 'avisos-plataforma.verificar',
         'avisos-plataforma.cambio.codigo', 'avisos-plataforma.cambio',
         'legales.aceptar',
@@ -121,11 +124,10 @@ class ResolverEstudio
             return false;
         }
 
-        // Marca blanca: solo de AgendaUno (TurnoUno aún no la tiene).
+        // Marca blanca: solo su negocio (que sea de su producto se revisó arriba).
         $negocio = (string) $request->header('X-App-Negocio', '');
 
-        return $negocio === ''
-            || ($negocio === $estudio->slug && $estudio->producto() === ProductoComercial::AgendaUno);
+        return $negocio === '' || $negocio === $estudio->slug;
     }
 
     /**

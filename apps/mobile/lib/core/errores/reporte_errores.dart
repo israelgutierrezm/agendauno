@@ -40,7 +40,11 @@ class ReporteErrores {
       reportar(detalles.exception, detalles.stack);
     };
     PlatformDispatcher.instance.onError = (error, pila) {
-      debugPrint('Error sin manejar: $error');
+      // Solo en desarrollo: en release, debugPrint también escribe en el log del
+      // sistema.
+      if (kDebugMode) {
+        debugPrint('Error sin manejar: $error');
+      }
       reportar(error, pila);
       return true;
     };

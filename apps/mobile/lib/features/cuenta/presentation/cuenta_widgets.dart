@@ -186,13 +186,35 @@ class AvisoAtencion extends StatelessWidget {
   );
 }
 
-class ConsentimientoCard extends ConsumerWidget {
+class ConsentimientoCard extends ConsumerStatefulWidget {
   const ConsentimientoCard(this.c, {super.key});
 
   final ConsentimientoPendiente c;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
+  ConsumerState<ConsentimientoCard> createState() => _ConsentimientoCardState();
+}
+
+class _ConsentimientoCardState extends ConsumerState<ConsentimientoCard> {
+  /// Mientras se firma: un segundo toque no manda otra firma.
+  var _firmando = false;
+
+  ConsentimientoPendiente get c => widget.c;
+
+  Future<void> _firmar() async {
+    setState(() => _firmando = true);
+    await hacerConAviso(
+      context,
+      () => ref.read(cuentaProvider.notifier).firmar(c.id),
+      exito: 'Gracias, quedó firmado.',
+    );
+    if (mounted) {
+      setState(() => _firmando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Card(
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -206,11 +228,7 @@ class ConsentimientoCard extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => hacerConAviso(
-              context,
-              () => ref.read(cuentaProvider.notifier).firmar(c.id),
-              exito: 'Gracias, quedó firmado.',
-            ),
+            onPressed: _firmando ? null : _firmar,
             child: const Text('Acepto'),
           ),
         ],
@@ -618,13 +636,23 @@ class _DetalleReservaState extends ConsumerState<_DetalleReserva> {
                   style: TextButton.styleFrom(
                     foregroundColor: context.colores.error,
                   ),
-                  onPressed: () async {
-                    final nav = Navigator.of(context);
-                    if (await confirmarCancelacion(context, ref, r.id) &&
-                        nav.mounted) {
-                      nav.pop();
-                    }
-                  },
+                  onPressed: _ocupado
+                      ? null
+                      : () async {
+                          final nav = Navigator.of(context);
+                          setState(() => _ocupado = true);
+                          final cancelada = await confirmarCancelacion(
+                            context,
+                            ref,
+                            r.id,
+                          );
+                          if (mounted) {
+                            setState(() => _ocupado = false);
+                          }
+                          if (cancelada && nav.mounted) {
+                            nav.pop();
+                          }
+                        },
                   child: const Text('Cancelar'),
                 ),
               ],
@@ -649,6 +677,10 @@ String? _etiquetaHoraSede(int? desfaseSede, DateTime? inicio, String? sede) =>
 Future<void> mostrarDetalleClase(BuildContext context, ClaseMiembro c) =>
     showModalBottomSheet<void>(
       context: context,
+      // Con lugares numerados no cabe en 9/16 de pantalla (el tope sin esto) y
+      // «Confirmar reserva» quedaría fuera.
+      isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => _DetalleClase(c),
     );
@@ -670,11 +702,16 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
   /// rechazaría y se vería un error después del «Reservado.»).
   var _reservando = false;
 
+  /// El error va aquí, a la vista: un SnackBar quedaría detrás de la hoja.
+  String? _error;
+
+  /// Lo que se apartó para el invitado (la hoja sigue abierta).
+  String? _aviso;
+
   ClaseMiembro get c => widget.c;
 
   /// Pase de invitado (ADR 0182): aparta un lugar para alguien que no es cliente.
   Future<void> _invitar(int pases) async {
-    final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(cuentaProvider.notifier);
     final nombre = await showDialog<String>(
       context: context,
@@ -685,16 +722,21 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
     }
     try {
       await notifier.invitar(c.id, nombre.trim());
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Apartamos un lugar para ${nombre.trim()}. Si no puede venir, '
-            'cancélalo antes de la clase y recuperas tu pase.',
-          ),
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _error = null;
+          _aviso =
+              'Apartamos un lugar para ${nombre.trim()}. Si no puede venir, '
+              'cancélalo a tiempo y recuperas tu pase.';
+        });
+      }
     } on DioException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
+      if (mounted) {
+        setState(() {
+          _aviso = null;
+          _error = mensajeDeError(e);
+        });
+      }
     }
     if (mounted) {
       ref.invalidate(antesDeReservarProvider(c.id));
@@ -719,7 +761,10 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
       if (_reservando) {
         return;
       }
-      setState(() => _reservando = true);
+      setState(() {
+        _reservando = true;
+        _error = null;
+      });
       final nav = Navigator.of(context);
       final messenger = ScaffoldMessenger.of(context);
       try {
@@ -748,9 +793,11 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
           nav.pop();
         }
       } on DioException catch (e) {
-        messenger.showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
         if (mounted) {
-          setState(() => _lugar = null);
+          setState(() {
+            _lugar = null;
+            _error = mensajeDeError(e);
+          });
           ref.invalidate(antesDeReservarProvider(c.id));
         }
       } finally {
@@ -761,7 +808,7 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
     }
 
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -889,12 +936,26 @@ class _DetalleClaseState extends ConsumerState<_DetalleClase> {
                   ),
                 ),
               ),
+            if (_aviso != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(_aviso!),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  key: const Key('reserva-error'),
+                  style: TextStyle(color: context.colores.error),
+                ),
+              ),
             const SizedBox(height: 16),
             // Una clase en línea de pago es contenido digital: la app no la vende
             // (reglas 3.1.1 y 3.1.3 de Apple). Se dice sin decir dónde pagarla.
             if (c.pagoDigital || (antes?.pagoDigital ?? false))
               Text(
-                'Esta clase en línea no se reserva desde la app.',
+                'En línea: no se reserva desde la app.',
                 key: const Key('clase-en-linea-fuera'),
                 style: TextStyle(color: context.colores.textoSuave),
               )
@@ -971,7 +1032,7 @@ class _NombreInvitadoState extends State<_NombreInvitado> {
           decoration: const InputDecoration(labelText: 'Nombre de tu invitado'),
         ),
         Text(
-          'Ocupa un lugar en la clase y usa uno de los pases de tu plan.',
+          'Ocupa un lugar y usa uno de los pases de tu plan.',
           style: TextStyle(fontSize: 12, color: context.colores.textoSuave),
         ),
       ],

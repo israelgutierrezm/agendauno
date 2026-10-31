@@ -42,12 +42,12 @@ void main() {
       );
       expect(
         a.cancelacionTexto(DateTime.utc(2030, 1, 9, 12)),
-        endsWith('Después, cancelar descuenta la clase.'),
+        endsWith('Después, cancelar la descuenta de tu plan.'),
       );
       expect(
         a.cancelacionTexto(DateTime.utc(2030, 1, 10, 9)),
         'Ya pasó el límite para cancelar sin costo. '
-        'Después, cancelar descuenta la clase.',
+        'Después, cancelar la descuenta de tu plan.',
       );
       expect(a.queLlevar, 'Ropa cómoda');
     },

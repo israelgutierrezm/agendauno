@@ -57,6 +57,15 @@ class PdfElegido {
 abstract final class ArchivosNativos {
   static const canal = MethodChannel('agendauno/archivos');
 
+  /// Borra lo que se bajó para verlo (p. ej. un certificado médico): al cerrar sesión
+  /// o eliminar la cuenta no se queda en el teléfono. Si no se puede, no pasa nada.
+  static Future<void> limpiarDocumentos() async {
+    try {
+      await canal.invokeMethod<void>('limpiarDocumentos');
+    } on Object {
+      // Sin canal (pruebas) o sin nada que borrar.
+    }
+  }
   /// El selector de documentos del sistema, solo PDF (sin permisos: el sistema da
   /// acceso solo al que se elige). Null si se canceló o no se pudo leer.
   static Future<PdfElegido?> elegirPdf() async {

@@ -1,0 +1,12 @@
+{
+  "NEGOCIO": "ejemplo",
+  "PRODUCTO": "turnouno",
+  "APP_NOMBRE": "Estudio Ejemplo",
+  "ANDROID_ID": "mx.ejemplo.citas",
+  "COLOR_MARCA": "#0F766E",
+  "FIREBASE_API_KEY": "",
+  "FIREBASE_ANDROID_APP_ID": "",
+  "FIREBASE_SENDER_ID": "",
+  "FIREBASE_PROJECT_ID": "",
+  "GOOGLE_SERVER_CLIENT_ID": ""
+}

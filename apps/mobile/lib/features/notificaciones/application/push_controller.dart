@@ -95,14 +95,20 @@ class PushController {
   /// Ajustes mientras tanto); si el mismo token ya quedó registrado, no se manda otra
   /// vez. En iPhone, Firebase da su token solo cuando ya tiene el de APNs: se espera
   /// con reintentos (si no llega, se intenta la próxima vez que vuelva a la app).
-  Future<void> registrar(Sesion sesion) async {
+  ///
+  /// Con [pedirPermiso] en false (al volver a la app) solo revisa cómo está: el
+  /// permiso se pide al entrar.
+  Future<void> registrar(Sesion sesion, {bool pedirPermiso = true}) async {
     if (!_listo) {
       return;
     }
     _sesion = sesion;
     try {
-      final permiso = await FirebaseMessaging.instance.requestPermission();
-      if (permiso.authorizationStatus == AuthorizationStatus.denied) {
+      final permiso = pedirPermiso
+          ? await FirebaseMessaging.instance.requestPermission()
+          : await FirebaseMessaging.instance.getNotificationSettings();
+      if (permiso.authorizationStatus == AuthorizationStatus.denied ||
+          permiso.authorizationStatus == AuthorizationStatus.notDetermined) {
         return;
       }
       if (defaultTargetPlatform == TargetPlatform.iOS &&

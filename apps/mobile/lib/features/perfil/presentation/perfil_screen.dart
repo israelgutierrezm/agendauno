@@ -44,6 +44,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   final _nueva = TextEditingController();
   final _confirmacion = TextEditingController();
   bool _guardando = false;
+  bool _cerrando = false;
   // De su ficha (opcionales): fecha de nacimiento (AAAA-MM-DD) y género.
   String? _fechaNacimiento;
   String? _genero;
@@ -748,7 +749,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     const SizedBox(height: 4),
                     Text(
                       sesion.googleConectado
-                          ? 'Google conectado: puedes entrar con él en la app y en la web.'
+                          ? ref.watch(googleAuthProvider).disponible
+                                ? 'Google conectado: puedes entrar con él en la app y en la web.'
+                                : 'Google conectado: puedes entrar con él en la web.'
                           : 'Conecta tu cuenta de Google para entrar sin contraseña. '
                                 'Puede ser un Gmail distinto a tu correo de acceso.',
                       style: Theme.of(context).textTheme.bodySmall,
@@ -888,12 +891,15 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: context.colores.error),
             icon: const Icon(Icons.logout),
-            label: const Text('Cerrar sesión'),
-            onPressed: () async {
-              final navegador = Navigator.of(context);
-              await ref.read(sesionProvider.notifier).cerrar();
-              navegador.popUntil((r) => r.isFirst);
-            },
+            label: Text(_cerrando ? 'Cerrando sesión…' : 'Cerrar sesión'),
+            onPressed: _cerrando
+                ? null
+                : () async {
+                    final navegador = Navigator.of(context);
+                    setState(() => _cerrando = true);
+                    await ref.read(sesionProvider.notifier).cerrar();
+                    navegador.popUntil((r) => r.isFirst);
+                  },
           ),
         ],
       ),

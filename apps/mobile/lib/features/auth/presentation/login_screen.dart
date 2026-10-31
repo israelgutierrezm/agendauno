@@ -364,17 +364,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  TextField(
-                    controller: _email,
-                    decoration: const InputDecoration(labelText: 'Correo'),
-                    keyboardType: TextInputType.emailAddress,
-                    autocorrect: false,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _password,
-                    decoration: const InputDecoration(labelText: 'Contraseña'),
-                    obscureText: true,
+                  // El correo y la contraseña que el teléfono tiene guardados.
+                  AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _email,
+                          decoration: const InputDecoration(
+                            labelText: 'Correo',
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          autocorrect: false,
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email,
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _password,
+                          decoration: const InputDecoration(
+                            labelText: 'Contraseña',
+                          ),
+                          obscureText: true,
+                          autofillHints: const [AutofillHints.password],
+                        ),
+                      ],
+                    ),
                   ),
                   Align(
                     alignment: Alignment.centerRight,

@@ -405,7 +405,8 @@ class AgendaRepository {
 
 /// Repositorio ligado a la sesión activa (null si no hay sesión).
 final agendaRepositoryProvider = Provider<AgendaRepository?>((ref) {
-  final sesion = ref.watch(sesionProvider);
+  ref.watch(sesionProvider.select((s) => s?.llaveDatos));
+  final sesion = ref.read(sesionProvider);
   if (sesion == null) {
     return null;
   }

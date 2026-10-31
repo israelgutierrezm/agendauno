@@ -41,7 +41,7 @@ it('la app de un producto no abre los negocios del otro', function (): void {
     $this->getJson("/api/v1/app/{$citas['slug']}/marca")->assertOk();
 });
 
-it('una app de marca blanca solo abre su negocio, y solo de AgendaUno', function (): void {
+it('una app de marca blanca solo abre su negocio, de su producto', function (): void {
     $suyo = estudioConSesion('fluo-app', 'f@correo.mx');
     $otro = estudioConSesion('zen-app', 'z@correo.mx');
     $citas = estudioConSesion('barberia-blanca', 'b@correo.mx', 'barberia');
@@ -56,7 +56,19 @@ it('una app de marca blanca solo abre su negocio, y solo de AgendaUno', function
     $this->getJson("/api/v1/app/{$otro['slug']}/yo", [...$deLaApp('fluo-app'), ...conBearer($otro['bearer'])])
         ->assertNotFound();
 
-    // TurnoUno aún no tiene marca blanca.
-    $this->getJson("/api/v1/app/{$citas['slug']}/marca", $deLaApp('barberia-blanca', 'turnouno'))->assertNotFound();
-    $this->getJson("/api/v1/app/{$citas['slug']}/marca", ['X-App-Negocio' => 'barberia-blanca'])->assertNotFound();
+    // La de un negocio de citas abre el suyo; compilada como AgendaUno, no; ni otro.
+    $this->getJson("/api/v1/app/{$citas['slug']}/yo", [...$deLaApp('barberia-blanca', 'turnouno'), ...conBearer($citas['bearer'])])
+        ->assertOk()->assertJsonPath('data.estudio.slug', 'barberia-blanca');
+    $this->getJson("/api/v1/app/{$citas['slug']}/marca", $deLaApp('barberia-blanca'))->assertNotFound();
+    $this->getJson("/api/v1/app/{$citas['slug']}/marca", $deLaApp('otra-barberia', 'turnouno'))->assertNotFound();
+});
+
+it('el complemento de la app con su marca nombra la app de su producto', function (): void {
+    $citas = estudioConSesion('barberia-marca', 'b@correo.mx', 'barberia');
+    $clases = estudioConSesion('estudio-marca', 'e@correo.mx');
+    $descripcion = fn (array $e): string => (string) collect($this->getJson("/api/v1/app/{$e['slug']}/renta/complementos", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->firstWhere('clave', 'app_marca')['descripcion'];
+
+    expect($descripcion($citas))->toContain('La app TurnoUno')->not->toContain('AgendaUno')
+        ->and($descripcion($clases))->toContain('La app AgendaUno');
 });
