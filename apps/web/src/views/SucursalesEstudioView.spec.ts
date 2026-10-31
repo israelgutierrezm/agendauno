@@ -11,7 +11,11 @@ import SucursalesEstudioView from "./SucursalesEstudioView.vue";
 */
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), replace: vi.fn() }));
-vi.mock("@/lib/api", () => ({ api: { get: mocks.get } }));
+vi.mock("@/lib/api", () => ({
+  api: { get: mocks.get },
+  mensajeDeError: () => "Sin conexión",
+  noEncontrado: (e: { status?: number }) => e.status === 404,
+}));
 vi.mock("@/lib/negociosRecientes", () => ({ recordarNegocio: vi.fn() }));
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { slug: "casa-navaja" }, query: {} }),
@@ -129,11 +133,22 @@ describe("entrada pública del negocio", () => {
   });
 
   it("si la página no está abierta, lo dice", async () => {
-    mocks.get.mockRejectedValue(new Error("404"));
+    mocks.get.mockRejectedValue({ status: 404 });
     const w = montar();
     await flushPromises();
 
     expect(w.text()).toContain("Este negocio no está disponible por ahora.");
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("un fallo temporal no se ve como «no disponible»: se reintenta", async () => {
+    mocks.get.mockRejectedValue({ status: 503 });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text()).not.toContain("no está disponible");
+    expect(w.get('[data-prueba="error-carga-publica"]').text()).toContain(
+      "Sin conexión",
+    );
   });
 });

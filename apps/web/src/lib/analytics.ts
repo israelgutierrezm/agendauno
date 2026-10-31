@@ -1,4 +1,5 @@
 import { ambitoEnUso, capturarAtribucion } from "@/lib/atribucion";
+import { leerPreferencias } from "@/lib/consentimiento";
 import { reenviarEvento } from "@/lib/etiquetas";
 import { rutasMarketing } from "@/marketing/seoConfig";
 
@@ -68,7 +69,8 @@ function deliver(payload: Record<string, unknown>): void {
 
   const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT as
     string | undefined;
-  if (!endpoint) {
+  // Sale del navegador: solo con el permiso de analítica (ADR 0234).
+  if (!endpoint || leerPreferencias(ambitoEnUso())?.analitica !== true) {
     return;
   }
 

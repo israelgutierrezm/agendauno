@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import GiroNegocio from "@/components/GiroNegocio.vue";
@@ -39,6 +40,7 @@ const logoUrl = ref<string | null>(null);
 
 async function cargar(): Promise<void> {
   cargando.value = true;
+  error.value = null;
   try {
     await sesion.cargarYo();
     const { data } = await api.get<{ data: { logo_url: string | null } }>(
@@ -86,9 +88,18 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+    <AvisoTono v-if="error" tono="peligro" class="mt-6" role="alert">
       {{ error }}
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <template v-if="!cargando">
       <!-- Logo del estudio (Configuración › Negocio › Logo del negocio). Solo se

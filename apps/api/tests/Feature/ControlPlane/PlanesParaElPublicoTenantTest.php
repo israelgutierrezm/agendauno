@@ -71,6 +71,8 @@ it('la clase de prueba es solo para quien nunca vino, y una sola vez', function 
     // Dos órdenes pendientes: al pagarse una, la otra ya no se cobra.
     $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($nueva['bearer']))
         ->assertCreated()->json('data.id');
+    // Sin caducidad, como las de antes (ADR 0231): la siguiente no la reutiliza.
+    enNegocioPlanesPublico(fn () => OrdenTenant::query()->where('ulid', $orden)->update(['caduca_en' => null]));
     $otra = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($nueva['bearer']))
         ->assertCreated()->json('data.id');
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
@@ -128,6 +130,8 @@ it('la clase de prueba: una por persona en la orden; junto con un plan, sí; pag
     $otra = alumnoConSesion($e, 'Otra', 'otra@correo.mx');
     $primera = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($otra['bearer']))
         ->assertCreated()->json('data.id');
+    // Sin caducidad, como las de antes (ADR 0231): la siguiente no la reutiliza.
+    enNegocioPlanesPublico(fn () => OrdenTenant::query()->where('ulid', $primera)->update(['caduca_en' => null]));
     $segunda = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($otra['bearer']))
         ->assertCreated()->json('data.id');
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$primera}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
@@ -175,6 +179,8 @@ it('si una orden con un plan y una clase de prueba ya usada se paga, se devuelve
     $otra = alumnoConSesion($e, 'Otra', 'otra@correo.mx');
     $primera = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [['producto_id' => $prueba, 'cantidad' => 1]]], conBearer($otra['bearer']))
         ->assertCreated()->json('data.id');
+    // Sin caducidad, como las de antes (ADR 0231): la siguiente no la reutiliza.
+    enNegocioPlanesPublico(fn () => OrdenTenant::query()->where('ulid', $primera)->update(['caduca_en' => null]));
     $segunda = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", ['items' => [
         ['producto_id' => $pack, 'cantidad' => 1], ['producto_id' => $prueba, 'cantidad' => 1],
     ]], conBearer($otra['bearer']))->assertCreated()->json('data.id');

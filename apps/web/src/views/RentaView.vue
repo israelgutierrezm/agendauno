@@ -223,6 +223,10 @@ const conTarjeta = computed(
     renta.value?.domiciliacion_posible === true || renta.value?.tarjeta != null,
 );
 const conTimbres = computed(() => sesion.estudio?.factura_posible === true);
+// Suspendido solo se paga, se guarda la tarjeta y se descargan los datos.
+const conTimbresAbiertos = computed(
+  () => conTimbres.value && !sesion.suspendido,
+);
 function planCambiado(mensaje: string): void {
   toast.exito(mensaje);
   void cargar();
@@ -289,6 +293,10 @@ async function cargar(): Promise<void> {
     const { data } = await api.get<{ data: Renta }>(`${base.value}/renta`);
     renta.value = data.data;
     await cargarCargos(metaCargos.value?.page ?? 1);
+    // Pagar puede reactivar el negocio: sin esto, el panel sigue suspendido hasta recargar.
+    if (sesion.suspendido) {
+      await sesion.cargarYo();
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -480,7 +488,7 @@ onMounted(() => {
         class="mt-6"
         :plan="renta.plan"
         :base="base"
-        :puede-gestionar="puedeGestionar"
+        :puede-gestionar="puedeGestionar && !sesion.suspendido"
         :ventas="renta.ventas ?? { correo: null, whatsapp: null }"
         @cambiado="planCambiado"
       />
@@ -712,11 +720,12 @@ onMounted(() => {
 
       <!-- Cobro automático y timbres para facturar (ADR 0107). Sin cobro automático
            posible (ni tarjeta guardada) no se ofrece: no se promete lo que no hay.
-           Dado de baja (ADR 0213) solo se paga lo pendiente. -->
+           Dado de baja (ADR 0213) solo se paga lo pendiente; suspendido, también se
+           puede guardar la tarjeta. -->
       <div
-        v-if="!sesion.dadoDeBaja && (conTarjeta || conTimbres)"
+        v-if="!sesion.dadoDeBaja && (conTarjeta || conTimbresAbiertos)"
         class="mt-4 grid gap-4"
-        :class="{ 'md:grid-cols-2': conTarjeta && conTimbres }"
+        :class="{ 'md:grid-cols-2': conTarjeta && conTimbresAbiertos }"
       >
         <TarjetaRenta
           v-if="conTarjeta"
@@ -727,7 +736,7 @@ onMounted(() => {
           @cambio="cargar"
         />
         <TimbresRenta
-          v-if="conTimbres"
+          v-if="conTimbresAbiertos"
           :base="base"
           :puede-gestionar="puedeGestionar"
           :pagado="retornoPago !== null && retornoPago !== 'cancelado'"
@@ -736,13 +745,17 @@ onMounted(() => {
 
       <!-- Mensajes de WhatsApp (ADR 0186): solo si está activo en el negocio. -->
       <WhatsAppRenta
-        v-if="!sesion.dadoDeBaja && sesion.estudio?.whatsapp_clientes === true"
+        v-if="
+          !sesion.dadoDeBaja &&
+          !sesion.suspendido &&
+          sesion.estudio?.whatsapp_clientes === true
+        "
         :base="base"
         :puede-gestionar="puedeGestionar"
       />
 
       <!-- Referidos entre negocios (ADR 0188). -->
-      <template v-if="!sesion.dadoDeBaja">
+      <template v-if="!sesion.dadoDeBaja && !sesion.suspendido">
         <ReferidosRenta :base="base" />
         <!-- Complementos que se piden (ADR 0140): p. ej. Familias. -->
         <ComplementosNegocio />
@@ -848,7 +861,7 @@ onMounted(() => {
                   {{
                     c.modo_cobro === "fijo"
                       ? "—"
-                      : `${c.cantidad} ${$t(`cobro.actual.${c.metrica}`)}`
+                      : `${c.cantidad} ${conTerminosActuales($t(`cobro.actual.${c.metrica}`))}`
                   }}
                 </td>
                 <td :data-etiqueta="$t('renta.colEstado')">
@@ -1030,7 +1043,10 @@ onMounted(() => {
           class="tu-card mt-8 space-y-6 p-5"
         >
           <DescargarDatosNegocio />
-          <DarDeBajaNegocio :dias="renta.dias_para_borrar_baja ?? 30" />
+          <DarDeBajaNegocio
+            v-if="!sesion.suspendido"
+            :dias="renta.dias_para_borrar_baja ?? 30"
+          />
         </div>
       </template>
     </template>

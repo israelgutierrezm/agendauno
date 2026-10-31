@@ -27,6 +27,7 @@ import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
+import TipoCambioPlataforma from "@/components/TipoCambioPlataforma.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import WhatsAppNegocio, {
@@ -168,6 +169,7 @@ interface FichaApi extends Omit<Estudio, "uso"> {
   modulos?: ModuloDelNegocio[];
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
+  cargos_total?: number;
   // Lo pactado con fecha de vigencia (ADR 0181).
   cobro?: {
     desde: string | null;
@@ -257,6 +259,14 @@ const codigoDesarrollo = ref<string | null>(null);
 const operador = ref<string | null>(null);
 // Qué puede hacer quien entró (ADR 0215): solo el perfil total ve la configuración.
 const perfilOperador = ref<string>("total");
+// Lo que cambia algo y puede hacer (de `/yo`): lo demás no se le ofrece.
+const accionesOperador = ref<string[]>(["*"]);
+function puedeAccion(ruta: string): boolean {
+  return (
+    accionesOperador.value.includes("*") ||
+    accionesOperador.value.includes(ruta)
+  );
+}
 // Alta asistida y corregir el contacto (ADR 0226): soporte y total.
 const puedeAltaAsistida = computed(() =>
   ["total", "soporte"].includes(perfilOperador.value),
@@ -360,7 +370,13 @@ const columnas = computed(() => [
 ]);
 // Por producto, estado y adeudo (ADR 0132), buscando y por páginas en el servidor:
 // la plataforma puede tener miles de negocios.
-const ESTADOS_ESTUDIO = ["trialing", "active", "suspended", "cancelled"];
+const ESTADOS_ESTUDIO = [
+  "provisioning",
+  "trialing",
+  "active",
+  "suspended",
+  "cancelled",
+];
 // 15 por página: la lista cabe en la pantalla sin un desplazamiento largo.
 const POR_PAGINA_ESTUDIOS = 15;
 const filtroEstudios = ref({ producto: "", estado: "", adeudo: false });
@@ -432,23 +448,40 @@ watch(buscarEstudios, () => {
   esperaEstudios = setTimeout(filtrarEstudios, 300);
 });
 
+// Cargando, error con Reintentar y, si una respuesta lenta llega tarde, no pisa a la
+// reciente (como en Cobros).
+const cargandoEstudios = ref(false);
+const errorEstudios = ref<string | null>(null);
+let turnoEstudios = 0;
 async function cargarEstudios(): Promise<void> {
-  const { data } = await cliente.get<{
-    data: Estudio[];
-    meta?: typeof metaEstudios.value;
-  }>("/api/v1/plataforma/estudios", {
-    ...encabezados(),
-    params: {
-      q: buscarEstudios.value.trim() || undefined,
-      producto: filtroEstudios.value.producto || undefined,
-      estado: filtroEstudios.value.estado || undefined,
-      adeudo: filtroEstudios.value.adeudo ? 1 : undefined,
-      page: paginaEstudios.value,
-      per_page: POR_PAGINA_ESTUDIOS,
-    },
-  });
-  estudios.value = data.data;
-  metaEstudios.value = data.meta ?? null;
+  const mio = ++turnoEstudios;
+  cargandoEstudios.value = true;
+  try {
+    const { data } = await cliente.get<{
+      data: Estudio[];
+      meta?: typeof metaEstudios.value;
+    }>("/api/v1/plataforma/estudios", {
+      ...encabezados(),
+      params: {
+        q: buscarEstudios.value.trim() || undefined,
+        producto: filtroEstudios.value.producto || undefined,
+        estado: filtroEstudios.value.estado || undefined,
+        adeudo: filtroEstudios.value.adeudo ? 1 : undefined,
+        page: paginaEstudios.value,
+        per_page: POR_PAGINA_ESTUDIOS,
+      },
+    });
+    if (mio !== turnoEstudios) return;
+    estudios.value = data.data;
+    metaEstudios.value = data.meta ?? null;
+    errorEstudios.value = null;
+  } catch (err) {
+    // Al entrar lo resuelve la puerta (un token vencido, por ejemplo).
+    if (!autenticado.value) throw err;
+    if (mio === turnoEstudios) errorEstudios.value = mensajeDeError(err);
+  } finally {
+    if (mio === turnoEstudios) cargandoEstudios.value = false;
+  }
 }
 
 // Ficha de un estudio (panel lateral).
@@ -473,29 +506,51 @@ const motivoSuspension = ref("");
 // Por qué se da de baja (obligatorio, ADR 0213).
 const motivoBaja = ref("");
 
+function edicionDe(f: FichaApi) {
+  return {
+    modo_cobro: f.modo_cobro,
+    cuota: String(f.cuota_fija_minor / 100),
+    moneda: f.cuota_fija_moneda ?? "MXN",
+    desde: f.cobro?.primer_periodo_abierto ?? "",
+  };
+}
+// Recargar la misma ficha tras una acción no la vacía ni pisa lo que se está escribiendo.
+let sincronizarEdicion = false;
+let turnoFicha = 0;
+const cargosFicha = ref(12);
 async function abrirFicha(e: Pick<Estudio, "slug">): Promise<void> {
+  const mio = ++turnoFicha;
   fichaAbierta.value = true;
-  if (ficha.value?.slug !== e.slug) {
+  const antes = ficha.value?.slug === e.slug ? ficha.value : null;
+  if (antes === null) {
     motivoSuspension.value = "";
     motivoBaja.value = "";
+    cargosFicha.value = 12;
+    ficha.value = null;
   }
-  ficha.value = null;
+  const escribiendo =
+    antes !== null &&
+    !sincronizarEdicion &&
+    JSON.stringify(edit.value) !== JSON.stringify(edicionDe(antes));
+  sincronizarEdicion = false;
   try {
     const { data } = await cliente.get<{ data: FichaApi }>(
       `/api/v1/plataforma/estudios/${e.slug}`,
-      encabezados(),
+      { ...encabezados(), params: { cargos: cargosFicha.value } },
     );
+    if (mio !== turnoFicha) return;
     ficha.value = data.data;
-    edit.value = {
-      modo_cobro: data.data.modo_cobro,
-      cuota: String(data.data.cuota_fija_minor / 100),
-      moneda: data.data.cuota_fija_moneda ?? "MXN",
-      desde: data.data.cobro?.primer_periodo_abierto ?? "",
-    };
+    if (!escribiendo) edit.value = edicionDe(data.data);
   } catch (err) {
+    if (mio !== turnoFicha) return;
     toast.error(mensajeDeError(err));
-    fichaAbierta.value = false;
+    if (antes === null) fichaAbierta.value = false;
   }
+}
+function verMasCargos(): void {
+  if (ficha.value === null) return;
+  cargosFicha.value += 24;
+  void abrirFicha({ slug: ficha.value.slug });
 }
 
 async function accion(
@@ -522,6 +577,14 @@ async function accion(
   }
 }
 
+// Alta asistida: ya aparece en la lista, y se abre su ficha.
+function negocioCreado(slug: string): void {
+  void cargarEstudios().catch((err: unknown) =>
+    toast.error(mensajeDeError(err)),
+  );
+  void abrirFicha({ slug });
+}
+
 // Tras cambiar su modalidad: cambian su cobro, su lista y su ficha.
 async function recargarFicha(): Promise<void> {
   const slug = ficha.value?.slug;
@@ -544,7 +607,7 @@ function leerCuota(valor: string | number): number | null {
     ? Math.round(n * 100)
     : null;
 }
-function guardarCobro(): void {
+async function guardarCobro(): Promise<void> {
   const f = ficha.value;
   if (f === null) {
     return;
@@ -555,7 +618,22 @@ function guardarCobro(): void {
     document.querySelector<HTMLElement>("#cf")?.focus();
     return;
   }
-  void accion(
+  // Un error de dedo en la cuota fija se cobra cada mes: se confirma con el importe.
+  if (
+    edit.value.modo_cobro === "fijo" &&
+    (f.modo_cobro !== "fijo" || cuota !== f.cuota_fija_minor) &&
+    !(await confirmar(
+      t("plataformaAdmin.ficha.confirmarCuota", {
+        nombre: f.nombre,
+        monto: dinero(cuota ?? 0, edit.value.moneda),
+      }),
+      { aceptar: t("plataforma.estudios.guardar") },
+    ))
+  ) {
+    return;
+  }
+  sincronizarEdicion = true;
+  await accion(
     () =>
       cliente.put(
         `/api/v1/plataforma/estudios/${f.slug}`,
@@ -591,12 +669,25 @@ async function guardarTerminologia(
   return data.data;
 }
 
-function extenderPrueba(): void {
+async function extenderPrueba(): Promise<void> {
   const f = ficha.value;
   if (f === null) {
     return;
   }
-  void accion(
+  // A un negocio activo es una cortesía: vuelve a prueba y no paga renta mientras dure.
+  if (
+    f.estado === "active" &&
+    !(await confirmar(
+      t("plataformaAdmin.ficha.confirmarExtenderActivo", {
+        nombre: f.nombre,
+        n: diasPrueba.value,
+      }),
+      { aceptar: t("plataformaAdmin.ficha.extender") },
+    ))
+  ) {
+    return;
+  }
+  await accion(
     () =>
       cliente.post(
         `/api/v1/plataforma/estudios/${f.slug}/extender-prueba`,
@@ -1351,11 +1442,18 @@ async function cargar(): Promise<void> {
     const [, yo] = await Promise.all([
       cargarEstudios(),
       cliente.get<{
-        data: { administrador: { nombre: string; perfil?: string } | null };
+        data: {
+          administrador: {
+            nombre: string;
+            perfil?: string;
+            acciones?: string[];
+          } | null;
+        };
       }>("/api/v1/plataforma/yo", encabezados()),
     ]);
     operador.value = yo.data.data.administrador?.nombre ?? null;
     perfilOperador.value = yo.data.data.administrador?.perfil ?? "total";
+    accionesOperador.value = yo.data.data.administrador?.acciones ?? ["*"];
     if (
       perfilOperador.value !== "total" &&
       SOLO_TOTAL.includes(pestana.value)
@@ -1633,11 +1731,11 @@ function borrar(): void {
            página en el servidor, con una sola paginación al pie. -->
       <!-- Alta asistida (ADR 0226): quien no puede registrarse solo. -->
       <AltaNegocioPlataforma
-        v-if="pestana === 'estudios' && puedeAltaAsistida"
+        v-if="pestana === 'estudios' && puedeAccion('estudios.store')"
         class="mt-5"
         :api-url="apiUrl"
         :token="token"
-        @creado="(slug: string) => abrirFicha({ slug })"
+        @creado="negocioCreado"
       />
       <div
         v-if="pestana === 'estudios'"
@@ -1694,10 +1792,30 @@ function borrar(): void {
             {{ $t("plataformaAdmin.estudios.filtroAdeudo") }}
           </label>
         </div>
+        <AvisoTono
+          v-if="errorEstudios"
+          tono="peligro"
+          class="mx-4 mb-3"
+          role="alert"
+          data-prueba="error-estudios"
+        >
+          {{ errorEstudios }}
+          <template #acciones>
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
+              @click="cargarEstudios"
+            >
+              {{ $t("comun.reintentar") }}
+            </button>
+          </template>
+        </AvisoTono>
         <!-- En el teléfono, cada negocio es una ficha (su nombre, el título). -->
         <!-- En el teléfono, fichas compactas: 15 negocios sin bajar pantallas de más. -->
         <div
           class="relative overflow-x-auto tu-tabla-adaptable tu-fichas-compactas"
+          :class="{ 'opacity-60': cargandoEstudios }"
+          :aria-busy="cargandoEstudios || undefined"
         >
           <table class="tu-tabla">
             <thead>
@@ -1713,7 +1831,11 @@ function borrar(): void {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="estudios.length === 0">
+              <tr
+                v-if="
+                  estudios.length === 0 && !cargandoEstudios && !errorEstudios
+                "
+              >
                 <td :colspan="columnas.length" class="text-center">
                   <EstadoVacioListado
                     :filtrado="hayFiltrosEstudios"
@@ -1815,6 +1937,14 @@ function borrar(): void {
 
       <!-- Cobros -->
       <div v-if="pestana === 'cobros'" class="mt-5">
+        <!-- Cobranza lo captura aquí: fuera del perfil total no ve Tarifas. -->
+        <TipoCambioPlataforma
+          v-if="perfilOperador !== 'total'"
+          class="mb-5"
+          :api-url="apiUrl"
+          :token="token"
+          :solo-lectura="!puedeAccion('tipo-cambio.guardar')"
+        />
         <div v-if="resumen" class="grid gap-3 grid-cols-2 lg:grid-cols-4">
           <div class="tu-card p-4">
             <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -1961,7 +2091,18 @@ function borrar(): void {
           <ul v-else class="mt-3">
             <li v-for="c in cargos" :key="c.id" class="pl-fila text-sm">
               <div class="min-w-0">
-                <p class="font-medium truncate">{{ c.estudio ?? "—" }}</p>
+                <button
+                  v-if="c.estudio_slug"
+                  type="button"
+                  class="tu-enlace block max-w-full truncate font-medium"
+                  data-prueba="cobro-abre-ficha"
+                  @click="abrirFicha({ slug: c.estudio_slug })"
+                >
+                  {{ c.estudio ?? c.estudio_slug }}
+                </button>
+                <p v-else class="font-medium truncate">
+                  {{ c.estudio ?? "—" }}
+                </p>
                 <p
                   class="mt-0.5 text-xs first-letter:uppercase"
                   :style="{ color: 'var(--texto-suave)' }"
@@ -2016,7 +2157,7 @@ function borrar(): void {
                     }}</span
                   >
                   <button
-                    v-else
+                    v-else-if="puedeAccion('estudios.suspender')"
                     type="button"
                     class="tu-btn tu-btn-peligro tu-btn-chico"
                     data-prueba="suspender-por-renta"
@@ -2027,7 +2168,10 @@ function borrar(): void {
                   </button>
                 </template>
               </span>
-              <div v-if="c.condonable" class="pl-condonar">
+              <div
+                v-if="c.condonable && puedeAccion('cargos.condonar')"
+                class="pl-condonar"
+              >
                 <CondonarCargo
                   :ocupado="condonando === c.id"
                   @condonar="(m) => condonar(c, m, cargarCobros)"
@@ -2052,6 +2196,15 @@ function borrar(): void {
         class="mt-5"
         :api-url="apiUrl"
         :token="token"
+        :solo-lectura="!puedeAccion('alertas.atender')"
+      />
+      <!-- Wellhub lo atiende soporte: fuera del perfil total no ve Configuración. -->
+      <SolicitudesWellhub
+        v-if="pestana === 'operacion' && perfilOperador !== 'total'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+        :solo-lectura="!puedeAccion('wellhub.solicitudes.asignar')"
       />
 
       <!-- Errores de la API, la web y la app (ADR 0080) -->
@@ -2060,6 +2213,7 @@ function borrar(): void {
         class="mt-5"
         :api-url="apiUrl"
         :token="token"
+        :solo-lectura="!puedeAccion('errores.update')"
       />
 
       <!-- Embudo de la plataforma: de la landing al primer pago (C08) -->
@@ -2092,6 +2246,8 @@ function borrar(): void {
         class="mt-5"
         :api-url="apiUrl"
         :token="token"
+        :solo-lectura="!puedeAccion('demos.actualizar')"
+        :solo-lectura-horario="!puedeAccion('demos.horario.guardar')"
         @proximas="(n) => (demosProximas = n)"
       />
 
@@ -2882,6 +3038,7 @@ function borrar(): void {
                   >{{ $t("plataformaAdmin.ficha.cuentaSinActivar") }}</span
                 >
                 <button
+                  v-if="puedeAccion('estudios.reenviar-activacion')"
                   type="button"
                   class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="accionando"
@@ -2902,6 +3059,7 @@ function borrar(): void {
                   >{{ $t("plataformaAdmin.ficha.sinBase") }}</span
                 >
                 <button
+                  v-if="puedeAccion('estudios.aprovisionar')"
                   type="button"
                   class="tu-btn tu-btn-secundario tu-btn-chico"
                   :disabled="accionando"
@@ -2958,6 +3116,7 @@ function borrar(): void {
               }}
             </p>
             <CargoManualPlataforma
+              v-if="puedeAccion('estudios.cargos.crear')"
               :api-url="apiUrl"
               :token="token"
               :slug="ficha.slug"
@@ -3010,13 +3169,17 @@ function borrar(): void {
                     ></span
                   >
                 </dd>
-                <div v-if="c.condonable" class="pl-condonar">
+                <div
+                  v-if="c.condonable && puedeAccion('cargos.condonar')"
+                  class="pl-condonar"
+                >
                   <CondonarCargo
                     :ocupado="condonando === c.id"
                     @condonar="(m) => condonar(c, m, recargarFicha)"
                   />
                 </div>
                 <AccionesCargoPlataforma
+                  v-if="puedeAccion('cargos.pago')"
                   class="pl-condonar"
                   :api-url="apiUrl"
                   :token="token"
@@ -3025,6 +3188,15 @@ function borrar(): void {
                 />
               </div>
             </dl>
+            <button
+              v-if="(ficha.cargos_total ?? 0) > ficha.cargos.length"
+              type="button"
+              class="tu-enlace mt-2 text-sm"
+              data-prueba="ver-mas-cargos"
+              @click="verMasCargos"
+            >
+              {{ $t("plataformaAdmin.ficha.verMasCargos") }}
+            </button>
           </section>
 
           <!-- Avisos al dueño -->
@@ -3076,7 +3248,7 @@ function borrar(): void {
 
           <!-- WhatsApp con sus clientes (ADR 0083) -->
           <WhatsAppNegocio
-            v-if="ficha.whatsapp_clientes"
+            v-if="ficha.whatsapp_clientes && puedeAccion('estudios.whatsapp')"
             :key="`wa-${ficha.slug}`"
             :api-url="apiUrl"
             :token="token"
@@ -3087,7 +3259,11 @@ function borrar(): void {
 
           <!-- Módulos por negocio (ADR 0123) -->
           <ModulosNegocio
-            v-if="ficha.modulos && ficha.modulos.length > 0"
+            v-if="
+              ficha.modulos &&
+              ficha.modulos.length > 0 &&
+              puedeAccion('estudios.modulos')
+            "
             :key="`mod-${ficha.slug}`"
             :api-url="apiUrl"
             :token="token"
@@ -3097,7 +3273,11 @@ function borrar(): void {
           />
 
           <!-- Facturación -->
-          <form class="space-y-3" @submit.prevent="guardarCobro">
+          <form
+            v-if="puedeAccion('estudios.actualizar')"
+            class="space-y-3"
+            @submit.prevent="guardarCobro"
+          >
             <h3
               class="text-xs font-medium uppercase tracking-wide"
               :style="{ color: 'var(--texto-suave)' }"
@@ -3209,7 +3389,7 @@ function borrar(): void {
 
           <!-- Plan de un negocio de citas (ADR 0107) -->
           <PlanEstudioPlataforma
-            v-if="ficha.plan_citas"
+            v-if="ficha.plan_citas && puedeAccion('estudios.plan')"
             :api-url="apiUrl"
             :token="token"
             :slug="ficha.slug"
@@ -3226,7 +3406,10 @@ function borrar(): void {
               {{ $t("plataformaAdmin.ficha.acciones") }}
             </h3>
             <div
-              v-if="ficha.estado === 'trialing' || ficha.estado === 'active'"
+              v-if="
+                (ficha.estado === 'trialing' || ficha.estado === 'active') &&
+                puedeAccion('estudios.extender-prueba')
+              "
               class="flex flex-wrap items-center gap-2"
             >
               <select
@@ -3248,7 +3431,10 @@ function borrar(): void {
               </button>
             </div>
             <div
-              v-if="ficha.estado === 'trialing' || ficha.estado === 'active'"
+              v-if="
+                (ficha.estado === 'trialing' || ficha.estado === 'active') &&
+                puedeAccion('estudios.suspender')
+              "
               class="flex flex-wrap items-end gap-2"
               data-prueba="suspender-negocio"
             >
@@ -3274,7 +3460,10 @@ function borrar(): void {
               </button>
             </div>
             <button
-              v-if="ficha.estado === 'suspended'"
+              v-if="
+                ficha.estado === 'suspended' &&
+                puedeAccion('estudios.reactivar')
+              "
               class="tu-btn tu-btn-primario"
               type="button"
               :disabled="accionando"
@@ -3317,6 +3506,7 @@ function borrar(): void {
                   }}
                 </p>
                 <button
+                  v-if="puedeAccion('estudios.revertir-baja')"
                   class="tu-btn tu-btn-secundario"
                   type="button"
                   :disabled="accionando"
@@ -3329,7 +3519,9 @@ function borrar(): void {
             </div>
             <div
               v-else-if="
-                ficha.estado !== 'provisioning' && ficha.estado !== 'cancelled'
+                ficha.estado !== 'provisioning' &&
+                ficha.estado !== 'cancelled' &&
+                puedeAccion('estudios.baja')
               "
               class="flex flex-wrap items-end gap-2"
               data-prueba="dar-de-baja"
@@ -3359,6 +3551,7 @@ function borrar(): void {
 
           <!-- Cómo se llaman las cosas en este negocio -->
           <TerminologiaNegocio
+            v-if="puedeAccion('estudios.terminologia.guardar')"
             :key="ficha.slug"
             :cargar="cargarTerminologia"
             :guardar="guardarTerminologia"

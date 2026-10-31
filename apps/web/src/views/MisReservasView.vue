@@ -256,11 +256,23 @@ const aviso = ref<string | null>(null);
 // Recién reservada (C05): su detalle abre con la confirmación de lo que quedó.
 const recienReservada = ref(false);
 // «Agendar de nuevo» una cita: el mismo servicio, sede y profesional.
+// O un servicio de un presupuesto ya pagado (`?servicio=…&sucursal=…`).
 const citaInicial = ref<{
   servicio: string | null;
   sucursal: string | null;
   profesional: string | null;
-} | null>(null);
+} | null>(
+  typeof route.query.servicio === "string"
+    ? {
+        servicio: route.query.servicio,
+        sucursal:
+          typeof route.query.sucursal === "string"
+            ? route.query.sucursal
+            : null,
+        profesional: null,
+      }
+    : null,
+);
 const formularioCita = ref(0);
 
 function deReserva(r: Reserva): Evento {

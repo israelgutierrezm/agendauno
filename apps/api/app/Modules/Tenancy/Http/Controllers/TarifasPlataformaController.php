@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FuncionesPlan;
+use App\Modules\Tenancy\Application\SubidaDeTarifa;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -97,6 +99,17 @@ class TarifasPlataformaController
                 'funciones' => FuncionesPlan::mapa(['funciones' => $validado['funciones'] ?? []]),
             ];
 
+        // Los términos prometen 30 días de aviso (ADR 0234): bajar puede ser inmediato.
+        $subidas = app(SubidaDeTarifa::class);
+        $vigente = TarifaSaas::vigente($modo);
+        $sube = $vigente !== null && $subidas->esSubida($vigente->definicion, $definicion);
+        $desde = isset($validado['vigente_desde']) ? Carbon::parse((string) $validado['vigente_desde']) : now();
+        if ($sube && $desde->lessThan($subidas->primerDiaPermitido())) {
+            throw ValidationException::withMessages([
+                'vigente_desde' => ['Esta tarifa sube algún precio: debe regir a '.SubidaDeTarifa::DIAS_DE_AVISO.' días o más, desde el '.$subidas->primerDiaPermitido()->format('d/m/Y').'.'],
+            ]);
+        }
+
         // Versión siguiente bajo lock: dos publicaciones simultáneas no chocan.
         $tarifa = DB::transaction(function () use ($modo, $definicion, $validado): TarifaSaas {
             $ultima = (int) TarifaSaas::query()->where('modalidad', $modo->value)->lockForUpdate()->max('version');
@@ -108,6 +121,10 @@ class TarifasPlataformaController
                 'vigente_desde' => isset($validado['vigente_desde']) ? $validado['vigente_desde'] : now(),
             ]);
         });
+
+        if ($sube) {
+            $subidas->avisar($modo, $desde);
+        }
 
         return response()->json(['data' => $this->presentar($tarifa)], 201);
     }

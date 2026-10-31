@@ -93,6 +93,13 @@ interface Interes {
   } | null;
 }
 const interes = ref<Interes | null>(null);
+// Solo si de verdad lo puede comprar: si no, llegaría a Pagos sin opción de compra.
+const planDeInteres = computed(() => {
+  const plan = interes.value?.plan ?? null;
+  return plan !== null && cuenta.productos.value.some((p) => p.id === plan.id)
+    ? plan
+    : null;
+});
 async function cargarInteres(): Promise<void> {
   try {
     const elegido = Object.fromEntries(
@@ -642,7 +649,7 @@ onMounted(() => {
         v-if="
           ofrecida ||
           cuenta.waivers.value.length > 0 ||
-          interes?.plan ||
+          planDeInteres ||
           interes?.clase
         "
         class="mt-5 space-y-2"
@@ -680,13 +687,13 @@ onMounted(() => {
           }}</RouterLink
         >
         <RouterLink
-          v-if="interes?.plan"
+          v-if="planDeInteres"
           :to="{ name: 'mis-pagos', hash: '#mp-comprar' }"
           class="pi-aviso"
           data-prueba="interes-plan"
           >{{
             $t("portal.inicio.atencion.interesPlan", {
-              plan: interes.plan.nombre,
+              plan: planDeInteres.nombre,
             })
           }}</RouterLink
         >

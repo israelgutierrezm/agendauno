@@ -135,7 +135,7 @@ class BitacoraTenant
                 'perdido' => 'Se perdió el contracargo de '.self::dinero($despues).': se devolvió el dinero a quien pagó',
                 default => 'El banco de quien pagó disputa un pago de '.self::dinero($despues),
             },
-            'credito.top_up' => 'Agregó créditos'.(isset($despues['unidades']) ? ' ('.((int) $despues['unidades'] / 1000).')' : ''),
+            'credito.top_up' => (app(ModalidadNegocioTenant::class)->esCitas() ? 'Agregó sesiones a un bono' : 'Agregó créditos').(isset($despues['unidades']) ? ' ('.((int) $despues['unidades'] / 1000).')' : ''),
             'producto.actualizado' => 'Editó el producto'.($nombre !== '' ? " {$nombre}" : ''),
             'recurso.actualizado' => 'Editó el espacio'.($nombre !== '' ? " {$nombre}" : ''),
             // Grupos y cursos: salidas con fecha y cierre.
@@ -170,8 +170,8 @@ class BitacoraTenant
                 : self::corregido('Editó la recompensa '.((string) ($despues['nombre'] ?? '')), $antes, $despues, [
                     'nombre' => 'el nombre', 'descripcion' => 'la descripción', 'costo_puntos' => 'los puntos',
                 ]),
-            'membresia.pausada' => 'Pausó una membresía'.(isset($despues['hasta']) ? ' hasta el '.$despues['hasta'] : ''),
-            'membresia.reanudada' => 'Reanudó una membresía',
+            'membresia.pausada' => (app(ModalidadNegocioTenant::class)->esCitas() ? 'Pausó un bono' : 'Pausó una membresía').(isset($despues['hasta']) ? ' hasta el '.$despues['hasta'] : ''),
+            'membresia.reanudada' => app(ModalidadNegocioTenant::class)->esCitas() ? 'Reanudó un bono' : 'Reanudó una membresía',
             'privacidad.baja_atendida' => 'Canceló los datos personales (ARCO) de una persona',
             'privacidad.baja_rechazada' => 'Rechazó una solicitud de cancelación de datos',
             'reserva.reprogramada' => 'Reprogramó una cita o reserva'.(isset($antes['fecha'], $despues['fecha']) ? " del {$antes['fecha']} {$antes['hora']} al {$despues['fecha']} {$despues['hora']}" : ''),

@@ -115,6 +115,7 @@ const manifest = JSON.parse(
 const VISTAS = {
   modalidad: "src/views/ModalidadView.vue",
   solucion: "src/views/SolucionView.vue",
+  faq: "src/views/PreguntasFrecuentesView.vue",
 };
 const sitemap = await readFile(resolve(dist, "sitemap.xml"), "utf8");
 const robots = await readFile(resolve(dist, "robots.txt"), "utf8");

@@ -179,10 +179,35 @@ async function irA(
   }
 }
 
-function activar(
+async function activar(
   m: Membresia,
   tarjetaTokenizada: Record<string, string> = {},
 ): Promise<void> {
+  // Con tarjeta guardada se activa al instante: es un compromiso de cargos recurrentes.
+  // Sin ella, la autoriza en la pasarela o en su formulario, y eso ya es confirmar.
+  if (
+    tarjeta.value !== null &&
+    Object.keys(tarjetaTokenizada).length === 0 &&
+    !(await confirmar(
+      t(
+        m.proxima_cobro_en
+          ? "pagoAutomatico.confirmarActivar"
+          : "pagoAutomatico.confirmarActivarSinFecha",
+        {
+          producto: m.producto ?? "",
+          monto: dinero(m.monto_minor, m.moneda),
+          tarjeta: t("pagoAutomatico.tarjeta", {
+            marca: marca(tarjeta.value.marca),
+            ultimos4: tarjeta.value.ultimos4 ?? "····",
+          }),
+          fecha: fecha(m.proxima_cobro_en),
+        },
+      ),
+      { aceptar: t("pagoAutomatico.activar") },
+    ))
+  ) {
+    return;
+  }
   return irA(
     `${base.value}/mi/pago-automatico/${m.id}`,
     m.id,

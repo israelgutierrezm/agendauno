@@ -143,6 +143,17 @@ onMounted(() => void cargar());
             :style="{ '--tono': tono(o.estado) }"
             >{{ $t(`miCuenta.compras.estados.${o.estado}`) }}</span
           >
+          <span
+            v-if="(o.devuelto_minor ?? 0) > 0"
+            class="text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="devuelto"
+            >{{
+              $t("miCuenta.compras.devuelto", {
+                monto: dinero(o.devuelto_minor ?? 0, o.moneda),
+              })
+            }}</span
+          >
         </span>
       </li>
     </ul>

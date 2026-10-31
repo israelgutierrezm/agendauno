@@ -773,6 +773,15 @@ const regreso = useRegreso({
 
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <p
       v-if="cargando"
@@ -818,7 +827,7 @@ const regreso = useRegreso({
                       : $t("miembros.suspendido")
                   }}</span
                 >
-                <span v-if="!ficha.persona.es_facturable"
+                <span v-if="!ficha.persona.es_facturable && !sesion.esCitas"
                   >· {{ $t("miembros.noFacturable") }}</span
                 >
                 <span v-if="ficha.persona.archivado"
@@ -1815,7 +1824,11 @@ const regreso = useRegreso({
                 <dd data-prueba="saldo-resumen">{{ textoSaldoVigente }}</dd>
               </div>
               <div class="fi-dato">
-                <dt>{{ $t("ficha.proxima") }}</dt>
+                <dt>
+                  {{
+                    $t(sesion.esCitas ? "ficha.proximaCitas" : "ficha.proxima")
+                  }}
+                </dt>
                 <dd v-if="resumen.proxima_reserva">
                   {{ resumen.proxima_reserva.clase ?? "—" }}
                   <span

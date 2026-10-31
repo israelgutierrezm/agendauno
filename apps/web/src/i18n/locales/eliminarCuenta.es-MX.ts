@@ -8,6 +8,8 @@ export default {
   confirmarTexto:
     "Ya no podrás entrar a {negocio} con esta cuenta. Escribe tu contraseña para confirmarlo.",
   contrasena: "Contraseña",
+  sinContrasena: "Para confirmar hace falta una contraseña.",
+  irAAcceso: "Créala en Acceso",
   motivo: "¿Por qué te vas? (opcional)",
   cancelar: "Cancelar",
   confirmar: "Eliminar mi cuenta",

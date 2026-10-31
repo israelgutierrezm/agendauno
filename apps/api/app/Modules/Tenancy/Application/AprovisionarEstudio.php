@@ -45,6 +45,8 @@ class AprovisionarEstudio
                 ['name' => $estudio->nombreContacto(), 'password' => null, 'activo' => false, 'rol' => 'propietario', 'roles' => ['propietario']],
             );
             // Roles/permisos canónicos tenant-local: fase posterior (migración de Authorization).
+            // Su aviso de privacidad base, para que lo revise y lo publique (ADR 0234).
+            app(WaiversTenant::class)->generarAvisoBase($estudio);
         });
         $estudio->update(['paso_aprovisionamiento' => 'owner_creado']);
 

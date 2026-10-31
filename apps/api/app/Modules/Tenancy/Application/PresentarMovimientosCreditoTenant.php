@@ -56,22 +56,25 @@ class PresentarMovimientosCreditoTenant
             return 'Corrección de asistencia';
         }
 
+        // En citas no hay créditos ni renovaciones: se habla del bono (ADR 0130).
+        $citas = app(ModalidadNegocioTenant::class)->esCitas();
+
         return match ($movimiento->tipo) {
             TipoMovimiento::Concesion => match ($movimiento->origen) {
-                OrigenMovimiento::Ciclo->value => 'Renovación del plan',
+                OrigenMovimiento::Ciclo->value => $citas ? 'Sesiones del bono' : 'Renovación del plan',
                 OrigenMovimiento::Apertura->value => 'Saldo de apertura',
-                default => 'Créditos del plan',
+                default => $citas ? 'Sesiones del bono' : 'Créditos del plan',
             },
-            TipoMovimiento::AddOn => 'Créditos adicionales',
+            TipoMovimiento::AddOn => $citas ? 'Sesiones adicionales' : 'Créditos adicionales',
             TipoMovimiento::Ajuste => 'Ajuste del negocio',
-            TipoMovimiento::Expiracion => 'Créditos vencidos',
+            TipoMovimiento::Expiracion => $citas ? 'Sesiones vencidas' : 'Créditos vencidos',
             TipoMovimiento::Reverso => $movimiento->origen === OrigenMovimiento::Reembolso->value ? 'Reembolso' : 'Devolución',
             TipoMovimiento::Consumo => match (true) {
                 ($meta['motivo'] ?? null) === 'cancelacion_tardia' => 'Cancelación tardía',
                 ($meta['asistencia'] ?? null) === 'presente' => 'Asistencia',
                 ($meta['asistencia'] ?? null) === 'ausente' => 'No asistió',
                 $movimiento->origen === OrigenMovimiento::Ajuste->value => 'Ajuste del negocio',
-                default => 'Uso de créditos',
+                default => $citas ? 'Uso del bono' : 'Uso de créditos',
             },
         };
     }

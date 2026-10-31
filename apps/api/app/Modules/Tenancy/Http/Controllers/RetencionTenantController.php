@@ -234,7 +234,7 @@ class RetencionTenantController
      */
     private function exportarCsv(array $miembros): Response
     {
-        $lineas = ['Alumno,Correo,Estado,Vence,Dias restantes,Ultima asistencia'];
+        $lineas = ['Persona,Correo,Estado,Vence,Dias restantes,Ultima asistencia'];
         foreach ($miembros as $m) {
             $lineas[] = implode(',', array_map(Csv::celda(...), [
                 (string) $m['nombre_completo'],

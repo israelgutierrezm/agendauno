@@ -804,6 +804,15 @@ onMounted(() => {
 
       <AvisoTono v-if="error" tono="peligro" class="mx-4 mb-4" role="alert">
         {{ error }}
+        <template #acciones>
+          <button
+            type="button"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
+            @click="cargar"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </template>
       </AvisoTono>
       <p v-else-if="cargando" class="tu-sin-resultados">
         {{ $t("comun.cargando") }}

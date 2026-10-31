@@ -32,6 +32,7 @@ export default {
     fallo: "No se pudo actualizar: lo que ves es de antes ({hace})",
   },
   comun: {
+    rangoFechasInvalido: "La fecha inicial debe ser anterior a la final.",
     // Elegir varias de una lista que crece (SelectorOpciones).
     selector: {
       buscar: "Buscar",
@@ -86,6 +87,7 @@ export default {
     ordenarPor: "Ordenar por {columna}",
   },
   nav: {
+    saltarContenido: "Saltar al contenido",
     menu: "Menu",
     probar: "Probar gratis",
     probarCorto: "Probar",
@@ -413,7 +415,7 @@ export default {
           descripcion:
             "Comparte tus videos de YouTube o Vimeo con los planes que elijas, y el enlace de tu clase en línea solo con quien reservó.",
           detalle:
-            "Tus alumnos ven los videos de su plan en su cuenta y en la app; de los demás ven el título y qué plan los incluye, para animarlos a cambiar. No subes archivos: pones el enlace de tu YouTube, Vimeo o Zoom.",
+            "Tus alumnos ven los videos de su plan en su cuenta; de los demás ven el título y qué plan los incluye, para animarlos a cambiar. No subes archivos: pones el enlace de tu YouTube, Vimeo o Zoom.",
         },
         // Productos al reservar (ADR 0194): se apartan y se pagan en el mostrador.
         apartados: {
@@ -426,9 +428,10 @@ export default {
         // Google Calendar y Outlook (ADR 0199): un calendario aparte, sin datos de
         // alumnos; de su calendario solo se lee si está ocupado.
         calendarios: {
-          titulo: "Google Calendar y Outlook",
+          // Solo los comprobados (ADR 0234): los pone FuncionesLanding.
+          titulo: "{calendarios}",
           descripcion:
-            "Cada instructor ve sus clases en su Google Calendar u Outlook, en un calendario aparte con el nombre de tu estudio.",
+            "Cada instructor ve sus clases en su {calendariosO}, en un calendario aparte con el nombre de tu estudio.",
           detalle:
             "Lo que tiene ocupado en su calendario se marca en su agenda de AgendaUno, al momento. De su calendario solo se lee si está ocupado, no qué tiene, y ningún dato de tus alumnos sale de aquí.",
         },
@@ -443,12 +446,20 @@ export default {
         enfasis: "desde más lugares",
         subtitulo:
           "Las apps de bienestar, tu propia web, tu WhatsApp y tu Instagram ya llegan al mismo lugar, y tus alumnos entran con el pase de su teléfono.",
+        // Sin plataformas ni bandeja comprobadas (ADR 0234).
+        subtituloBase:
+          "Tu propia web y tu página ya llegan a la misma agenda, y tus alumnos entran con el pase de su teléfono.",
         cta: "Quiero esto en mi estudio",
         items: {
+          // Solo lo comprobado (ADR 0234): la lista la arma NovedadesLanding.
           plataformas: {
-            titulo: "Wellhub, TotalPass y Fitpass*, en tu misma agenda",
+            titulo: "{plataformas}, en tu misma agenda",
             texto:
               "Quien reserva desde la app de Wellhub o TotalPass ocupa su lugar en tu clase, sin sobrecupo, y su check-in se valida solo. Con Fitpass apartas sus lugares y recepción registra sus reservas.",
+            textoConexion:
+              "Quien reserva desde la app de {conectadas} ocupa su lugar en tu clase, sin sobrecupo, y su check-in se valida solo.",
+            textoFitpass:
+              "Con Fitpass apartas sus lugares y recepción registra sus reservas.",
             puntos: {
               p1: "Sus visitantes no cuentan como alumnos activos",
               p2: "Cada sede, como su propio gimnasio",
@@ -456,13 +467,57 @@ export default {
             },
           },
           wallet: {
-            titulo: "Su pase de entrada en Apple Wallet y Google Wallet",
+            titulo: "Su pase de entrada en {carteras}",
             texto:
               "Tus alumnos guardan su pase en la cartera del teléfono y ahí ven su plan, hasta cuándo vale y su saldo. Cuando compran o usan un crédito, se actualiza solo.",
             puntos: {
               p1: "Recepción o el kiosco de llegada lo escanean",
-              p2: "Además del QR de la app",
+              p2: "Además del QR de su cuenta",
               p3: "Tú decides si lo ofreces",
+            },
+          },
+          // En lugar de `wallet` mientras no esté comprobado (ADR 0234).
+          pase: {
+            titulo: "Su pase de entrada, en su teléfono",
+            texto:
+              "Cada alumno tiene su código QR en su cuenta. Recepción lo escanea y ve al momento quién es, su plan y si puede pasar.",
+            puntos: {
+              p1: "Recepción o el kiosco de llegada lo escanean",
+              p2: "Tu página se guarda en su teléfono, con tu logo",
+              p3: "Tú decides quién puede entrar con él",
+            },
+          },
+          // En lugar de `plataformas` mientras no estén comprobadas (ADR 0234).
+          kiosco: {
+            titulo: "Una tableta que recibe a tus alumnos",
+            texto:
+              "Pon una tableta en la entrada: tus alumnos muestran su pase y queda su asistencia, con retardo si la clase ya empezó.",
+            puntos: {
+              p1: "Solo muestra su primer nombre y su clase",
+              p2: "Sirve cualquier tableta con navegador",
+              p3: "Recepción sigue pasando lista si hace falta",
+            },
+          },
+          // En lugar de `app` mientras no esté en las tiendas (ADR 0110 y 0234).
+          instalable: {
+            titulo: "Tu estudio, en el celular de tu equipo y de tus alumnos",
+            texto:
+              "Tu página se instala como app, con tu logo. Tus alumnos reservan, pagan y ven sus videos y sus documentos; tu equipo pasa lista desde el celular.",
+            puntos: {
+              p1: "Con lugares numerados, cada quien elige o cambia el suyo",
+              p2: "Sin descargas: se abre desde su enlace",
+              p3: "Con tu nombre y tu logo en la pantalla de inicio",
+            },
+          },
+          // En lugar de `bandeja` mientras no esté comprobada (ADR 0234).
+          apartados: {
+            titulo: "Lo que venden, apartado desde la reserva",
+            texto:
+              "Al reservar, tus alumnos apartan agua, calcetines o lo que ofrezcas, y lo pagan al recogerlo. Recepción lo ve en la lista de la clase.",
+            puntos: {
+              p1: "Nunca se aparta más de lo que hay en la sede",
+              p2: "Se cobra en el mostrador",
+              p3: "El inventario se mueve con la venta",
             },
           },
           widgets: {
@@ -487,14 +542,16 @@ export default {
             },
           },
           bandeja: {
-            titulo: "WhatsApp e Instagram, en una sola bandeja",
+            titulo: "{canales}, en una sola bandeja",
             texto:
-              "Lee y contesta los mensajes de tu WhatsApp Business y de tu Instagram desde el panel o la app, con todo tu equipo, y liga cada conversación con la ficha del alumno.",
+              "Lee y contesta los mensajes de {cuentas} desde el panel, con todo tu equipo, y liga cada conversación con la ficha del alumno.",
             puntos: {
               p1: "Aviso en el celular cuando alguien escribe",
               p2: "Fotos y PDF dentro de la conversación",
               p3: "Fuera de las 24 horas, con tus plantillas de WhatsApp",
             },
+            // El tercer punto, si WhatsApp no está comprobado.
+            p3SinWhatsapp: "Cada conversación, ligada a su ficha",
           },
           caja: {
             titulo: "Una caja que cuadra al final del día",
@@ -637,14 +694,19 @@ export default {
         // Pase en Apple y Google Wallet (ADR 0195): se actualiza solo y el negocio
         // decide si lo ofrece.
         wallet: {
-          q: "¿Mis alumnos pueden llevar su pase en Apple Wallet o Google Wallet?",
-          a: "Sí. Desde su cuenta o la app guardan su pase de entrada en la cartera de su teléfono. Muestra su plan, hasta cuándo vale y su saldo, y se actualiza solo cuando cambian. Recepción y el kiosco de llegada lo escanean igual que el QR de la app. Si pierde su teléfono, lo renueva y el anterior deja de servir; y si prefieres no ofrecerlo, lo apagas.",
+          q: "¿Mis alumnos pueden llevar su pase en {carterasO}?",
+          a: "Sí. Desde su cuenta guardan su pase de entrada en la cartera de su teléfono. Muestra su plan, hasta cuándo vale y su saldo, y se actualiza solo cuando cambian. Recepción y el kiosco de llegada lo escanean igual que el QR de su cuenta. Si pierde su teléfono, lo renueva y el anterior deja de servir; y si prefieres no ofrecerlo, lo apagas.",
         },
         // Wellhub, TotalPass y Fitpass (ADR 0148, 0149, 0197 y 0202), sin «*»: esta
         // sección no lleva la nota de México y lo dice con palabras.
         plataformas: {
-          q: "¿Puedo recibir usuarios de Wellhub, TotalPass o Fitpass?",
-          a: "Sí. Con Wellhub y TotalPass publicas tus clases en su app: sus reservas ocupan su lugar en tu misma agenda, sin sobrecupo, y el check-in se valida solo. Fitpass no tiene una conexión abierta: apartas sus lugares, recepción registra sus reservas y ves qué asistencias faltan por marcar en su portal. Cada sede puede ser su propio gimnasio y concilias lo que te pagan con su reporte en Excel o CSV. Sus visitantes no cuentan como tus alumnos activos. Wellhub y TotalPass están en los países donde AgendaUno los ofrece; Fitpass, solo en México.",
+          // Solo las comprobadas (ADR 0234): la respuesta la arma PreguntasFrecuentesView.
+          q: "¿Puedo recibir usuarios de {plataformasO}?",
+          a: "Sí. Cada sede puede ser su propio gimnasio y concilias lo que te pagan con su reporte en Excel o CSV. Sus visitantes no cuentan como tus alumnos activos.",
+          aConexion:
+            "Con {conectadas} publicas tus clases en su app: sus reservas ocupan su lugar en tu misma agenda, sin sobrecupo, y el check-in se valida solo. Están en los países donde AgendaUno los ofrece.",
+          aFitpass:
+            "Fitpass, solo en México, no tiene una conexión abierta: apartas sus lugares, recepción registra sus reservas y ves qué asistencias faltan por marcar en su portal.",
         },
         // Widgets para la web del negocio (ADR 0141): reservar o comprar con su cuenta.
         web: {
@@ -666,10 +728,10 @@ export default {
         // El correo y el WhatsApp llegan como parámetros (lib/producto: soporte).
         soporte: {
           q: "¿Quién me ayuda si tengo dudas?",
-          a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+          a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: sin costo te orientamos con guías, con los importadores y con cualquier duda de AgendaUno. Si prefieres que lo configuremos o lo migremos por ti, eso es el arranque acompañado.",
           // Sin WhatsApp de soporte configurado, solo el correo.
           aSinWhatsapp:
-            "Nosotros. Escríbenos a {correo}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+            "Nosotros. Escríbenos a {correo}: sin costo te orientamos con guías, con los importadores y con cualquier duda de AgendaUno. Si prefieres que lo configuremos o lo migremos por ti, eso es el arranque acompañado.",
         },
         permanencia: {
           q: "¿Hay plazo forzoso o contrato anual?",
@@ -749,14 +811,14 @@ export default {
           descripcion:
             "Tus clientes reciben un correo antes de su cita: 24 y 2 horas antes, o con la anticipación que tú configures.",
           detalle:
-            "También reciben la confirmación al agendar. Tú editas el texto de cada correo desde Comunicación.",
+            "También reciben la confirmación al agendar. En el plan Pro editas el texto de cada correo desde Comunicación.",
         },
         // Google Calendar y Outlook (ADR 0199): un calendario aparte, sin datos de
         // clientes; lo ocupado allá se vuelve bloqueo aquí.
         calendarios: {
-          titulo: "Google Calendar y Outlook, sin choques",
+          titulo: "{calendarios}, sin choques",
           descripcion:
-            "Cada profesional conecta su Google Calendar u Outlook: sus citas aparecen allá y lo que tiene ocupado allá ya no se ofrece aquí.",
+            "Cada profesional conecta su {calendariosO}: sus citas aparecen allá y lo que tiene ocupado allá ya no se ofrece aquí.",
           detalle:
             "Las citas van a un calendario aparte con el nombre de tu negocio, sin datos de tus clientes. De su calendario personal solo se lee si está ocupado, no qué tiene, y los cambios llegan al momento.",
         },
@@ -815,7 +877,7 @@ export default {
             puntos: {
               p1: "Servicios, bonos, productos o conceptos libres",
               p2: "Impuestos incluidos o desglosados",
-              p3: "También en su cuenta y en la app",
+              p3: "También desde su cuenta",
             },
           },
           factura: {
@@ -839,19 +901,43 @@ export default {
             },
           },
           bandeja: {
-            titulo: "WhatsApp e Instagram, en una sola bandeja",
+            titulo: "{canales}, en una sola bandeja",
             texto:
-              "Lee y contesta los mensajes de tu WhatsApp Business y de tu Instagram desde el panel o la app, con todo tu equipo, y liga cada conversación con la ficha del cliente. En el plan Pro.",
+              "Lee y contesta los mensajes de {cuentas} desde el panel, con todo tu equipo, y liga cada conversación con la ficha del cliente. En el plan Pro.",
             puntos: {
               p1: "Aviso en el celular cuando alguien escribe",
               p2: "Fotos y PDF dentro de la conversación",
               p3: "Fuera de las 24 horas, con tus plantillas de WhatsApp",
             },
+            // El tercer punto, si WhatsApp no está comprobado.
+            p3SinWhatsapp: "Cada conversación, ligada a su ficha",
+          },
+          // En lugar de `bandeja` mientras no esté comprobada (ADR 0234).
+          caja: {
+            titulo: "Una caja que cuadra al final del día",
+            texto:
+              "Abre con fondo, cobra en efectivo y con tarjeta en un mismo cobro y cierra con conteo a ciegas. Si algo no cuadra, queda el motivo para que lo revise quien administra.",
+            puntos: {
+              p1: "Una caja por sucursal, con sus turnos",
+              p2: "Retiros e ingresos de efectivo con su motivo",
+              p3: "Lo cerrado no cambia: los ajustes van a la caja abierta",
+            },
+          },
+          // En lugar de `app` mientras no esté en las tiendas (ADR 0110 y 0234).
+          instalable: {
+            titulo: "Tu negocio, en el celular de tu equipo y de tus clientes",
+            texto:
+              "Tu página se instala como app, con tu logo. Tus clientes agendan, pagan y responden sus presupuestos; tu equipo agenda, reprograma y cobra desde el celular.",
+            puntos: {
+              p1: "Reprograman o cancelan según tu política",
+              p2: "Sin descargas: se abre desde su enlace",
+              p3: "Con tu nombre y tu logo en la pantalla de inicio",
+            },
           },
           app: {
             titulo: "Tu negocio, en el celular de tu equipo y de tus clientes",
             texto:
-              "Tu equipo agenda, reprograma y cobra desde la app. Tus clientes agendan, pagan, responden sus presupuestos y llevan su pase en Apple Wallet o Google Wallet.",
+              "Tu equipo agenda, reprograma y cobra desde la app. Tus clientes agendan, pagan, responden sus presupuestos y llevan su pase en su teléfono.",
             puntos: {
               // El widget de inicio solo está en Android (en iPhone falta compilarlo: ios/WIDGET.md).
               p1: "En Android, su próxima cita en la pantalla de inicio",
@@ -994,7 +1080,7 @@ export default {
         // Presupuestos en línea (ADR 0127, ajuste del 2026-10-21).
         presupuestos: {
           q: "¿Puedo mandar presupuestos y cobrarlos en línea?",
-          a: "Sí. Armas el presupuesto con tus servicios, bonos, productos o conceptos libres, con impuestos incluidos o desglosados, y lo mandas por correo con tu marca. Tu cliente lo abre sin cuenta, o desde su cuenta y la app, y lo acepta o lo rechaza. Al aceptarlo se vuelve su cobro: lo paga en línea con tu pasarela* o en tu negocio, y desde ahí agenda cada servicio.",
+          a: "Sí. Armas el presupuesto con tus servicios, bonos, productos o conceptos libres, con impuestos incluidos o desglosados, y lo mandas por correo con tu marca. Tu cliente lo abre sin cuenta, o desde su cuenta, y lo acepta o lo rechaza. Al aceptarlo se vuelve su cobro: lo paga en línea con tu pasarela* o en tu negocio, y desde ahí agenda cada servicio.",
         },
         // Facturas automáticas de citas (ADR 0163): facturación abre en Pro (ADR 0107).
         factura: {
@@ -1027,10 +1113,10 @@ export default {
         },
         soporte: {
           q: "¿Quién me ayuda si tengo dudas?",
-          a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+          a: "Nosotros. Escríbenos a {correo} o por WhatsApp al {whatsapp}: sin costo te orientamos con guías, con los importadores y con cualquier duda de AgendaUno. Si prefieres que lo configuremos o lo migremos por ti, eso es el arranque acompañado.",
           // Sin WhatsApp de soporte configurado, solo el correo.
           aSinWhatsapp:
-            "Nosotros. Escríbenos a {correo}: te ayudamos a configurar tu negocio, a traer tus datos de otro sistema y con cualquier duda de AgendaUno.",
+            "Nosotros. Escríbenos a {correo}: sin costo te orientamos con guías, con los importadores y con cualquier duda de AgendaUno. Si prefieres que lo configuremos o lo migremos por ti, eso es el arranque acompañado.",
         },
         // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
         // citas (ADR 0104 y 0108, como en `landing.clases.faq.modalidad`).
@@ -1051,79 +1137,11 @@ export default {
         otraEnlace: "Conoce {otro}, para negocios con clases",
       },
     },
-    // Portada «/» (LandingView): corta, para elegir modalidad. Cada negocio es solo de
-    // clases o solo de citas (ADR 0104); lo de cada una vive en /clases y /citas.
-    portada: {
-      subtitulo:
-        "Agenda, reservas en línea, cobros y tu equipo en un solo lugar.",
-      elegir: "¿Cómo atiendes a tus clientes?",
-      opciones: {
-        clases: "Doy clases",
-        clasesGiros: "Estudios, gimnasios y academias",
-        citas: "Atiendo con cita",
-        citasGiros: "Barberías, estéticas, spas y consultorios",
-      },
-      unaModalidad:
-        "Cada negocio trabaja con una modalidad, clases con cupo o citas 1 a 1, y la eliges al registrarte.",
-      modalidades: {
-        etiqueta: "Dos formas de trabajar",
-        titulo: "Tu negocio tiene su ritmo. Tu agenda también.",
-        subtitulo:
-          "Organiza los lugares de cada clase o el tiempo de cada profesional. Elige la tuya para conocerla a fondo.",
-      },
-      precios: {
-        etiqueta: "Tu suscripción a AgendaUno",
-        titulo: "Dos modelos de suscripción. Uno para tu forma de trabajar.",
-        subtitulo:
-          "Pagas por alumnos activos si das clases, o eliges tu plan por los profesionales que contratas si atiendes con cita.",
-        clases: "Por alumnos activos",
-        citas: "Por plan y profesionales",
-        desde: "Desde",
-        // {moneda}: la de la tarifa publicada de esa modalidad.
-        porMes: "{moneda} / mes",
-        iva: "Más impuestos",
-        verClases: "Ver precios de clases",
-        verCitas: "Ver precios de citas",
-        prueba: "Pruébalo {dias} días gratis, sin tarjeta, antes de contratar.",
-      },
-      giros: {
-        etiqueta: "Encuentra tu forma de trabajar",
-        titulo: "Conoce AgendaUno para tu tipo de negocio.",
-        verClases: "Todo sobre las clases",
-        verCitas: "Todo sobre las citas",
-      },
-      faq: {
-        titulo: "Preguntas frecuentes",
-        prueba: "¿Necesito tarjeta para la prueba?",
-        pruebaR:
-          "No. Pruebas AgendaUno gratis durante {dias} días, sin tarjeta y sin compromiso.",
-        cancelacion: "¿Hay plazo forzoso o penalización por cancelar?",
-        cancelacionR:
-          "No. No hay permanencia forzosa ni penalización por cancelar. Pagas mes con mes según los alumnos activos de tu negocio, o tu plan de citas mensual o anual.",
-        datos: "¿Qué pasa con la información de mi negocio?",
-        datosR:
-          "Cada negocio tiene su propia base de datos, separada de la de los demás, y se respalda todos los días. Tus clientes pueden pedir el acceso, la corrección o la cancelación de sus datos, como indica el aviso de privacidad.",
-        dosNegocios: "¿Puedo tener clases y citas en el mismo negocio?",
-        dosNegociosR:
-          "No. Cada negocio trabaja con una modalidad, clases con cupo o citas 1 a 1, y la eliges al registrarte. Si das clases y también atiendes con cita, registra dos negocios, cada uno con su cuenta, su agenda y su suscripción.",
-        // Quién cambia la modalidad (ADR 0104): aquí y no en el registro.
-        cambiarModalidad: "¿Puedo cambiar de clases a citas después?",
-        cambiarModalidadR:
-          "Solo AgendaUno puede cambiar la modalidad, de clases a citas o al revés, y solo antes de que empieces a operar: mientras tu negocio no tenga clases, citas ni reservas.",
-      },
-      final: {
-        titulo: "Prueba AgendaUno con tu próxima clase o cita.",
-        subtitulo:
-          "Elige tu modalidad, configura tu negocio y comparte tu enlace. Tienes {dias} días para probarlo, sin tarjeta.",
-        clases: "Probar con clases",
-        citas: "Probar con citas",
-      },
-    },
     // Lo que reemplaza y lo que nadie más da (comparativo del 2026-10-20).
     porQue: {
       etiqueta: "Por qué AgendaUno",
-      // Las filas de ReemplazaHerramientas: si cambian, cambia el número.
-      titulo: "Un solo sistema en lugar de ocho.",
+      // Las filas de ReemplazaHerramientas dependen de lo comprobado (ADR 0234): sin número.
+      titulo: "Un solo sistema en lugar de varios.",
       subtitulo:
         "Deja atrás hojas de cálculo y herramientas sueltas con una sola suscripción mensual.",
       aparte: "Si quieres más ayuda",
@@ -1501,8 +1519,8 @@ export default {
     agendaCitasDesc:
       "Elige el servicio, la persona que te atenderá y un horario disponible. Puedes pagar en línea si el negocio lo requiere.",
     agendaPaso1: "Elige servicio",
-    agendaPaso2: "Elige profesional",
-    agendaPaso3: "Elige horario",
+    agendaPaso2: "Elige profesional y horario",
+    agendaPaso3: "Confirma tus datos",
     pedirAcceso: "Pedir acceso",
     // Pedir lugar en una clase concreta: llega a Prospectos con esa clase (ADR 0117).
     pedirLugar: "Pedir este lugar",
@@ -1803,6 +1821,7 @@ export default {
     resumen: {
       total: "Total de {grupo}",
       conPlan: "Con plan vigente",
+      conPlanCitas: "Con bono vigente",
       nuevos: "Nuevos este mes",
       porVencer: "Por vencer ({dias} días)",
       porVencerValor: "{n} · {vencidas} vencidas",
@@ -2150,6 +2169,17 @@ export default {
       yaTiene: "Ya tiene seguimiento",
       noPromociones: "No desea promociones",
       errorLista: "No se pudo cargar a las personas de este grupo.",
+      // Se usa con llave dinámica; en citas se habla del bono (ADR 0130).
+      descCitas: {
+        sin_iniciar:
+          "Pagaron su bono hace los días que fijas en Seguimiento, nunca han venido y no tienen cita.",
+        saldo_por_vencer:
+          "Su bono vence pronto y aún le quedan sesiones sin usar.",
+        vino_sin_comprar: "Vinieron hace poco y nunca han comprado un bono.",
+        pago_fallido: "Falló el cobro automático de su bono.",
+        sin_asistir:
+          "Tienen un bono en vigor y no vienen desde hace los días que fijas en Seguimiento.",
+      },
       // Se usa con llave dinámica (`retencion.segmentos.desc.${clave}`).
       desc: {
         sin_asistir:
@@ -2235,8 +2265,6 @@ export default {
         "La pasarela no ha confirmado el cobro automático de la suscripción. Revísalo en su panel o registra el pago en caja.",
       sinClave: "Cobro no realizado",
     },
-    regularizar: "Regularizar",
-    regularizando: "Regularizando…",
     reembolsar: "Reembolsar",
     corregir: "Corregir",
     estados: {
@@ -2302,6 +2330,7 @@ export default {
     saldo: "Saldo",
     creditos: "1 crédito | {n} créditos",
     proxima: "Próxima reserva",
+    proximaCitas: "Próxima cita",
     sinProxima: "Sin próxima reserva",
     asistencias: "Asistencias",
     documentos: "Documentos pendientes",
@@ -2593,6 +2622,7 @@ export default {
     agendando: "Agendando…",
     errorFalta: "Elige servicio, persona y una hora para continuar.",
     listoTitulo: "¡Listo, tu cita quedó agendada!",
+    apartadaTitulo: "Apartamos tu horario",
     listoResumen: "{servicio} con {barbero}",
     apartado:
       "Apartamos tu lugar por tiempo limitado. Completa el pago para confirmarlo.",
@@ -2838,7 +2868,7 @@ export default {
       guardado: "Pasarela actualizada.",
       webhookUrl: "URL del webhook",
       webhookEventosStripe:
-        "Regístrala en Stripe con los eventos checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, checkout.session.expired, payment_intent.succeeded, payment_intent.payment_failed y payment_intent.canceled.",
+        "Regístrala en Stripe con los eventos checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, checkout.session.expired, payment_intent.succeeded, payment_intent.payment_failed, payment_intent.canceled, charge.refunded y charge.dispute.created.",
     },
     estudios: {
       titulo: "Estudios",
@@ -3009,6 +3039,7 @@ export default {
     comprobaciones: {
       titulo: "Comprobado",
       servicios: "Tienes servicios a la venta",
+      serviciosClases: "Tienes clases a la venta",
       disponibilidad: "Hay una fecha que se puede reservar",
       precios: "Tienen precio (o hay un plan para entrar)",
       cobro: "Ya se registró un cobro (en caja o aprobado en línea)",
@@ -3336,7 +3367,7 @@ export default {
     vacio: "Aún no hay recursos.",
     eliminar: "Eliminar espacio",
     confirmarEliminar:
-      "¿Eliminar este espacio? Sus citas próximas pasan a otro espacio libre del servicio; si alguna no cabe, te diremos cuál reprogramar.",
+      "¿Eliminar este espacio? Lo que ya está agendado pasa a otro espacio libre; si algo no cabe, te diremos qué reprogramar.",
     activado: "Espacio activado.",
     desactivado: "Espacio desactivado.",
     eliminado: "Espacio eliminado.",
@@ -3854,6 +3885,7 @@ export default {
     compras: {
       titulo: "Mis compras",
       nota: "Las compras pendientes se activan al completar el pago (en línea o en el negocio).",
+      devuelto: "Devuelto {monto}",
       estados: {
         pendiente: "Pendiente de pago",
         pagada: "Pagada",

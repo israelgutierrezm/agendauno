@@ -233,7 +233,11 @@ async function guardar(): Promise<void> {
           </span>
           <input v-model="form.activo" type="checkbox" class="h-5 w-5" />
         </label>
-        <label class="flex items-center justify-between gap-3 text-sm">
+        <!-- En citas se cobra por profesional: no aplica (el valor se conserva al guardar). -->
+        <label
+          v-if="!sesion.esCitas"
+          class="flex items-center justify-between gap-3 text-sm"
+        >
           <span>
             {{ $t("miembros.editar.facturable") }}
             <span
@@ -275,6 +279,7 @@ async function guardar(): Promise<void> {
           class="tu-input"
           maxlength="500"
           :placeholder="$t('bajas.motivo')"
+          :aria-label="$t('bajas.motivo')"
         />
         <button
           type="button"

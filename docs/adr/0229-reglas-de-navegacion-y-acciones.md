@@ -86,6 +86,17 @@ La misma revisión pidió tres arreglos del teléfono que siguen estas reglas:
 - **Nómina › Exportar CSV** (`NominaView`): ahora dice en su `title` que nadie del
   equipo tiene esquema de pago (regla 6).
 
+### Corregidos en la revisión para producción (2026-10-31)
+
+- **Regla 5**: `PrivacidadView` (`rechazar`), `AltaNegocioPlataforma`,
+  `ContactoDuenoPlataforma` y `PanelNuevaCita` (`agendar`) dicen el error dentro del formulario, también el de un campo
+  sin control a la vista. `VentasView` y `PosView` avisan junto al botón de cobrar, y
+  `PasarelasView` dentro de la tarjeta de la pasarela. `AccionesCargoPlataforma` deja
+  abierto el formulario si falla.
+- **Superadmin móvil**: `LayoutPlataforma` usa el mismo cajón (`inert`, foco y Escape).
+- **Panel**: «Saltar al contenido» (`tu-saltar-panel`).
+- **Lo que el plan no incluye** (ADR 0107): `AvisoIncluidoPremium`, antes de llenar nada.
+
 ### Pendientes (encontrados con búsquedas, sin rediseñar)
 
 Cada uno se revisa uno por uno. Algunos pueden tener ya el error visible por otro lado.
@@ -97,7 +108,6 @@ Cada uno se revisa uno por uno. Algunos pueden tener ya el error visible por otr
     - `FormulariosCaptacionView` (`guardar`);
     - `MiPerfilView` (`guardarDatos`, `pedirCambioCorreo`, `cambiarClave`);
     - `PresupuestosView` (`guardarAjustes`);
-    - `PrivacidadView` (`rechazar`);
     - `ProspectosView` (`darAcceso`);
     - `RegionNegocioView` (`guardar`);
     - `ReglasAgendaView` (`guardarPolitica`, `agregarDia`);
@@ -111,14 +121,11 @@ Cada uno se revisa uno por uno. Algunos pueden tener ya el error visible por otr
     - `HistorialReservas` (`enviarResena`);
     - `ListaFormularios`;
     - `ModalMiembro` (`guardarNota`);
-    - `PanelNuevaCita` (`agendar`);
     - `WhatsAppRenta` (`comprar`).
   - Del superadmin:
-    - `AltaNegocioPlataforma`;
     - `CargoManualPlataforma`;
     - `ComercialPlataforma`;
     - `ConciliacionPlataformas`;
-    - `ContactoDuenoPlataforma`;
     - `DestinoMedicion`;
     - `EquipoPlataforma`;
     - `HorarioDemosPlataforma`;

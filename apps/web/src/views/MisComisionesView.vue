@@ -81,6 +81,10 @@ async function cargar(): Promise<void> {
   }
 }
 
+// «Desde» después de «hasta»: se dice, en vez de quedarse sin responder.
+const rangoInvalido = computed(
+  () => !!desde.value && !!hasta.value && desde.value > hasta.value,
+);
 watch([desde, hasta], () => {
   if (desde.value && hasta.value && desde.value <= hasta.value) {
     void cargar();
@@ -110,9 +114,21 @@ onMounted(() => void cargar());
       </div>
     </div>
 
-    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">{{
-      error
-    }}</AvisoTono>
+    <p v-if="rangoInvalido" class="tu-error-campo mt-3" role="alert">
+      {{ $t("comun.rangoFechasInvalido") }}
+    </p>
+    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
+      {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p
       v-else-if="!cargando && filas.length === 0"
       class="mt-6"

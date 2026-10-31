@@ -122,6 +122,19 @@ describe("registro de acceso", () => {
     ).toBe(true);
   });
 
+  it("sin bonos en su plan no se ofrece Bonos: no tendría qué vender", () => {
+    const area = (s: Sesion) =>
+      menuVisible(s)
+        .flatMap((g) => g.areas)
+        .flatMap((a) => vistasVisibles(a, s))
+        .map((v) => v.clave);
+    const con = sesion(["*"], { modalidad: "citas" });
+    const sin = sesion(["*"], { modalidad: "citas", planSin: ["paquetes"] });
+
+    expect(area(con)).toContain("paquetes");
+    expect(area(sin)).not.toContain("paquetes");
+  });
+
   it("suspendido por renta, solo se entra a la renta para pagarla", () => {
     const s = sesion(["*"], { rol: "propietario", suspendido: true });
 

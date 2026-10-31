@@ -28,6 +28,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\OrigenCliente;
 use App\Modules\Tenancy\Pagos\MetodoPago;
@@ -90,6 +91,7 @@ class PublicoCitasController
                 'lada' => app(RegionNegocioTenant::class)->lada(),
                 // ¿Publicó su aviso de privacidad? (se enlaza antes de pedir los datos).
                 'aviso_privacidad' => app(WaiversTenant::class)->avisoPrivacidad() !== null,
+                'aviso_version' => app(WaiversTenant::class)->avisoPrivacidad()?->version,
                 // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
                 'en_directorio' => $estudio->enDirectorio(),
             ],
@@ -213,7 +215,7 @@ class PublicoCitasController
             // Lada del país del celular.
             'lada' => ['nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
             'como_nos_conocio' => ['nullable', Rule::enum(OrigenCliente::class)],
-            // Para el negocio: alergias, preferencias, si es su primera vez… (ADR 0067).
+            // Para el negocio: preferencias, si es su primera vez… (ADR 0067). Sin datos de salud.
             'nota' => ['nullable', 'string', 'max:500'],
             // Para otra persona: quién asiste (la cita es de quien agenda, ADR 0068).
             'asiste' => ['nullable', 'string', 'max:120'],
@@ -235,10 +237,13 @@ class PublicoCitasController
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
             // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
             'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
+            // La versión del aviso que tenía a la vista (ADR 0234).
+            'aviso_version' => ['nullable', 'integer', 'min:1'],
         ]);
+        $aviso = $this->exigirAviso($validado['aviso_version'] ?? null);
         if (! app(VerificarRecaptcha::class)->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip(), 'cita')) {
             throw ValidationException::withMessages([
-                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
+                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo; si usas un bloqueador de anuncios, desactívalo en esta página.'],
             ]);
         }
 
@@ -274,6 +279,9 @@ class PublicoCitasController
         // registrar de dónde llegó.
         $nueva = $reserva->wasRecentlyCreated;
         $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
+        if ($nueva && $aviso !== null) {
+            $reserva->update(['aviso_version' => $aviso->version]);
+        }
         $reserva->load(['orden', 'saldoOrden', 'sesion.instructor']);
         $contexto = $nueva ? $atribucion->registrar($validado['atribucion'] ?? null, $persona, $validado['medicion'] ?? null, $request->ip(), $request->userAgent()) : null;
         if ($contexto !== null && $reserva->orden !== null) {
@@ -463,6 +471,29 @@ class PublicoCitasController
      * Lo que el cliente dejó para su cita: la nota para el negocio (ADR 0067) y, si es
      * para otra persona, quién asiste (ADR 0068).
      */
+    /**
+     * Sin cuenta se dejan datos: en producción, solo con el aviso del negocio publicado
+     * y sin que haya cambiado mientras llenaba el formulario (ADR 0234).
+     *
+     * @throws ValidationException
+     */
+    private function exigirAviso(mixed $leida): ?WaiverTenant
+    {
+        $aviso = app(WaiversTenant::class)->avisoPrivacidad();
+        if ($aviso === null && app()->environment('production')) {
+            throw ValidationException::withMessages([
+                'aviso_version' => ['Este negocio aún no publica su aviso de privacidad, así que no puede recibir citas en línea. Comunícate directamente con él.'],
+            ]);
+        }
+        if ($leida !== null && $aviso !== null && (int) $leida !== (int) $aviso->version) {
+            throw ValidationException::withMessages([
+                'aviso_version' => ['El aviso de privacidad cambió mientras llenabas tus datos: revísalo y vuelve a agendar.'],
+            ]);
+        }
+
+        return $aviso;
+    }
+
     private function anotar(ReservaTenant $reserva, mixed $nota, mixed $asiste): void
     {
         $cambios = array_filter([

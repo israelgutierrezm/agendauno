@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import { erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { useToastStore } from "@/stores/toast";
@@ -35,6 +36,7 @@ const toast = useToastStore();
 const abierto = ref(false);
 const ocupado = ref(false);
 const errores = ref<Record<string, string>>({});
+const errorGeneral = ref<string | null>(null);
 
 const vacio = (c: CamposContacto) => ({
   contacto_nombre: c.contacto_nombre ?? "",
@@ -53,10 +55,19 @@ watch(
   },
 );
 
+const VISIBLES = [
+  "contacto_nombre",
+  "contacto_primer_apellido",
+  "contacto_email",
+  "contacto_whatsapp_pais",
+  "contacto_telefono",
+];
+
 async function guardar(): Promise<void> {
   if (ocupado.value) return;
   ocupado.value = true;
   errores.value = {};
+  errorGeneral.value = null;
   try {
     await cliente.put(
       `${props.apiUrl}/api/v1/plataforma/estudios/${props.slug}/contacto`,
@@ -77,7 +88,11 @@ async function guardar(): Promise<void> {
     emit("guardado");
   } catch (e) {
     errores.value = erroresPorCampo(e);
-    if (Object.keys(errores.value).length === 0) toast.error(mensajeDeError(e));
+    // Lo que no tiene campo a la vista (o no es de un campo) se dice en el formulario.
+    const campos = Object.keys(errores.value);
+    if (campos.length === 0 || campos.some((c) => !VISIBLES.includes(c))) {
+      errorGeneral.value = mensajeDeError(e);
+    }
   } finally {
     ocupado.value = false;
   }
@@ -110,6 +125,12 @@ async function guardar(): Promise<void> {
           maxlength="120"
           required
         />
+        <span
+          v-if="errores.contacto_nombre"
+          class="tu-error-campo"
+          role="alert"
+          >{{ errores.contacto_nombre }}</span
+        >
       </label>
       <label class="grid gap-1">
         <span class="tu-label">{{
@@ -121,6 +142,12 @@ async function guardar(): Promise<void> {
           maxlength="120"
           required
         />
+        <span
+          v-if="errores.contacto_primer_apellido"
+          class="tu-error-campo"
+          role="alert"
+          >{{ errores.contacto_primer_apellido }}</span
+        >
       </label>
       <label class="grid gap-1 sm:col-span-2">
         <span class="tu-label">{{
@@ -151,8 +178,16 @@ async function guardar(): Promise<void> {
           class="tu-input text-sm"
           inputmode="numeric"
           maxlength="4"
+          pattern="[0-9]{1,4}"
+          :title="$t('plataformaAdmin.contacto.ladaFormato')"
           required
         />
+        <span
+          v-if="errores.contacto_whatsapp_pais"
+          class="tu-error-campo"
+          role="alert"
+          >{{ errores.contacto_whatsapp_pais }}</span
+        >
       </label>
       <label class="grid gap-1">
         <span class="tu-label">{{
@@ -163,9 +198,29 @@ async function guardar(): Promise<void> {
           class="tu-input text-sm"
           inputmode="tel"
           maxlength="15"
+          pattern="[0-9 \-]{7,15}"
+          :title="$t('plataformaAdmin.contacto.telefonoFormato')"
           required
         />
+        <span class="tu-hint">{{
+          $t("plataformaAdmin.contacto.telefonoFormato")
+        }}</span>
+        <span
+          v-if="errores.contacto_telefono"
+          class="tu-error-campo"
+          role="alert"
+          >{{ errores.contacto_telefono }}</span
+        >
       </label>
+      <AvisoTono
+        v-if="errorGeneral"
+        tono="peligro"
+        class="sm:col-span-2"
+        role="alert"
+        data-prueba="error-contacto"
+      >
+        {{ errorGeneral }}
+      </AvisoTono>
       <div class="flex flex-wrap gap-2 sm:col-span-2">
         <button
           type="submit"

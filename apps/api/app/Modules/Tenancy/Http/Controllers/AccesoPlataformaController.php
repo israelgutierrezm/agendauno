@@ -96,6 +96,7 @@ class AccesoPlataformaController
             'email' => $administrador->email,
             // Qué puede hacer (ADR 0215).
             'perfil' => $administrador->perfil ?: PerfilesPlataforma::TOTAL,
+            'acciones' => PerfilesPlataforma::acciones($administrador->perfil ?: PerfilesPlataforma::TOTAL),
         ];
     }
 }

@@ -28,7 +28,7 @@ defineProps<{ resumen: ResumenCarga }>();
       </div>
     </div>
     <div class="tu-card p-4 text-center">
-      <div class="text-xl font-semibold" :style="{ color: 'var(--exito)' }">
+      <div class="text-xl font-semibold" :style="{ color: 'var(--exito-texto)' }">
         {{ resumen.validas }}
       </div>
       <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">

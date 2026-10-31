@@ -81,7 +81,7 @@ const cifras = computed(() =>
       },
       { clave: "reservas", valor: String(f.primeras_reservas) },
       {
-        clave: "renovaciones",
+        clave: sesion.esCitas ? "recompras" : "renovaciones",
         valor: `${f.renovaciones} · ${plata(f.renovaciones_minor)}`,
       },
     ],

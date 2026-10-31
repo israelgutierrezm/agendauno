@@ -288,7 +288,7 @@ onMounted(() => void cuenta.asegurar());
         class="tu-card tu-card-enlace mp-acceso"
         ><span class="mp-icono"><IconoNav nombre="etiqueta" :tam="26" /></span
         ><span
-          ><strong>{{ $t("portal.pagos.planes") }}</strong
+          ><strong>{{ $t(tc("portal.pagos.planes")) }}</strong
           ><small>{{ $t("portal.pagos.saldoVigencia") }}</small></span
         ></a
       >
@@ -305,7 +305,7 @@ onMounted(() => void cuenta.asegurar());
         class="tu-card tu-card-enlace mp-acceso"
         ><span class="mp-icono"><IconoNav nombre="dinero" :tam="26" /></span
         ><span
-          ><strong>{{ $t("portal.pagos.renovar") }}</strong
+          ><strong>{{ $t(tc("portal.pagos.renovar")) }}</strong
           ><small>{{ $t("portal.pagos.verOpciones") }}</small></span
         ></a
       >

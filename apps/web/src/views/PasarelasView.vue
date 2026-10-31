@@ -10,6 +10,7 @@ import InterruptorSiNo from "@/components/InterruptorSiNo.vue";
 import LogoPlataforma from "@/components/LogoPlataforma.vue";
 import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Pasarela {
@@ -101,6 +102,8 @@ useCambiosPendientes(() =>
 
 // Las llaves que la API rechazó, por pasarela.
 const llavesConError = reactive<Record<string, string[]>>({});
+// Lo que impide guardar se dice en la tarjeta de esa pasarela, junto a su botón.
+const errorDe = reactive<Record<string, string | null>>({});
 
 /**
  * Las llaves sin las que no cobra y que no están ni guardadas ni escritas: mientras
@@ -168,9 +171,34 @@ async function cargar(): Promise<void> {
 }
 
 async function guardar(proveedor: string): Promise<void> {
+  // Apagarla deja de cobrar en línea y pasar a real cobra de verdad: se confirma.
+  const antes = pasarelas.value.find((p) => p.proveedor === proveedor);
+  const nueva = edicion[proveedor];
+  if (antes?.activa && !nueva.activa) {
+    const nombre = t(`pasarelas.proveedores.${proveedor}`);
+    if (
+      !(await confirmar(t("operacion.pasarelas.confirmarApagar", { nombre }), {
+        aceptar: t("operacion.pasarelas.apagar", { nombre }),
+        peligro: true,
+      }))
+    ) {
+      return;
+    }
+  }
+  if (antes?.modo !== "live" && nueva.modo === "live") {
+    const nombre = t(`pasarelas.proveedores.${proveedor}`);
+    if (
+      !(await confirmar(t("operacion.pasarelas.confirmarReal", { nombre }), {
+        aceptar: t("operacion.pasarelas.pasarAReal"),
+      }))
+    ) {
+      return;
+    }
+  }
   guardando.value = proveedor;
   guardado.value = null;
   error.value = null;
+  errorDe[proveedor] = null;
   llavesConError[proveedor] = [];
   try {
     const ed = edicion[proveedor];
@@ -202,7 +230,7 @@ async function guardar(proveedor: string): Promise<void> {
     llavesConError[proveedor] = camposConError(e)
       .filter((campo) => campo.startsWith("credenciales."))
       .map((campo) => campo.slice("credenciales.".length));
-    error.value = mensajeDeError(e);
+    errorDe[proveedor] = mensajeDeError(e);
   } finally {
     guardando.value = null;
   }
@@ -390,7 +418,11 @@ onMounted(cargar);
           {{ $t("pasarelasEstado.enPrueba") }}
         </AvisoTono>
 
-        <details class="pg-configurar" :open="p.activa">
+        <!-- Abierto también al encenderla: el botón Guardar queda a la vista. -->
+        <details
+          class="pg-configurar"
+          :open="p.activa || edicion[p.proveedor].activa"
+        >
           <summary>{{ $t("adminUsabilidad.configurarConexion") }}</summary>
           <div class="mt-3 grid sm:grid-cols-2 gap-3">
             <div>
@@ -495,6 +527,15 @@ onMounted(cargar);
             {{ $t("pasarelas.sinLlaves") }}
           </p>
 
+          <AvisoTono
+            v-if="errorDe[p.proveedor]"
+            tono="peligro"
+            class="mt-4"
+            role="alert"
+            :data-prueba="`error-${p.proveedor}`"
+          >
+            {{ errorDe[p.proveedor] }}
+          </AvisoTono>
           <div class="mt-4 flex items-center gap-3">
             <button
               class="tu-btn tu-btn-primario"
@@ -510,7 +551,7 @@ onMounted(cargar);
             <span
               v-if="guardado === p.proveedor"
               class="text-sm"
-              :style="{ color: 'var(--exito)' }"
+              :style="{ color: 'var(--exito-texto)' }"
             >
               {{ $t("pasarelas.guardado") }}
             </span>

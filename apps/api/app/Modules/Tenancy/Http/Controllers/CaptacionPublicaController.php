@@ -62,7 +62,7 @@ class CaptacionPublicaController
 
         if (! $recaptcha->aprobado((string) ($validado['recaptcha_token'] ?? ''), $request->ip(), 'captacion')) {
             throw ValidationException::withMessages([
-                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
+                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo; si usas un bloqueador de anuncios, desactívalo en esta página.'],
             ]);
         }
 

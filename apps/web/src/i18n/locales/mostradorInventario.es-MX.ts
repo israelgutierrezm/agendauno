@@ -239,6 +239,7 @@ export const planesVisual = {
     planCitas: "Bono",
     incluye: "Incluye",
     dura: "Vigencia y renovación",
+    duraCitas: "Vigencia",
     sirve: "Válido para",
     precio: "Precio",
     estado: "Estado",

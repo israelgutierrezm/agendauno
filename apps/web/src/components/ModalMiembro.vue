@@ -1029,6 +1029,7 @@ function colorAlerta(codigo: string): string {
               rows="2"
               maxlength="2000"
               :placeholder="$t('detalleMiembro.notas.placeholder')"
+              :aria-label="$t('detalleMiembro.notas.placeholder')"
               data-prueba="texto-nota"
             />
             <div class="flex justify-end gap-2">
@@ -1255,6 +1256,7 @@ function colorAlerta(codigo: string): string {
             rows="2"
             maxlength="2000"
             :placeholder="$t('detalleMiembro.notas.placeholder')"
+            :aria-label="$t('detalleMiembro.notas.placeholder')"
           />
           <div class="flex justify-end">
             <button

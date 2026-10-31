@@ -300,17 +300,22 @@ class ResolverDerechoTenant
                 && ! $this->cubre($d, $sesion)
                 && ($d->ilimitado || $this->libro->disponible($d) >= $unidades));
         if (! $deOtraSucursal instanceof DerechoTenant) {
-            return 'No hay un derecho con saldo para esta sesion.';
+            return $sesion->esCita()
+                ? 'No tiene un bono con sesiones para esta cita.'
+                : 'No hay un plan con saldo para esta clase.';
         }
 
         $ids = $deOtraSucursal->sucursales_ids ?? ($deOtraSucursal->sucursal_id !== null ? [(int) $deOtraSucursal->sucursal_id] : []);
+        // Lo lee quien reserva o quien atiende en recepción: sin «tu».
+        $plan = $sesion->esCita() ? 'El bono' : 'El plan';
+        $otro = $sesion->esCita() ? 'un bono' : 'un plan';
         $incluidas = SucursalTenant::query()->whereKey($ids)->orderBy('nombre')->pluck('nombre')->all();
         $aqui = SucursalTenant::query()->whereKey($sesion->sucursal_id)->value('nombre');
         if ($incluidas === [] || ! is_string($aqui)) {
-            return 'Tu plan cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o un plan que la incluya.';
+            return "{$plan} cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o {$otro} que la incluya.";
         }
 
-        return 'Tu plan vale solo en '.self::lista($incluidas).", no en {$aqui}. Elige una fecha en una sucursal incluida o un plan que incluya {$aqui}.";
+        return "{$plan} vale solo en ".self::lista($incluidas).", no en {$aqui}. Elige una fecha en una sucursal incluida o {$otro} que incluya {$aqui}.";
     }
 
     /**

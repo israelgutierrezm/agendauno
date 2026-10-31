@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -37,6 +38,8 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const solicitudes = ref<Solicitud[]>([]);
 const cargando = ref(true);
+const errorCarga = ref<string | null>(null);
+const errorRechazo = ref<string | null>(null);
 const rechazando = ref<string | null>(null);
 const respuesta = ref("");
 const ocupado = ref<string | null>(null);
@@ -103,8 +106,9 @@ async function cargar(): Promise<void> {
     if (mio !== turno) return;
     solicitudes.value = data.data;
     meta.value = data.meta;
+    errorCarga.value = null;
   } catch (e) {
-    if (mio === turno) toast.error(mensajeDeError(e));
+    if (mio === turno) errorCarga.value = mensajeDeError(e);
   } finally {
     if (mio === turno) cargando.value = false;
   }
@@ -152,6 +156,7 @@ async function atender(s: Solicitud): Promise<void> {
 
 async function rechazar(s: Solicitud): Promise<void> {
   ocupado.value = s.id;
+  errorRechazo.value = null;
   try {
     await api.post(`${base.value}/solicitudes-privacidad/${s.id}/rechazar`, {
       respuesta: respuesta.value.trim(),
@@ -160,7 +165,7 @@ async function rechazar(s: Solicitud): Promise<void> {
     respuesta.value = "";
     await cargar();
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    errorRechazo.value = mensajeDeError(e);
   } finally {
     ocupado.value = null;
   }
@@ -226,7 +231,31 @@ onMounted(cargar);
       </div>
       <div class="p-5">
         <p
-          v-if="cargando && solicitudes.length === 0"
+          v-if="!puedeResolver && solicitudes.length > 0"
+          class="tu-hint mb-3"
+          data-prueba="quien-resuelve"
+        >
+          {{ $t("privacidadNegocio.quienResuelve") }}
+        </p>
+        <AvisoTono
+          v-if="errorCarga"
+          tono="peligro"
+          role="alert"
+          data-prueba="error-carga-privacidad"
+        >
+          {{ errorCarga }}
+          <template #acciones>
+            <button
+              type="button"
+              class="tu-btn tu-btn-secundario tu-btn-chico"
+              @click="cargar"
+            >
+              {{ $t("comun.reintentar") }}
+            </button>
+          </template>
+        </AvisoTono>
+        <p
+          v-else-if="cargando && solicitudes.length === 0"
           class="text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
@@ -341,6 +370,14 @@ onMounted(cargar);
               >
                 {{ $t("privacidadNegocio.confirmarRechazo") }}
               </button>
+              <AvisoTono
+                v-if="errorRechazo"
+                tono="peligro"
+                class="w-full"
+                role="alert"
+              >
+                {{ errorRechazo }}
+              </AvisoTono>
             </form>
           </li>
         </ul>

@@ -335,7 +335,7 @@ async function exportar(): Promise<void> {
     const url = URL.createObjectURL(data);
     const enlace = document.createElement("a");
     enlace.href = url;
-    enlace.download = "clientes.csv";
+    enlace.download = "personas.csv";
     enlace.click();
     URL.revokeObjectURL(url);
   } catch (e) {
@@ -445,7 +445,11 @@ const indicadores = computed<Indicador[]>(() => {
     },
     {
       clave: "conPlan",
-      etiqueta: t("miembros.resumen.conPlan"),
+      etiqueta: t(
+        sesion.esCitas
+          ? "miembros.resumen.conPlanCitas"
+          : "miembros.resumen.conPlan",
+      ),
       valor: String(r.con_plan),
       icono: "etiqueta",
       tono: "verde",

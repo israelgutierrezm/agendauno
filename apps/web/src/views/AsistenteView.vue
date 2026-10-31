@@ -79,31 +79,38 @@ async function preguntar(texto = escrito.value): Promise<void> {
   }
 }
 
+const aplicando = ref(false);
 async function aplicar(p: Propuesta): Promise<void> {
-  if (
-    !(await confirmar(
-      t("asistenteIA.aplicarConfirmar", { resumen: p.resumen }),
-      {
-        aceptar: t("asistenteIA.aplicar"),
-      },
-    ))
-  ) {
-    return;
-  }
+  if (aplicando.value) return;
+  aplicando.value = true;
   try {
-    const { data } = await api.post<{
-      data: { tipo: string; resultado: Record<string, number> };
-    }>(`${base.value}/acciones`, { token: p.token });
-    p.aplicada =
-      data.data.tipo === "campana"
-        ? t("asistenteIA.aplicadaCampana", {
-            n: data.data.resultado.enviados ?? 0,
-          })
-        : t("asistenteIA.aplicadaAgenda", {
-            n: data.data.resultado.creadas ?? 0,
-          });
-  } catch (e) {
-    error.value = mensajeDeError(e);
+    if (
+      !(await confirmar(
+        t("asistenteIA.aplicarConfirmar", { resumen: p.resumen }),
+        {
+          aceptar: t("asistenteIA.aplicar"),
+        },
+      ))
+    ) {
+      return;
+    }
+    try {
+      const { data } = await api.post<{
+        data: { tipo: string; resultado: Record<string, number> };
+      }>(`${base.value}/acciones`, { token: p.token });
+      p.aplicada =
+        data.data.tipo === "campana"
+          ? t("asistenteIA.aplicadaCampana", {
+              n: data.data.resultado.enviados ?? 0,
+            })
+          : t("asistenteIA.aplicadaAgenda", {
+              n: data.data.resultado.creadas ?? 0,
+            });
+    } catch (e) {
+      error.value = mensajeDeError(e);
+    }
+  } finally {
+    aplicando.value = false;
   }
 }
 
@@ -197,6 +204,8 @@ function detalle(p: Propuesta): string {
             type="button"
             class="tu-btn tu-btn-primario tu-btn-chico"
             data-prueba="aplicar-propuesta"
+            :disabled="aplicando"
+            :aria-busy="aplicando || undefined"
             @click="aplicar(p)"
           >
             {{ $t("asistenteIA.aplicar") }}

@@ -274,10 +274,15 @@ export const reglasAgenda = {
   // Lo ya programado el día que se cierra (ADR 0223).
   afectadasDia:
     "Ese día ya hay 1 clase programada ({reservas} personas con lugar o en espera). | Ese día ya hay {n} clases programadas ({reservas} personas con lugar o en espera).",
+  afectadasDiaCitas:
+    "Ese día ya hay 1 cita programada. | Ese día ya hay {n} citas programadas.",
   cancelarDelDia:
     "Cancelarlas al cerrar el día (se avisa a cada persona y sus créditos vuelven)",
+  cancelarDelDiaCitas: "Cancelarlas al cerrar el día (se avisa a cada persona)",
   fechasDelDiaCanceladas:
     "Día cerrado: se canceló 1 clase. | Día cerrado: se cancelaron {n} clases.",
+  fechasDelDiaCanceladasCitas:
+    "Día cerrado: se canceló 1 cita. | Día cerrado: se cancelaron {n} citas.",
   sinCerrados: "No hay días cerrados próximos.",
   quitar: "Quitar cierre",
   confirmarQuitarDia:
@@ -627,6 +632,9 @@ export const plataformaAdmin = {
   },
   contacto: {
     corregir: "Corregir contacto",
+    ladaFormato: "Solo dígitos, sin el signo +. Ejemplo: 52.",
+    telefonoFormato:
+      "De 7 a 15 dígitos; se aceptan espacios y guiones, sin paréntesis.",
     nombre: "Nombre del dueño",
     primerApellido: "Primer apellido",
     correo: "Correo",
@@ -930,6 +938,8 @@ export const plataformaAdmin = {
     atender: "Marcar atendida",
     atendida: "Atendida por {quien}",
     atendidaOk: "Alerta atendida.",
+    soloPidenAtencion:
+      "Ver solo la que pide atención (1) | Ver solo las que piden atención ({n})",
     sinAtender: "{n} por atender",
     // Un tipo de alerta sin nombre aún (su mensaje la describe).
     tipoOtro: "Otra alerta",
@@ -991,6 +1001,11 @@ export const plataformaAdmin = {
   },
   pruebaHasta: "hasta el {fecha}",
   ficha: {
+    verMasCargos: "Ver más cargos",
+    confirmarCuota:
+      "¿Cobrar a {nombre} una cuota fija de {monto} al mes? Es lo que se le cobrará desde el mes indicado.",
+    confirmarExtenderActivo:
+      "{nombre} está activo. Si extiendes la prueba, vuelve a prueba {n} días y no paga renta en ese tiempo: es una cortesía.",
     whatsappVerificado: "WhatsApp verificado",
     avisos: "Avisos al dueño",
     sinAvisos: "Aún no se le ha avisado nada.",
@@ -1499,6 +1514,8 @@ export const miPrivacidad = {
 };
 
 export const privacidadNegocio = {
+  quienResuelve:
+    "Las resuelve quien administra el negocio. Avísale si alguna está por vencer.",
   titulo: "Solicitudes de privacidad",
   ayuda:
     "Alumnos que pidieron la baja de sus datos. Al atenderla se borran sus datos personales (nombre, correo, celular, documentos) y su cuenta; sus compras y pagos se conservan sin nombre. La ley pide responder en 20 días hábiles.",
@@ -1595,6 +1612,10 @@ export const pagoAutomatico = {
     "El precio de tu plan ahora es {nuevo}. Tu pago automático sigue cobrando {monto} hasta que autorices el nuevo precio.",
   precioNuevoNegocio: "Autorizó {monto}; el plan ahora cuesta {nuevo}",
   autorizarPrecio: "Autorizar el nuevo precio",
+  confirmarActivar:
+    "¿Activar el pago automático de {producto}? Se cobrarán {monto} a {tarjeta} en cada renovación. El próximo cobro es el {fecha}.",
+  confirmarActivarSinFecha:
+    "¿Activar el pago automático de {producto}? Se cobrarán {monto} a {tarjeta} en cada renovación.",
   confirmarPrecio:
     "¿Autorizar que tu pago automático cobre {nuevo} en cada renovación?",
   numeroTarjeta: "Número de tarjeta",
@@ -1691,7 +1712,7 @@ export const margenesServicio = {
   preparacion: "Preparación antes (min)",
   limpieza: "Limpieza después (min)",
   ayudaAlumno:
-    "Ocupan la agenda del profesional y de la sala, pero no se le cobran ni se le muestran al alumno.",
+    "Ocupan la agenda de quien atiende y de la sala, pero no se le cobran ni se le muestran al alumno.",
   resumen: "+{n} min de preparación y limpieza",
   enAgenda: "Preparación o limpieza",
 };
@@ -1722,7 +1743,9 @@ export const bloqueosAgenda = {
   confirmarQuitar:
     "¿Quitar el bloqueo «{motivo}» ({cuando})? Ese horario vuelve a quedar libre para agendar.",
   afectadas:
-    "Ya hay {n} citas o clases en ese horario. No se cancelan: revísalas después de bloquear.",
+    "Ya hay {n} clases en ese horario. No se cancelan: revísalas después de bloquear.",
+  afectadasCitas:
+    "Ya hay {n} citas en ese horario. No se cancelan: revísalas después de bloquear.",
   conReservas: "{n} con reserva",
 };
 

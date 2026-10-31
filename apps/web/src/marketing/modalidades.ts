@@ -1,4 +1,15 @@
 import { soluciones, type Solucion } from "./soluciones.ts";
+import {
+  appPublicada,
+  calendarios,
+  canalesDeBandeja,
+  carteras,
+  hayPlataformas,
+  listaNatural,
+  plataformasConectadas,
+  comprobada,
+} from "./integraciones.ts";
+import { productoDeModalidad } from "../lib/producto.ts";
 
 /*
 | Las dos modalidades del producto en la parte comercial: /clases y /citas (ADR 0104:
@@ -305,6 +316,11 @@ export interface ContenidoModalidad {
    * (`p1`–`p3`). Solo lo que el producto ya hace, sin mezclar clases con citas.
    */
   novedades: readonly string[];
+  /**
+   * La tarjeta que ocupa el lugar de una novedad que todavía no se puede prometer
+   * (ADR 0234: integración sin comprobar o app sin publicar). Ver `novedadesVisibles`.
+   */
+  novedadesRespaldo: Readonly<Record<string, string>>;
   /** Preguntas frecuentes principales en la landing: claves de `landing.{modo}.faq.{clave}`. */
   preguntas: readonly string[];
   /** Todas las preguntas frecuentes organizadas por sección para `/preguntas-frecuentes`. */
@@ -328,6 +344,14 @@ export interface ContenidoModalidad {
   otra: Modo;
 }
 
+/** Las plataformas comprobadas, para nombrarlas (Fitpass, con «solo en México» aparte). */
+export function nombresDePlataformas(): string[] {
+  return [
+    ...plataformasConectadas(),
+    ...(comprobada("fitpass") ? ["Fitpass"] : []),
+  ];
+}
+
 export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
   clases: {
     modo: "clases",
@@ -336,8 +360,10 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     nombre: NOMBRE_MODALIDAD.clases,
     seo: {
       title: "Software de reservas para estudios y gimnasios | AgendaUno",
-      description:
-        "Reservas de clases, cupos, membresías, cobros y Wellhub o TotalPass para tu estudio o gimnasio.",
+      // Solo lo comprobado se nombra (ADR 0234).
+      description: hayPlataformas()
+        ? `Reservas de clases, cupos, membresías, cobros y ${listaNatural(nombresDePlataformas(), "o")} para tu estudio o gimnasio.`
+        : "Reservas de clases, cupos, membresías y cobros para tu estudio o gimnasio.",
       imagen: "/assets/landing/disciplinas/pilates-v1.jpg",
       imagenAlt: "Alumna practicando Pilates Reformer en un estudio moderno",
       miga: ETIQUETA_MENU.clases,
@@ -363,6 +389,12 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     // Google Wallet (ADR 0195), los widgets para la web del negocio (ADR 0141), las
     // apps, la bandeja de WhatsApp e Instagram (ADR 0200) y la caja (ADR 0175/0177).
     novedades: ["plataformas", "wallet", "widgets", "app", "bandeja", "caja"],
+    novedadesRespaldo: {
+      plataformas: "kiosco",
+      wallet: "pase",
+      app: "instalable",
+      bandeja: "apartados",
+    },
     // En la landing: las 6 preguntas clave de decisión; el resto vive en /preguntas-frecuentes.
     preguntas: [
       "precio",
@@ -390,8 +422,9 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       {
         clave: "pagos",
         titulo: "Cobros, plataformas y sitio web",
-        descripcion:
-          "Pasarelas, comisiones, CFDI, Wellhub / TotalPass y sucursales.",
+        descripcion: hayPlataformas()
+          ? `Pasarelas, comisiones, CFDI, ${nombresDePlataformas().join(" / ")} y sucursales.`
+          : "Pasarelas, comisiones, CFDI y sucursales.",
         preguntas: [
           "pagos",
           "comisiones",
@@ -479,6 +512,7 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
       "bandeja",
       "app",
     ],
+    novedadesRespaldo: { bandeja: "caja", app: "instalable" },
     // En la landing: las 6 preguntas clave de decisión; el resto vive en /preguntas-frecuentes.
     preguntas: [
       "precio",
@@ -547,6 +581,46 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     otra: "clases",
   },
 };
+
+/** ¿Se puede prometer esta tarjeta de «Lo nuevo» hoy? (ADR 0234). */
+function novedadDisponible(modo: Modo, clave: string): boolean {
+  switch (clave) {
+    case "plataformas":
+      return hayPlataformas();
+    case "wallet":
+      return carteras().length > 0;
+    case "bandeja":
+      return canalesDeBandeja().length > 0;
+    case "app":
+      return appPublicada(productoDeModalidad(modo));
+    default:
+      return true;
+  }
+}
+
+/** «Lo nuevo» de hoy: lo no comprobado, cambiado por su tarjeta de respaldo. */
+export function novedadesVisibles(modo: Modo): string[] {
+  const { novedades, novedadesRespaldo } = MODALIDADES[modo];
+  return novedades.map((clave) =>
+    novedadDisponible(modo, clave)
+      ? clave
+      : (novedadesRespaldo[clave] ?? clave),
+  );
+}
+
+/** Las funciones que hoy se pueden prometer: los calendarios, si hay comprobados. */
+export function funcionesVisibles(modo: Modo): string[] {
+  return MODALIDADES[modo].funciones.filter(
+    (clave) => clave !== "calendarios" || calendarios().length > 0,
+  );
+}
+
+/** Las preguntas frecuentes de una sección que hoy se pueden responder con un «sí». */
+export function preguntaDisponible(clave: string): boolean {
+  if (clave === "plataformas") return hayPlataformas();
+  if (clave === "wallet") return carteras().length > 0;
+  return true;
+}
 
 /** Páginas editoriales existentes; nunca inventar una ruta para un giro. */
 const SOLUCION_DE_NEGOCIO: Readonly<Record<string, string>> = {

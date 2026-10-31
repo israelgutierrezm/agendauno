@@ -219,7 +219,7 @@ it('citas: disponibilidad, reserva, pago, atención, cancelación del negocio y 
     $otra = $agendar('2030-01-08');
     $pago = pagarConStripe($e, $ana['bearer'], $otra['orden_id']);
     $this->getJson("/api/v1/app/{$e['slug']}/reservas/{$otra['id']}/cancelacion", conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.mensaje', 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.');
+        ->assertOk()->assertJsonPath('data.mensaje', 'Ya está pagada: el pago no se reembolsa automáticamente.');
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$otra['id']}/cancelar", [], conBearer($e['bearer']))->assertOk();
     expect($libre('2030-01-08'))->toBeTrue();
 

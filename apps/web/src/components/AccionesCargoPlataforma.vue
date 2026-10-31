@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -43,7 +44,13 @@ const METODOS = ["transferencia", "deposito", "efectivo", "cheque"] as const;
 const pagando = ref(false);
 const metodo = ref<(typeof METODOS)[number]>("transferencia");
 const referencia = ref("");
-const fechaPago = ref(new Date().toISOString().slice(0, 10));
+// Hoy en el calendario local: en UTC, de noche ya es mañana (o el mes siguiente).
+function hoyIso(): string {
+  const d = new Date();
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+const fechaPago = ref(hoyIso());
 const motivoCancelacion = ref<"02" | "03">("02");
 const cancelando = ref(false);
 const ocupado = ref(false);
@@ -80,15 +87,24 @@ function dinero(minor: number, moneda: string): string {
 async function hacer(
   accion: () => Promise<unknown>,
   exito: string,
-): Promise<void> {
-  if (ocupado.value) return;
+): Promise<boolean> {
+  if (ocupado.value) return false;
   ocupado.value = true;
   try {
     await accion();
     toast.exito(exito);
     emit("cambiado");
+    return true;
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    // El rechazo del timbre llega como 422 con la factura en error y su motivo.
+    const factura = axios.isAxiosError(e) ? e.response?.data?.data : null;
+    if (factura?.estado === "error") {
+      toast.error(factura.motivo_error ?? mensajeDeError(e));
+      emit("cambiado");
+    } else {
+      toast.error(mensajeDeError(e));
+    }
+    return false;
   } finally {
     ocupado.value = false;
   }
@@ -104,7 +120,7 @@ async function registrarPago(): Promise<void> {
   ) {
     return;
   }
-  await hacer(
+  const hecho = await hacer(
     () =>
       cliente.post(
         `${props.apiUrl}/api/v1/plataforma/cargos/${props.cargo.id}/pago`,
@@ -117,7 +133,8 @@ async function registrarPago(): Promise<void> {
       ),
     t("plataformaAdmin.rentaManual.pagoRegistrado"),
   );
-  pagando.value = false;
+  // Si falló, el formulario se queda abierto con lo escrito para reintentar.
+  if (hecho) pagando.value = false;
 }
 
 async function facturar(): Promise<void> {
@@ -149,8 +166,24 @@ async function descargar(formato: "pdf" | "xml"): Promise<void> {
     enlace.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    toast.error(await mensajeDeDescarga(e));
   }
+}
+
+// Una descarga pide un Blob, y su error también llega como Blob: se lee su JSON.
+async function mensajeDeDescarga(e: unknown): Promise<string> {
+  const cuerpo = axios.isAxiosError(e) ? e.response?.data : null;
+  if (cuerpo instanceof Blob) {
+    try {
+      const { message } = JSON.parse(await cuerpo.text()) as {
+        message?: unknown;
+      };
+      if (typeof message === "string" && message !== "") return message;
+    } catch {
+      // No era JSON: el mensaje general.
+    }
+  }
+  return mensajeDeError(e);
 }
 
 async function cancelar(): Promise<void> {
@@ -166,7 +199,7 @@ async function cancelar(): Promise<void> {
   ) {
     return;
   }
-  await hacer(
+  const hecho = await hacer(
     () =>
       cliente.post(
         `${props.apiUrl}/api/v1/plataforma/facturas/${f.id}/cancelar`,
@@ -175,7 +208,7 @@ async function cancelar(): Promise<void> {
       ),
     t("plataformaAdmin.rentaManual.cancelacionPedida"),
   );
-  cancelando.value = false;
+  if (hecho) cancelando.value = false;
 }
 
 async function consultar(): Promise<void> {

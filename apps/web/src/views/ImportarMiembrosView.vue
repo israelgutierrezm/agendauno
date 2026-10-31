@@ -209,7 +209,7 @@ function descargarPlantilla(): void {
       class="mt-6 tu-card p-6 text-center"
       role="status"
     >
-      <p class="text-lg font-semibold" :style="{ color: 'var(--exito)' }">
+      <p class="text-lg font-semibold" :style="{ color: 'var(--exito-texto)' }">
         {{ $t("importar.creados", { n: creados }) }}
       </p>
       <p

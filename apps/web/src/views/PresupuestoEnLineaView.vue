@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -8,7 +9,7 @@ import DetallePresupuesto, {
   type PresupuestoCliente,
 } from "@/components/DetallePresupuesto.vue";
 import RespuestaPresupuesto from "@/components/RespuestaPresupuesto.vue";
-import { api } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api";
 import { claveDeRetorno, useConfirmacionPago } from "@/lib/retornoPago";
 
 /**
@@ -44,7 +45,8 @@ function tokenDelEnlace(): string {
 const token = tokenDelEnlace();
 const presupuesto = ref<PresupuestoCliente | null>(null);
 const marca = ref<{ nombre: string; logo_url: string | null } | null>(null);
-const estado = ref<"cargando" | "listo" | "invalido">("cargando");
+const estado = ref<"cargando" | "listo" | "invalido" | "error">("cargando");
+const errorCarga = ref<string | null>(null);
 const url = computed(
   () =>
     `/api/v1/app/${encodeURIComponent(slug)}/presupuestos-en-linea/${encodeURIComponent(id)}`,
@@ -64,6 +66,7 @@ async function cargar(): Promise<void> {
     estado.value = "invalido";
     return;
   }
+  estado.value = "cargando";
   try {
     const [p, m] = await Promise.all([
       api.get<{ data: PresupuestoCliente }>(url.value, {
@@ -78,8 +81,16 @@ async function cargar(): Promise<void> {
     presupuesto.value = p.data.data;
     marca.value = m?.data.data ?? null;
     estado.value = "listo";
-  } catch {
-    estado.value = "invalido";
+  } catch (e) {
+    // El servidor lo rechazó: el enlace no vale. Sin respuesta, un 5xx o un 429 es un
+    // fallo temporal: se reintenta, sin decirle que su presupuesto es inválido.
+    const codigo = axios.isAxiosError(e) ? e.response?.status : undefined;
+    if (codigo !== undefined && codigo < 500 && codigo !== 429) {
+      estado.value = "invalido";
+    } else {
+      errorCarga.value = mensajeDeError(e);
+      estado.value = "error";
+    }
   }
 }
 
@@ -91,6 +102,23 @@ onMounted(cargar);
     <p v-if="estado === 'cargando'" :style="{ color: 'var(--texto-suave)' }">
       {{ t("comun.cargando") }}
     </p>
+    <AvisoTono
+      v-else-if="estado === 'error'"
+      tono="peligro"
+      role="alert"
+      data-prueba="presupuesto-error"
+    >
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <div
       v-else-if="estado === 'invalido'"
       class="text-center py-16"

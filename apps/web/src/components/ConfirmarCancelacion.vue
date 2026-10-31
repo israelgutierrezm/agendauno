@@ -82,11 +82,22 @@ onMounted(cargar);
       </button>
     </div>
 
-    <p v-if="efecto" role="status">{{ efecto.mensaje }}</p>
-    <p v-else-if="!error" :style="{ color: 'var(--texto-suave)' }">
+    <p v-if="efecto?.mensaje" role="status">{{ efecto.mensaje }}</p>
+    <p v-else-if="!efecto && !error" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cancelacion.calculando") }}
     </p>
-    <AvisoTono v-if="error" tono="peligro" role="alert">{{ error }}</AvisoTono>
+    <AvisoTono v-if="error" tono="peligro" role="alert">
+      {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <div class="flex flex-wrap gap-2">
       <button

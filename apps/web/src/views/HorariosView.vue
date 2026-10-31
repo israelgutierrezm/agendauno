@@ -931,7 +931,7 @@ onMounted(cargarReferencias);
                 <p
                   v-else-if="okGuardado"
                   class="text-sm"
-                  :style="{ color: 'var(--exito)' }"
+                  :style="{ color: 'var(--exito-texto)' }"
                 >
                   {{ $t("horarios.guardado") }}
                 </p>

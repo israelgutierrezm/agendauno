@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Platform\Acceso\AdministradorPlataforma;
+use App\Modules\Platform\Acceso\PerfilesPlataforma;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 
@@ -38,7 +39,11 @@ it('cada perfil cambia solo lo suyo, y todos ven todo', function (): void {
     foreach ([$lectura, $soporte, $cobranza] as $token) {
         $this->getJson("/api/v1/plataforma/estudios/{$e['slug']}", conPlataforma($token))->assertOk();
     }
-    $this->getJson('/api/v1/plataforma/yo', conPlataforma($soporte))->assertOk()->assertJsonPath('data.administrador.perfil', 'soporte');
+    $this->getJson('/api/v1/plataforma/yo', conPlataforma($soporte))->assertOk()->assertJsonPath('data.administrador.perfil', 'soporte')
+        // Lo que puede cambiar, para que la interfaz oculte lo demás (U24).
+        ->assertJsonFragment(['estudios.extender-prueba'])
+        ->assertJsonMissing(['estudios.baja']);
+    expect(PerfilesPlataforma::acciones('total'))->toBe(['*']);
 
     // Solo lectura no cambia nada.
     $this->postJson("/api/v1/plataforma/estudios/{$e['slug']}/extender-prueba", ['dias' => 7], conPlataforma($lectura))->assertForbidden();

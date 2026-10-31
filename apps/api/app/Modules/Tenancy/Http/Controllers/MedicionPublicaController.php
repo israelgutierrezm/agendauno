@@ -30,6 +30,11 @@ class MedicionPublicaController
         $producto = ProductoComercial::tryFrom((string) $request->route('producto'));
         abort_if($producto === null, 404);
 
+        // Fuera de producción el navegador no carga GA4 ni Meta reales (ADR 0234).
+        if (! app()->environment('production')) {
+            return response()->json(['data' => ['ga4' => null, 'meta' => null]]);
+        }
+
         $ids = DestinoMedicionPlataforma::query()->where('producto', $producto->value)->where('activo', true)->get()
             ->filter->enUso()
             ->mapWithKeys(fn (DestinoMedicionPlataforma $d): array => [$d->proveedor->value => $d->identificador]);

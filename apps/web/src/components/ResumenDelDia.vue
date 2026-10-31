@@ -1027,7 +1027,9 @@ onMounted(() => {
             icono="hecho"
             compacto
             class="py-8"
-            :titulo="$t('operacion.hoy.alDia')"
+            :titulo="
+              $t(esCitas ? 'operacion.hoy.alDiaCitas' : 'operacion.hoy.alDia')
+            "
           />
           <ul v-else class="mt-3 space-y-2 text-sm">
             <li v-if="hoy.cobros && hoy.cobros.ordenes_pendientes > 0">

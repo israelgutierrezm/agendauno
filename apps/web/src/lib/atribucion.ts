@@ -53,7 +53,7 @@ export interface Atribucion {
 export type AtribucionParaEnviar = Atribucion;
 
 /** Topes de lo que se guarda en el navegador; el servidor aplica su propia ventana. */
-export const MAXIMO_DIAS_PRIMER_TOQUE = 365;
+export const MAXIMO_DIAS_PRIMER_TOQUE = 90;
 export const MAXIMO_DIAS_ULTIMO_TOQUE = 90;
 
 const DIA_MS = 86_400_000;
@@ -264,9 +264,12 @@ export function capturarAtribucion(
   if (toque === null || mismoToque(actual.ultimo_toque, toque)) {
     return actual;
   }
+  // Los identificadores de clic son de publicidad: sin ese permiso ni se guardan (ADR 0234).
+  const guardar =
+    leerPreferencias(ambito)?.publicidad === true ? toque : sinClics(toque)!;
   const nueva: Atribucion = {
-    primer_toque: actual.primer_toque ?? toque,
-    ultimo_toque: toque,
+    primer_toque: actual.primer_toque ?? guardar,
+    ultimo_toque: guardar,
   };
   try {
     almacen(ambito)?.setItem(CLAVE + ambito, JSON.stringify(nueva));

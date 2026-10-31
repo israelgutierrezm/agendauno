@@ -219,7 +219,11 @@ const avance = computed(() =>
           :data-si="c.hecho"
         >
           <span v-if="c.hecho">{{
-            $t(`quickstart.comprobaciones.${c.clave}`)
+            $t(
+              c.clave === "servicios" && !sesion.esCitas
+                ? "quickstart.comprobaciones.serviciosClases"
+                : `quickstart.comprobaciones.${c.clave}`,
+            )
           }}</span>
           <RouterLink
             v-else

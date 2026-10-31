@@ -145,15 +145,24 @@ const enlaceAviso = computed(() =>
         >
           {{ t("medicion.aviso.guardar") }}
         </button>
-        <button
-          v-else
-          type="button"
-          class="tu-btn tu-btn-primario am-boton"
-          data-prueba="am-aceptar"
-          @click="elegir({ analitica: true, publicidad: true })"
-        >
-          {{ t("medicion.aviso.aceptar") }}
-        </button>
+        <template v-else>
+          <button
+            type="button"
+            class="tu-btn tu-btn-primario am-boton"
+            data-prueba="am-solo-necesarias"
+            @click="elegir({ analitica: false, publicidad: false })"
+          >
+            {{ t("medicion.aviso.soloNecesarias") }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-primario am-boton"
+            data-prueba="am-aceptar"
+            @click="elegir({ analitica: true, publicidad: true })"
+          >
+            {{ t("medicion.aviso.aceptar") }}
+          </button>
+        </template>
         <button
           v-if="medicion.eligiendo"
           type="button"

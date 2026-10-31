@@ -512,22 +512,29 @@ async function confirmarCierre(): Promise<void> {
     cerrando.value = false;
   }
 }
+const reabriendo = ref(false);
 async function reabrir(): Promise<void> {
-  const g = seleccionado.value;
-  if (
-    g === null ||
-    !(await confirmar(t("cursos.confirmarReabrir", { grupo: g.nombre }), {
-      aceptar: t("cursos.reabrir"),
-    }))
-  ) {
-    return;
-  }
+  if (reabriendo.value) return;
+  reabriendo.value = true;
   try {
-    await api.post(`${base.value}/grupos/${g.id}/reabrir`);
-    toast.exito(t("cursos.reabierto", { grupo: g.nombre }));
-    await recargarElegido();
-  } catch (e) {
-    toast.error(mensajeDeError(e));
+    const g = seleccionado.value;
+    if (
+      g === null ||
+      !(await confirmar(t("cursos.confirmarReabrir", { grupo: g.nombre }), {
+        aceptar: t("cursos.reabrir"),
+      }))
+    ) {
+      return;
+    }
+    try {
+      await api.post(`${base.value}/grupos/${g.id}/reabrir`);
+      toast.exito(t("cursos.reabierto", { grupo: g.nombre }));
+      await recargarElegido();
+    } catch (e) {
+      toast.error(mensajeDeError(e));
+    }
+  } finally {
+    reabriendo.value = false;
   }
 }
 
@@ -719,6 +726,8 @@ const indicadores = computed<Indicador[]>(() => {
                     type="button"
                     class="tu-btn tu-btn-secundario tu-btn-chico"
                     data-prueba="reabrir-grupo"
+                    :disabled="reabriendo"
+                    :aria-busy="reabriendo || undefined"
                     @click="reabrir"
                   >
                     {{ $t("cursos.reabrir") }}

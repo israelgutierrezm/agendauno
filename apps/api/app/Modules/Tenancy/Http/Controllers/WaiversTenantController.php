@@ -44,6 +44,8 @@ class WaiversTenantController
                 'publicado_en' => $w->created_at?->toIso8601String(),
                 'firmas' => (int) ($firmas[$w->getKey()] ?? 0),
             ])->all(),
+            // Sin aviso publicado, el que se generó al dar de alta el negocio (ADR 0234).
+            'aviso_base' => $this->waivers->avisoBase()?->only(['titulo', 'contenido']),
         ]);
     }
 

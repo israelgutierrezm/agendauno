@@ -8,9 +8,9 @@ Una cookie es un archivo pequeño que un sitio guarda en tu navegador. El almace
 
 2. Cómo eliges
 
-La primera vez que entras a nuestros sitios te avisamos, en una barra al pie de la página, que usamos cookies. Con «Aceptar» autorizas las de analítica y publicidad. En «Cookies y configuración» eliges por separado la analítica y la publicidad, o no marcas ninguna para usar solo las necesarias. Mientras no aceptes, solo funcionan las necesarias: no se carga ninguna herramienta de medición ni de publicidad.
+La primera vez que entras a nuestros sitios te avisamos, en una barra al pie de la página, que usamos cookies. Con «Aceptar» autorizas las de analítica y publicidad; con «Solo necesarias», ninguna de las dos. En «Cookies y configuración» eliges por separado la analítica y la publicidad. Mientras no aceptes, solo funcionan las necesarias: no se carga ninguna herramienta de medición ni de publicidad.
 
-Puedes cambiar tu elección cuando quieras en «Cookies y configuración», al pie de cada página, o en esta misma página. Si retiras un permiso, apagamos esa herramienta, borramos sus cookies de este navegador y pedimos que se borren los identificadores ya registrados con él.
+Puedes cambiar tu elección cuando quieras en «Cookies y configuración», al pie de cada página, o en esta misma página. Si retiras un permiso, apagamos esa herramienta, borramos sus cookies de este navegador y borramos de nuestros servidores los identificadores ya registrados con él. Lo que esas herramientas ya recibieron se rige por las políticas de cada proveedor.
 
 Cada marca y la página de cada negocio piden y guardan su propia elección: aceptar en AgendaUno no autoriza nada en TurnoUno ni en la página de un negocio.
 
@@ -28,6 +28,8 @@ Sin ellas el servicio no funciona, por eso no se pueden desactivar desde el avis
 
 Recuerdan cómo prefieres ver la plataforma: tema claro u oscuro, color de acento, densidad, columnas de las listas, la barra lateral compacta, los negocios a los que entraste recientemente y si ya cerraste la invitación a instalar la aplicación. Se guardan solo en tu navegador y no salen de él.
 
+La página que se instala como aplicación usa un service worker: un archivo que el navegador guarda para abrirla más rápido y recibir avisos. Los avisos del navegador solo llegan si los activas, y el servicio de avisos de tu navegador recibe su contenido para entregártelo.
+
 5. Analítica (solo con tu permiso)
 
 Nos dice qué páginas se visitan y cómo se llega a ellas, para mejorar el sitio.
@@ -39,12 +41,13 @@ Nos dice qué páginas se visitan y cómo se llega a ellas, para mejorar el siti
 
 Mide los resultados de nuestros anuncios y nos ayuda a mejorar las campañas.
 • Píxel de Meta en los sitios de AgendaUno y TurnoUno: cookies «_fbp» y «_fbc», hasta 90 días. No se carga en la página de ningún negocio.
+• Identificadores de clic de los anuncios («gclid» y «fbclid»): se guardan en tu navegador solo con este permiso.
 • Señales de anuncios de Google en nuestros sitios: cookies como «_gcl_au», hasta 90 días.
-• Con este permiso también enviamos desde nuestro servidor, a Meta y a Google, la confirmación de un resultado (por ejemplo, que se registró un negocio) con identificadores del navegador. Nunca enviamos tu nombre, correo, teléfono ni datos de salud en estos eventos.
+• Con este permiso también enviamos desde nuestro servidor, a Meta y a Google, la confirmación de un resultado (por ejemplo, que se registró un negocio) con identificadores del navegador, tu dirección IP y los datos de tu navegador. Un negocio que lo active puede hacer lo mismo con Meta desde su página, solo con este permiso. Nunca enviamos tu nombre, correo, teléfono ni datos de salud en estos eventos.
 
 7. Videos y contenido de terceros
 
-Los videos que un negocio inserta en su página se cargan solo cuando los reproduces, desde YouTube en su modo sin cookies o desde Vimeo sin rastreo.
+Los videos que un negocio inserta en su página se cargan solo cuando los reproduces, desde YouTube en su modo sin cookies o desde Vimeo con su opción para no rastrear.
 
 Las tipografías de nuestras páginas se cargan desde Google Fonts. No guardan cookies, pero al pedirlas tu navegador envía a Google tu dirección IP y los datos técnicos de la petición.
 

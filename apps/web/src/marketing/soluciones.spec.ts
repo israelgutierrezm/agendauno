@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import es from "@/i18n/locales/es-MX";
 import modalidadNegocio from "@/i18n/locales/modalidad.es-MX";
@@ -43,9 +43,6 @@ describe("giros y su modalidad", () => {
     // después va en las preguntas frecuentes.
     expect(modalidadNegocio.registro).toBe(
       "Con el tipo de negocio eliges tu modalidad, clases o citas.",
-    );
-    expect(es.landing.portada.faq.cambiarModalidadR).toContain(
-      "Solo AgendaUno puede cambiar la modalidad",
     );
   });
 
@@ -119,9 +116,19 @@ describe("textos veraces de las páginas por giro", () => {
     expect(cabinas.respuesta).toContain("profesional y un espacio libres");
   });
 
-  it("Wellhub, TotalPass y Fitpass en los giros de clases que más los usan, con Fitpass solo en México", () => {
+  it("Wellhub, TotalPass y Fitpass en los giros de clases que más los usan, con Fitpass solo en México", async () => {
+    // Sin comprobar (ADR 0234) ninguna página las nombra.
+    for (const s of soluciones) {
+      expect(textoDe(s), s.slug).not.toMatch(/Wellhub|TotalPass|Fitpass/);
+    }
+    vi.stubEnv("VITE_INTEGRACION_WELLHUB", "1");
+    vi.stubEnv("VITE_INTEGRACION_TOTALPASS", "1");
+    vi.stubEnv("VITE_INTEGRACION_FITPASS", "1");
+    vi.resetModules();
+    const { soluciones: conPlataformas } = await import("./soluciones");
+    vi.unstubAllEnvs();
     for (const slug of ["crossfit-hyrox", "pilates", "yoga"]) {
-      const s = soluciones.find((x) => x.slug === slug)!;
+      const s = conPlataformas.find((x) => x.slug === slug)!;
       const pregunta = s.preguntas.find((p) => /Wellhub/.test(p.pregunta));
       expect(pregunta, slug).toBeDefined();
       expect(pregunta!.respuesta).toMatch(/^Sí\./);
@@ -130,7 +137,7 @@ describe("textos veraces de las páginas por giro", () => {
       expect(pregunta!.respuesta).not.toContain("*");
     }
     // En citas no se habla de plataformas de bienestar.
-    for (const s of soluciones.filter((x) => x.modo === "citas")) {
+    for (const s of conPlataformas.filter((x) => x.modo === "citas")) {
       expect(textoDe(s), s.slug).not.toMatch(/Wellhub|TotalPass|Fitpass/);
     }
   });

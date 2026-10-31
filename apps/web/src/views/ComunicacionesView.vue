@@ -1013,7 +1013,7 @@ onMounted(cargar);
       <div
         v-if="exito !== null"
         class="mt-4 tu-card p-4 text-sm"
-        :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
+        :style="{ background: 'var(--exito-suave)', color: 'var(--exito-texto)' }"
       >
         {{ $t("comunicaciones.enviada", { n: exito }) }}
       </div>

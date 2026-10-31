@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -79,11 +80,14 @@ async function cargar(): Promise<void> {
     await nextTick();
     entrada.value?.focus();
   } catch (e) {
-    // Dada de baja o mal copiada: hay que volver a activarla.
     negocio.value = null;
-    llave.value = null;
-    guardarLlave(null);
     error.value = mensajeDeError(e);
+    // Dada de baja o mal copiada (401): hay que volver a activarla. Sin red, un
+    // despliegue o un 429 no: el enlace solo se da una vez, la llave se conserva.
+    if (axios.isAxiosError(e) && e.response?.status === 401) {
+      llave.value = null;
+      guardarLlave(null);
+    }
   }
 }
 
@@ -176,7 +180,20 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="kiosco" data-prueba="kiosco">
-    <section v-if="!negocio" class="kiosco-centro">
+    <section v-if="!negocio && llave" class="kiosco-centro">
+      <h1>{{ $t("kiosco.sinConexion") }}</h1>
+      <p v-if="error" class="kiosco-error" role="alert">{{ error }}</p>
+      <button
+        type="button"
+        class="tu-btn tu-btn-primario"
+        data-prueba="kiosco-reintentar"
+        @click="cargar"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </section>
+
+    <section v-else-if="!negocio" class="kiosco-centro">
       <h1>{{ $t("kiosco.sinActivar") }}</h1>
       <p>{{ $t("kiosco.sinActivarAyuda") }}</p>
       <p v-if="error" class="kiosco-error" role="alert">{{ error }}</p>
@@ -285,7 +302,7 @@ onBeforeUnmount(() => {
   background: var(--superficie);
 }
 .kiosco-ok {
-  border-color: var(--exito);
+  border-color: var(--exito-texto);
 }
 .kiosco-aviso {
   border-color: var(--aviso);

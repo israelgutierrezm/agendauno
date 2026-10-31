@@ -325,7 +325,13 @@ async function agregarDia(): Promise<void> {
     const canceladas = data.meta?.cancelacion?.canceladas ?? 0;
     if (canceladas > 0) {
       toast.exito(
-        t("reglasAgenda.fechasDelDiaCanceladas", { n: canceladas }, canceladas),
+        t(
+          sesion.esCitas
+            ? "reglasAgenda.fechasDelDiaCanceladasCitas"
+            : "reglasAgenda.fechasDelDiaCanceladas",
+          { n: canceladas },
+          canceladas,
+        ),
       );
     }
     nuevoDia.value = { fecha: "", motivo: "", sucursal: sedePorOmision.value };
@@ -707,7 +713,9 @@ onMounted(cargar);
             <p :style="{ color: 'var(--texto-suave)' }">
               {{
                 $t(
-                  "reglasAgenda.afectadasDia",
+                  sesion.esCitas
+                    ? "reglasAgenda.afectadasDiaCitas"
+                    : "reglasAgenda.afectadasDia",
                   { n: afectadas.sesiones, reservas: afectadas.reservas },
                   afectadas.sesiones,
                 )
@@ -719,7 +727,13 @@ onMounted(cargar);
                 type="checkbox"
                 data-prueba="cancelar-del-dia"
               />
-              {{ $t("reglasAgenda.cancelarDelDia") }}
+              {{
+                $t(
+                  sesion.esCitas
+                    ? "reglasAgenda.cancelarDelDiaCitas"
+                    : "reglasAgenda.cancelarDelDia",
+                )
+              }}
             </label>
           </div>
         </form>

@@ -981,7 +981,7 @@ onMounted(cargar);
                         <span
                           v-if="guardadoId === o.id"
                           class="ml-2 text-sm"
-                          :style="{ color: 'var(--exito)' }"
+                          :style="{ color: 'var(--exito-texto)' }"
                           >{{
                             esCitas
                               ? $t("catalogo.guardado")

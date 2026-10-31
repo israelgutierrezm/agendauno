@@ -129,27 +129,41 @@ async function guardarClases(): Promise<void> {
   }
 }
 
+const marcando = ref(false);
 async function yaMarcado(p: PorMarcar): Promise<void> {
+  if (marcando.value) return;
+  marcando.value = true;
   try {
-    await api.post(
-      `/api/v1/app/${sesion.slug}/lugares-plataforma/${p.id}/marcado`,
-      {},
-    );
-    porMarcar.value = porMarcar.value.filter((x) => x.id !== p.id);
-  } catch (e) {
-    toast.error(mensajeDeError(e));
+    try {
+      await api.post(
+        `/api/v1/app/${sesion.slug}/lugares-plataforma/${p.id}/marcado`,
+        {},
+      );
+      porMarcar.value = porMarcar.value.filter((x) => x.id !== p.id);
+    } catch (e) {
+      toast.error(mensajeDeError(e));
+    }
+  } finally {
+    marcando.value = false;
   }
 }
 
+const marcandoCancelada = ref(false);
 async function yaCancelada(p: PorCancelar): Promise<void> {
+  if (marcandoCancelada.value) return;
+  marcandoCancelada.value = true;
   try {
-    await api.post(
-      `/api/v1/app/${sesion.slug}/lugares-plataforma/${p.id}/marcado`,
-      {},
-    );
-    porCancelar.value = porCancelar.value.filter((x) => x.id !== p.id);
-  } catch (e) {
-    toast.error(mensajeDeError(e));
+    try {
+      await api.post(
+        `/api/v1/app/${sesion.slug}/lugares-plataforma/${p.id}/marcado`,
+        {},
+      );
+      porCancelar.value = porCancelar.value.filter((x) => x.id !== p.id);
+    } catch (e) {
+      toast.error(mensajeDeError(e));
+    }
+  } finally {
+    marcandoCancelada.value = false;
   }
 }
 
@@ -341,6 +355,8 @@ onMounted(cargar);
           <button
             type="button"
             class="tu-btn tu-btn-secundario"
+            :disabled="marcando"
+            :aria-busy="marcando || undefined"
             @click="yaMarcado(p)"
           >
             {{ $t("fitpass.yaMarcado") }}
@@ -370,6 +386,8 @@ onMounted(cargar);
           <button
             type="button"
             class="tu-btn tu-btn-secundario"
+            :disabled="marcandoCancelada"
+            :aria-busy="marcandoCancelada || undefined"
             @click="yaCancelada(p)"
           >
             {{ $t("fitpass.yaCancelada") }}

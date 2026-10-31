@@ -9,9 +9,11 @@ producto, con su propio build de landing (`npm run build:agendauno`,
 
 ```
 agendauno.mx/                  portada de Clases con cupo (ModalidadView, modo clases)
-└── /software-para-{pilates, pole-dance, academias, crossfit-hyrox}
+├── /preguntas-frecuentes      todas las preguntas (indexable, con FAQPage, ADR 0234)
+└── /software-para-{pilates, pole-dance, academias, crossfit-hyrox, …}
 turnouno.mx/                   portada de Citas 1 a 1 (ModalidadView, modo citas)
-└── /software-para-{barberias, spas, terapeutas, nutriologos}
+├── /preguntas-frecuentes
+└── /software-para-{barberias, spas, terapeutas, nutriologos, …}
 ```
 
 `/clases` en agendauno.mx lleva a `/`; `/citas` y las páginas por giro de citas, a
@@ -33,8 +35,9 @@ en desarrollo, de `?producto=turnouno`.
   anclas: hero, sellos, `#producto` (demo fija por modo), `#soluciones` (funciones),
   `#como-funciona`, `#para-quien` (carrusel y páginas por giro de su modalidad),
   `#operacion` (recepción y ventas), `#precios`, `#pagina-publica`, `#preguntas` y
-  el llamado final, que cierra con un enlace discreto al otro producto. El menú es
-  Funciones · Precios · Preguntas.
+  el llamado final, que cierra con un enlace discreto al otro producto. Las preguntas
+  que no caben en la portada viven en `/preguntas-frecuentes` (enlazada en «Ayuda» del
+  pie, ADR 0234).
 - **Prelanzamiento**: mientras un producto no recibe registros (`/precios` →
   `registro`, lo decide el superadmin; el HTML pre-generado usa el respaldo
   `PRECIOS_POR_OMISION.registro`), nada ofrece prueba gratis, registrarse ni contratar:
@@ -52,6 +55,16 @@ en desarrollo, de `?producto=turnouno`.
 - **Nombres**: la modalidad se llama «Clases con cupo» / «Citas 1 a 1» en la portada,
   los precios y el registro (`NOMBRE_MODALIDAD`, igual a `modalidadNegocio.nombres`;
   una prueba lo vigila). El menú dice «Clases» / «Citas».
+- **Solo lo comprobado (ADR 0234)**: `src/marketing/integraciones.ts`. Las landings y el
+  SEO nombran una integración solo con su `VITE_INTEGRACION_*=1` (se enciende al pasar su
+  caso real de `docs/VERIFICACION-V1.md`) y las apps nativas solo con
+  `VITE_{PRODUCTO}_PLAY_URL` o `VITE_{PRODUCTO}_APP_STORE_URL`. Mientras tanto,
+  `novedadesVisibles` cambia cada tarjeta por su respaldo y se dice que la página se
+  instala como app (ADR 0110).
+- **Logo de TurnoUno (ADR 0234)**: se abre con el provisional. El definitivo va en
+  `public/assets/brand/turnouno/` (logo y `open-graph.png`), en los íconos de
+  `public/assets/pwa/turnouno-*` y en `DEFAULT_IMAGE` y `organizacionYSoftware`
+  (`logo` del JSON-LD) de `seoConfig.ts`.
 - **Textos veraces**: no se anuncia lo que no existe. Nada de «anticipos» (es «cobro en
   línea al agendar*»); recordatorios solo por correo (sin WhatsApp, push ni app); el QR
   es un pase de entrada y solo en gimnasios, CrossFit y HYROX (acceso libre, ADR 0105;
@@ -78,8 +91,8 @@ en desarrollo, de `?producto=turnouno`.
   `paginasMarketing` en `seoConfig.ts` es la lista única (router, pre-generado, sitemap
   y comprobaciones).
 - JSON-LD: `Organization`, `SoftwareApplication`, `WebSite` y `WebPage` en la portada;
-  en cada página por giro, además `BreadcrumbList` (Inicio → giro). Sin `Offer`,
-  `FAQPage` ni `hreflang`.
+  en cada página por giro, además `BreadcrumbList` (Inicio → giro). Solo
+  `/preguntas-frecuentes` lleva `FAQPage` (con sus respuestas). Sin `Offer` ni `hreflang`.
 - El sitemap lista las páginas de la marca; su robots anuncia también
   `/sitemap-negocios.xml` (los negocios de la marca, ADR 0155). Registro, acceso,
   activación, directorio, aviso de privacidad y la aplicación quedan con
@@ -148,8 +161,7 @@ JavaScript:
   marca lista los de sus negocios del directorio en `/sitemap-negocios.xml`. Que un
   buscador los acepte desde ahí pide verificar el dominio completo (propiedad de
   dominio) en su consola.
-- **Pendiente: dominio propio** (`docs/MULTIPRODUCTO.md`). Hace falta verificar el
-  dominio, emitir sus certificados y que la API resuelva el negocio por ese host.
+- **Dominio propio**: ya existe (ADR 0189).
 
 ## Registro con modalidad
 

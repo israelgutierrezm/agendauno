@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use Illuminate\Support\Carbon;
@@ -25,6 +27,9 @@ class WaiversTenant
      */
     public const AVISO_PRIVACIDAD = 'aviso-privacidad';
 
+    /** La versión del aviso base (sin publicar) que se genera al dar de alta el negocio. */
+    public const VERSION_BASE = 0;
+
     /** La versión vigente del aviso de privacidad del negocio, o null. */
     public function avisoPrivacidad(): ?WaiverTenant
     {
@@ -32,6 +37,42 @@ class WaiversTenant
             ->where('clave', self::AVISO_PRIVACIDAD)
             ->where('activo', true)
             ->orderByDesc('version')
+            ->first();
+    }
+
+    /**
+     * El aviso base con los datos del negocio, para que lo revise y lo publique (ADR 0234).
+     * Es la versión 0, sin activar: nadie lo ve ni lo firma; publicar crea la versión 1.
+     */
+    public function generarAvisoBase(Estudio $estudio): WaiverTenant
+    {
+        $citas = $estudio->modalidad() === ModalidadServicio::Citas;
+        $producto = $estudio->producto();
+        $texto = strtr((string) file_get_contents(resource_path('legales/aviso-negocio.txt')), [
+            '{negocio}' => (string) $estudio->nombre,
+            '{servicios}' => $citas ? 'citas' : 'clases',
+            '{planes}' => $citas ? 'bonos' : 'membresías, paquetes',
+            '[CORREO DE CONTACTO]' => (string) $estudio->contacto_email,
+            'AgendaUno' => $producto->nombre(),
+            'agendauno.mx' => $producto->dominio(),
+        ]);
+
+        return WaiverTenant::query()->firstOrCreate(
+            ['clave' => self::AVISO_PRIVACIDAD, 'version' => self::VERSION_BASE],
+            ['titulo' => 'Aviso de privacidad', 'contenido' => $texto, 'hash' => hash('sha256', $texto), 'activo' => false],
+        );
+    }
+
+    /** El aviso base, mientras el negocio no publique uno. */
+    public function avisoBase(): ?WaiverTenant
+    {
+        if ($this->avisoPrivacidad() !== null) {
+            return null;
+        }
+
+        return WaiverTenant::query()
+            ->where('clave', self::AVISO_PRIVACIDAD)
+            ->where('version', self::VERSION_BASE)
             ->first();
     }
 

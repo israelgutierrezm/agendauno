@@ -26,7 +26,12 @@ import { useToastStore } from "@/stores/toast";
  * que la landing las ofrece. Sub-sección y filtros en la dirección con claves propias
  * (`demos`, `demo_ver`…): no chocan con los de otras secciones del superadmin.
  */
-const props = defineProps<{ apiUrl: string; token: string }>();
+const props = defineProps<{
+  apiUrl: string;
+  token: string;
+  soloLectura?: boolean;
+  soloLecturaHorario?: boolean;
+}>();
 const emit = defineEmits<{ proximas: [n: number] }>();
 
 interface Calificacion {
@@ -400,7 +405,7 @@ onMounted(() => void cargar());
                 >
               </td>
               <td class="tu-celda-acciones">
-                <template v-if="d.estado === 'agendada'">
+                <template v-if="d.estado === 'agendada' && !soloLectura">
                   <!-- Ya empezó: se marca cómo fue. Aún no: se puede cancelar. -->
                   <template v-if="empezo(d)">
                     <button
@@ -449,7 +454,7 @@ onMounted(() => void cargar());
     </section>
 
     <HorarioDemosPlataforma
-      v-else
+      v-else-if="!soloLecturaHorario"
       class="mt-4"
       :api-url="apiUrl"
       :token="token"

@@ -80,7 +80,7 @@ export const DEFAULT_SEO = {
 } as const;
 
 /** Qué vista monta cada página comercial (el router elige el componente). */
-export type VistaMarketing = "modalidad" | "solucion";
+export type VistaMarketing = "modalidad" | "solucion" | "faq";
 
 export interface PaginaMarketing {
   path: string;
@@ -106,6 +106,13 @@ export interface PaginaMarketing {
  */
 export const paginasMarketing: readonly PaginaMarketing[] = [
   { path: "/", name: "inicio", vista: "modalidad", modo: MODO_COMERCIAL },
+  // Las respuestas que no caben en la portada, también para buscadores (ADR 0234).
+  {
+    path: "/preguntas-frecuentes",
+    name: "preguntas-frecuentes",
+    vista: "faq",
+    modo: MODO_COMERCIAL,
+  },
   ...soluciones
     .filter((s) => s.modo === MODO_COMERCIAL)
     .map((s): PaginaMarketing => ({
@@ -217,6 +224,46 @@ function seoDeModalidad(modo: Modo, registroAbierto: boolean): SeoOptions {
   };
 }
 
+/** Preguntas frecuentes: indexable; el `FAQPage` lo pone la vista con sus respuestas. */
+function seoDePreguntas(registroAbierto: boolean): SeoOptions {
+  const { seo } = MODALIDADES[MODO_COMERCIAL];
+  const ruta = "/preguntas-frecuentes";
+  const url = `${SITE_URL}${ruta}`;
+  const title = "Preguntas frecuentes | AgendaUno";
+  const image = `${SITE_URL}${seo.imagen}`;
+  const description = conCierre(
+    "Resuelve tus dudas sobre reservas, pagos, facturación, migración y planes en AgendaUno.",
+    registroAbierto,
+  );
+  return {
+    title,
+    description,
+    path: ruta,
+    image,
+    imageAlt: seo.imagenAlt,
+    index: true,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@graph": [
+        ...organizacionYSoftware(registroAbierto),
+        {
+          "@type": "WebPage",
+          "@id": `${url}#webpage`,
+          url,
+          name: title,
+          description,
+          inLanguage: "es-MX",
+          primaryImageOfPage: image,
+          about: { "@id": `${SITE_URL}/#software` },
+          isPartOf: { "@id": `${SITE_URL}/#website` },
+          breadcrumb: { "@id": `${url}#breadcrumb` },
+        },
+        migaDePan(url, [{ name: "Preguntas frecuentes", item: url }]),
+      ],
+    },
+  };
+}
+
 /**
  * El SEO de una ruta, con la marca del producto (ADR 0108). `registroAbierto`: si el
  * producto recibe registros (por omisión, el respaldo de `precios.ts`, el mismo del
@@ -270,6 +317,9 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
   if (ruta === "/") {
     return seoDeModalidad(MODO_COMERCIAL, registroAbierto);
   }
+  if (ruta === "/preguntas-frecuentes") {
+    return seoDePreguntas(registroAbierto);
+  }
   const solucion = soluciones.find(
     (s) => rutaSolucion(s.slug) === ruta && s.modo === MODO_COMERCIAL,
   );
@@ -320,13 +370,10 @@ function seoBase(path: string, registroAbierto: boolean): SeoOptions {
     "/activar": "Activa tu cuenta | AgendaUno",
     // Adonde llevan los botones de demo de la landing (ADR 0204).
     "/demo": "Agenda una demo | AgendaUno",
-    "/preguntas-frecuentes": "Preguntas frecuentes | AgendaUno",
   };
   const descripciones: Record<string, string> = {
     "/demo":
       "Agenda una llamada gratis para ver AgendaUno con los casos de tu negocio.",
-    "/preguntas-frecuentes":
-      "Resuelve tus dudas sobre reservas, pagos, facturación, migración y planes en AgendaUno.",
   };
   return {
     title: titulos[ruta] ?? "AgendaUno",

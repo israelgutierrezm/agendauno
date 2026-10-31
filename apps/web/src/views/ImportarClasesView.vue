@@ -217,7 +217,7 @@ async function descargar() {
       {{ error }}
     </AvisoTono>
     <div v-if="exito" class="tu-card mt-6 p-6 text-center" role="status">
-      <p class="text-lg font-semibold" :style="{ color: 'var(--exito)' }">
+      <p class="text-lg font-semibold" :style="{ color: 'var(--exito-texto)' }">
         {{ t("importarClases.creada", { n: exito.creados }) }}
       </p>
       <p class="mt-2 text-sm" style="color: var(--texto-suave)">

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
+import TipoCambioPlataforma from "@/components/TipoCambioPlataforma.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import { crearClientePlataforma } from "@/lib/clientePlataforma";
 import { mensajeDeError } from "@/lib/api";
@@ -54,6 +55,8 @@ interface Tarifa {
   definicion: Definicion;
 }
 interface Borrador {
+  // Desde cuándo rige: una subida, a 30 días o más (ADR 0234). Vacío: hoy.
+  vigente_desde?: string;
   moneda: string;
   dias_prueba: number;
   iva_porcentaje: number;
@@ -66,12 +69,6 @@ interface Borrador {
   /** Qué nivel abre cada función. */
   funciones: Record<string, Nivel>;
 }
-interface TipoCambio {
-  valor: string;
-  fecha: string;
-  fuente: string;
-}
-
 const MODALIDADES = ["clases", "citas"] as const;
 type Modalidad = (typeof MODALIDADES)[number];
 
@@ -96,13 +93,6 @@ const publicando = ref<Modalidad | null>(null);
 const incompleta = ref<Partial<Record<Modalidad, boolean>>>({});
 const cargando = ref(true);
 const errorCarga = ref<string | null>(null);
-
-const banxico = ref(false);
-const ultimoCambio = ref<TipoCambio | null>(null);
-const nuevoCambio = ref("");
-const guardandoCambio = ref(false);
-// El error del valor capturado va debajo de su campo.
-const errorCambio = ref<string | null>(null);
 
 function cliente() {
   return crearClientePlataforma({
@@ -240,18 +230,6 @@ async function cargar(conservar?: Modalidad): Promise<void> {
   }
 }
 
-async function cargarCambio(): Promise<void> {
-  try {
-    const { data } = await cliente().get<{
-      data: { banxico_configurado: boolean; ultimo: TipoCambio | null };
-    }>("/api/v1/plataforma/tipo-cambio");
-    banxico.value = data.data.banxico_configurado;
-    ultimoCambio.value = data.data.ultimo;
-  } catch {
-    // Si la API falla, ya lo avisan las tarifas (con su «Reintentar»).
-  }
-}
-
 function agregar(m: Modalidad): void {
   const b = borradores.value[m];
   if (b === undefined) {
@@ -283,6 +261,7 @@ function cuerpoDe(m: Modalidad, b: Borrador): Record<string, unknown> {
     dias_prueba: b.dias_prueba,
     iva_porcentaje: b.iva_porcentaje,
     iva_porcentaje_extranjero: b.iva_porcentaje_extranjero,
+    ...(b.vigente_desde ? { vigente_desde: b.vigente_desde } : {}),
   };
   if (m === "clases") {
     const ultimo = b.escalones.length - 1;
@@ -349,23 +328,6 @@ async function publicar(m: Modalidad): Promise<void> {
   }
 }
 
-async function guardarCambio(): Promise<void> {
-  guardandoCambio.value = true;
-  errorCambio.value = null;
-  try {
-    const { data } = await cliente().put<{
-      data: { banxico_configurado: boolean; ultimo: TipoCambio | null };
-    }>("/api/v1/plataforma/tipo-cambio", { valor: nuevoCambio.value });
-    ultimoCambio.value = data.data.ultimo;
-    nuevoCambio.value = "";
-    toast.exito(t("suscripcion.plataforma.tipoCambio.guardado"));
-  } catch (e) {
-    errorCambio.value = mensajeDeError(e);
-  } finally {
-    guardandoCambio.value = false;
-  }
-}
-
 function fecha(iso: string): string {
   const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
@@ -387,13 +349,9 @@ function sucio(m: Modalidad): boolean {
     escrito(b) !== escrito(borradorDe(vigentes.value[m] ?? null))
   );
 }
-// Salir con un borrador sin publicar (o un tipo de cambio escrito sin guardar)
-// pregunta antes (ADR 0166). Cambiar entre Clases y Citas no: los dos se conservan.
-useCambiosPendientes(
-  () =>
-    !cargando.value &&
-    (MODALIDADES.some(sucio) || String(nuevoCambio.value).trim() !== ""),
-);
+// Salir con un borrador sin publicar pregunta antes (ADR 0166). Cambiar entre Clases y
+// Citas no: los dos se conservan.
+useCambiosPendientes(() => !cargando.value && MODALIDADES.some(sucio));
 
 // Una versión publicada, en una línea: sus precios principales.
 function resumenVersion(v: Tarifa): string {
@@ -444,7 +402,6 @@ const TONO_VERSION = {
 
 function reintentar(): void {
   void cargar();
-  void cargarCambio();
 }
 
 onMounted(reintentar);
@@ -772,6 +729,19 @@ onMounted(reintentar);
               {{ $t("cobro.tarifas.incompleta") }}
             </AvisoTono>
 
+            <label class="tu-campo mt-4 block">
+              <span class="tu-label">{{ $t("cobro.tarifas.rigeDesde") }}</span>
+              <input
+                v-model="borradores[m]!.vigente_desde"
+                type="date"
+                class="tu-input"
+                :data-prueba="`tarifa-${m}-rige`"
+              />
+              <span class="tu-hint">{{
+                $t("cobro.tarifas.rigeDesdeAyuda")
+              }}</span>
+            </label>
+
             <!-- «Publicar» siempre a la vista al bajar por la tarjeta. -->
             <div class="tu-pie-acciones">
               <button
@@ -827,87 +797,7 @@ onMounted(reintentar);
       </template>
     </template>
 
-    <!-- Tipo de cambio para cobrar en pesos la renta en dólares (ADR 0107): vale para
-         las dos tarifas; compacto, con el valor vigente y su captura en una fila. -->
-    <form
-      class="tu-card p-4 mt-4"
-      data-prueba="tipo-cambio"
-      @submit.prevent="guardarCambio"
-    >
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div class="min-w-0 flex-1 space-y-1">
-          <h2 class="tu-titulo-seccion">
-            {{ $t("suscripcion.plataforma.tipoCambio.titulo") }}
-          </h2>
-          <p class="font-semibold">
-            <template v-if="ultimoCambio">
-              {{
-                $t("suscripcion.plataforma.tipoCambio.ultimo", {
-                  valor: ultimoCambio.valor,
-                  fecha: fecha(ultimoCambio.fecha),
-                })
-              }}
-              <span
-                class="text-sm font-normal"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                ·
-                {{
-                  ultimoCambio.fuente === "banxico"
-                    ? $t("suscripcion.plataforma.tipoCambio.fuenteBanxico")
-                    : $t("suscripcion.plataforma.tipoCambio.fuenteManual")
-                }}
-              </span>
-            </template>
-            <template v-else>{{
-              $t("suscripcion.plataforma.tipoCambio.sinValor")
-            }}</template>
-          </p>
-          <p class="text-sm">
-            {{
-              banxico
-                ? $t("suscripcion.plataforma.tipoCambio.banxico")
-                : $t("suscripcion.plataforma.tipoCambio.sinBanxico")
-            }}
-          </p>
-        </div>
-        <div class="flex items-end gap-2">
-          <label class="block">
-            <span class="tu-label">{{
-              $t("suscripcion.plataforma.tipoCambio.valor")
-            }}</span>
-            <input
-              v-model="nuevoCambio"
-              class="tu-input w-36"
-              inputmode="decimal"
-              placeholder="17.2345"
-              :aria-invalid="errorCambio ? 'true' : undefined"
-              aria-describedby="tipo-cambio-error"
-            />
-          </label>
-          <button
-            type="submit"
-            class="tu-btn tu-btn-primario"
-            :disabled="guardandoCambio || nuevoCambio.trim() === ''"
-            :aria-busy="guardandoCambio || undefined"
-          >
-            {{ $t("suscripcion.plataforma.tipoCambio.guardar") }}
-          </button>
-        </div>
-      </div>
-      <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("suscripcion.plataforma.tipoCambio.ayuda") }}
-      </p>
-      <AvisoTono
-        v-if="errorCambio"
-        id="tipo-cambio-error"
-        class="mt-3"
-        tono="peligro"
-        role="alert"
-      >
-        {{ errorCambio }}
-      </AvisoTono>
-    </form>
+    <TipoCambioPlataforma :api-url="apiUrl" :token="token" />
   </div>
 </template>
 

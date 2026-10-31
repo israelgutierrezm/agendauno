@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
@@ -462,9 +463,6 @@ onMounted(cargar);
       </RouterLink>
     </p>
 
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
@@ -569,7 +567,10 @@ onMounted(cargar);
 
             <div>
               <p class="tu-label">{{ $t("ventas.vender.metodo") }}</p>
-              <div class="tu-segmentado w-full" role="group">
+              <div
+                class="tu-segmentado tu-segmentado-apilado w-full"
+                role="group"
+              >
                 <button
                   v-for="m in METODOS"
                   :key="m"
@@ -611,7 +612,7 @@ onMounted(cargar);
               <p
                 v-if="promoPreview"
                 class="mt-1 text-sm"
-                :style="{ color: 'var(--exito)' }"
+                :style="{ color: 'var(--exito-texto)' }"
               >
                 {{
                   $t("ventas.vender.promoDescuento", {
@@ -723,6 +724,14 @@ onMounted(cargar);
             >
               {{ $t("sucursalOperativa.eligeParaCobrar") }}
             </p>
+            <AvisoTono
+              v-if="error"
+              tono="peligro"
+              role="alert"
+              data-prueba="error-venta"
+            >
+              {{ error }}
+            </AvisoTono>
             <button
               class="tu-btn tu-btn-primario w-full"
               type="submit"

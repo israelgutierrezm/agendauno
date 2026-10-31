@@ -128,6 +128,23 @@ describe("vender un plan", () => {
     ).toBeDefined();
   });
 
+  it("un cobro que falla avisa junto al botón, no arriba de la pantalla", async () => {
+    mocks.post.mockRejectedValue(new Error("Abre la caja"));
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    await w.findAll('[data-prueba="plan"]')[0]!.trigger("click");
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+    buscador.vm.$emit("update:modelValue", "m1");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    const aviso = w.get('[data-prueba="error-venta"]');
+    expect(aviso.attributes("role")).toBe("alert");
+    expect(w.get("form").element.contains(aviso.element)).toBe(true);
+    expect(aviso.text()).toContain("Error");
+  });
+
   it("un código escrito pero no aplicado no se manda: se cobra lo que se confirmó", async () => {
     const w = mount(VentasView, { global: { plugins: [i18n] } });
     await flushPromises();

@@ -1,17 +1,22 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 
 import IconoRed from "@/components/IconoRed.vue";
-import { api } from "@/lib/api";
+import AvisoTono from "@/components/AvisoTono.vue";
+import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import {
   capacidadesDeNegocio,
+  modalidadDe,
   type Capacidades,
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { updateSeo } from "@/lib/seo";
+import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
 import { slugDeContexto, urlCanonicaEstudio } from "@/lib/tenant";
+import { PRODUCTOS, productoActual, productoDeModalidad } from "@/lib/producto";
 
 /**
  * Página de enlaces del negocio (la del link en la bio de Instagram): logo, nombre,
@@ -37,7 +42,10 @@ interface Datos {
     // Solo clases o solo citas (ADR 0104): lo dice el servidor, no las ofertas.
     modalidad?: ModalidadServicio;
     capacidades?: Capacidades;
-    perfil_config?: { modalidad?: ModalidadServicio };
+    perfil_config?: {
+      modalidad?: ModalidadServicio;
+      terminologia?: Partial<TerminosNegocio>;
+    };
   };
   sucursales: {
     nombre: string;
@@ -67,10 +75,28 @@ const slug = computed(() =>
 const datos = ref<Datos | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
+const errorCarga = ref<string | null>(null);
 
 const redesSociales = computed(() =>
   (datos.value?.estudio.redes ?? []).filter((r) => r.red !== "sitio_web"),
 );
+const registroDelProducto = computed(() => {
+  const estudio = datos.value?.estudio;
+  const { dominio } =
+    PRODUCTOS[
+      estudio ? productoDeModalidad(modalidadDe(estudio)) : productoActual()
+    ];
+  return `https://${dominio}/registro`;
+});
+const { t } = useI18n();
+// Con las palabras del negocio («Horario de sesiones», ADR 0234).
+function textoBoton(boton: Boton): string {
+  const texto = t(`perfilPublico.enlaces.${boton.texto}`, boton.params ?? {});
+  const terminos = datos.value?.estudio.perfil_config?.terminologia;
+  return terminos?.sesion && terminos.miembro && terminos.instructor
+    ? adaptarTexto(texto, terminos as TerminosNegocio)
+    : texto;
+}
 const resumen = computed(() => {
   const d = datos.value?.estudio.descripcion ?? "";
   return d.length > 140 ? `${d.slice(0, 137).trimEnd()}…` : d;
@@ -165,6 +191,7 @@ function registrarClic(boton: Boton): void {
 }
 
 async function cargar(): Promise<void> {
+  errorCarga.value = null;
   cargando.value = true;
   try {
     const { data } = await api.get<{ data: Datos }>(
@@ -176,14 +203,19 @@ async function cargar(): Promise<void> {
       description:
         data.data.estudio.descripcion ??
         `Enlaces de ${data.data.estudio.nombre}.`,
-      path: urlCanonicaEstudio(data.data.estudio.slug, "/enlaces"),
+      path: urlCanonicaEstudio(
+        data.data.estudio.slug,
+        "/enlaces",
+        productoDeModalidad(modalidadDe(data.data.estudio)),
+      ),
       image: data.data.estudio.logo_url ?? undefined,
       imageAlt: data.data.estudio.nombre,
       type: "profile",
       index: data.data.estudio.en_directorio !== false,
     });
-  } catch {
-    noDisponible.value = true;
+  } catch (e) {
+    if (noEncontrado(e)) noDisponible.value = true;
+    else errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -201,6 +233,23 @@ onMounted(cargar);
     >
       {{ $t("perfilPublico.enlaces.cargando") }}
     </p>
+    <AvisoTono
+      v-else-if="errorCarga"
+      tono="peligro"
+      role="alert"
+      data-prueba="error-carga-publica"
+    >
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p v-else-if="noDisponible" class="text-center font-semibold">
       {{ $t("perfilPublico.enlaces.noDisponible") }}
     </p>
@@ -243,9 +292,7 @@ onMounted(cargar);
             @click="registrarClic(b)"
           >
             <IconoRed :red="b.icono" :tamano="18" />
-            <span>{{
-              $t(`perfilPublico.enlaces.${b.texto}`, b.params ?? {})
-            }}</span>
+            <span>{{ textoBoton(b) }}</span>
           </RouterLink>
           <a
             v-else
@@ -256,9 +303,7 @@ onMounted(cargar);
             @click="registrarClic(b)"
           >
             <IconoRed :red="b.icono" :tamano="18" />
-            <span>{{
-              $t(`perfilPublico.enlaces.${b.texto}`, b.params ?? {})
-            }}</span>
+            <span>{{ textoBoton(b) }}</span>
           </a>
         </li>
       </ul>
@@ -282,9 +327,10 @@ onMounted(cargar);
       </ul>
 
       <p class="mt-10 text-xs">
-        <RouterLink :to="{ name: 'registro' }" class="tu-enlace">{{
+        <!-- En el dominio del negocio, el registro sigue siendo del producto. -->
+        <a :href="registroDelProducto" class="tu-enlace">{{
           $t("perfilPublico.enlaces.crearTuya")
-        }}</RouterLink>
+        }}</a>
       </p>
     </div>
   </section>

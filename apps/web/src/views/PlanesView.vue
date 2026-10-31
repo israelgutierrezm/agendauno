@@ -34,6 +34,10 @@ import { useToastStore } from "@/stores/toast";
  */
 const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas un bono no se renueva (ADR 0130).
+const colDura = computed(() =>
+  t(sesion.esCitas ? "planesVisual.col.duraCitas" : "planesVisual.col.dura"),
+);
 // En citas lo que se vende son bonos de sesiones (ADR 0130): la variante «…Citas».
 function tm(
   clave: string,
@@ -415,7 +419,7 @@ onMounted(cargar);
                   {{ $t("planesVisual.col.incluye") }}
                 </th>
                 <th class="hidden md:table-cell">
-                  {{ $t("planesVisual.col.dura") }}
+                  {{ colDura }}
                 </th>
                 <th class="hidden lg:table-cell">
                   {{ $t("planesVisual.col.sirve") }}
@@ -478,7 +482,7 @@ onMounted(cargar);
                 </td>
                 <td
                   class="hidden md:table-cell pv-suave"
-                  :data-etiqueta="$t('planesVisual.col.dura')"
+                  :data-etiqueta="colDura"
                 >
                   <span>
                     {{ vigencia(p) }}

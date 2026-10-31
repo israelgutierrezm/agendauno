@@ -362,6 +362,12 @@ defineEmits<{ alternarTema: [] }>();
           </div>
           <div class="tu-public-footer-col">
             <p class="tu-public-footer-titulo">Ayuda</p>
+            <RouterLink
+              class="tu-public-footer-link"
+              :to="{ name: 'preguntas-frecuentes' }"
+            >
+              Preguntas frecuentes
+            </RouterLink>
             <a
               class="tu-public-footer-link"
               :href="`mailto:${PRODUCTOS[producto].soporte.correo}`"

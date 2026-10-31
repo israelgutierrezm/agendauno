@@ -269,7 +269,11 @@ async function registrar(): Promise<void> {
       </ul>
       <div>
         <p class="tu-label">{{ $t("ventas.vender.metodo") }}</p>
-        <div v-if="!dividido" class="tu-segmentado w-full" role="group">
+        <div
+          v-if="!dividido"
+          class="tu-segmentado tu-segmentado-apilado w-full"
+          role="group"
+        >
           <button
             v-for="m in METODOS"
             :key="m"

@@ -324,6 +324,7 @@ export default {
     },
     pendientes: "Pendientes",
     alDia: "Todo al día: nada por cobrar ni renovaciones por atender.",
+    alDiaCitas: "Todo al día: nada por cobrar.",
     porCobrar: "1 orden por cobrar | {n} órdenes por cobrar",
     enMora: "1 cuenta en mora | {n} cuentas en mora",
     porVencer:
@@ -1118,6 +1119,12 @@ export default {
   },
   // Pasarelas de pago del negocio: con su propia cuenta.
   pasarelas: {
+    confirmarApagar:
+      "¿Apagar {nombre}? Dejarás de cobrar en línea con ella hasta que la vuelvas a activar.",
+    apagar: "Apagar {nombre}",
+    confirmarReal:
+      "¿Pasar {nombre} a modo real? Desde ese momento los cobros son de dinero de verdad.",
+    pasarAReal: "Pasar a modo real",
     alcanceTitulo: "Cobra en línea con tu propia cuenta",
     alcance:
       "Los pagos llegan directo a tu cuenta de la pasarela. Tus llaves se guardan cifradas y nunca se vuelven a mostrar; activa la que uses cuando tenga sus llaves.",

@@ -238,7 +238,7 @@ it('los indicadores de Cobranza cuadran con el corte: lo cobrado incluye lo devu
         ->and($segundo->json('meta.resumen.reembolsado'))->toBe([['moneda' => 'MXN', 'total_minor' => 30000]]);
 });
 
-it('repetir una compra del alumno con su clave devuelve la misma orden; con otra clave, otra', function (): void {
+it('repetir una compra del alumno devuelve la misma orden mientras siga abierta; ya pagada, otra', function (): void {
     $e = estudioConSesion('revision-compra', 'a@revision-compra.mx');
     $pack = crearPackTenant($e);
     $a = alumnoConSesion($e);
@@ -248,5 +248,8 @@ it('repetir una compra del alumno con su clave devuelve la misma orden; con otra
 
     $primera = $comprar('compra-1');
     expect($comprar('compra-1'))->toBe($primera)
-        ->and($comprar('compra-2'))->not->toBe($primera);
+        ->and($comprar('compra-2'))->toBe($primera);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$primera}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
+    expect($comprar('compra-3'))->not->toBe($primera);
 });

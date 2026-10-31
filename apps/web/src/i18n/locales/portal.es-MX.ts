@@ -396,6 +396,8 @@ export default {
       "Revisa los pagos de tus citas y consulta tus compras anteriores.",
     secciones: "Secciones de pagos",
     planes: "Mis planes",
+    planesCitas: "Mis bonos",
+    renovarCitas: "Comprar un bono",
     saldoVigencia: "Disponibilidad y vigencia",
     verMovimientos: "Consulta tus compras y pagos",
     renovar: "Comprar o renovar",

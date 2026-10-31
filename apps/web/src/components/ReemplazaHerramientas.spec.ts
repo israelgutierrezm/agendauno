@@ -43,10 +43,21 @@ describe("lo que se cobra aparte", () => {
     expect(w.text()).not.toContain("membresías");
   });
 
-  it("en clases, la app con tu marca dice que hoy es en Google Play", () => {
+  it("en clases, la app con tu marca sale solo con su enlace de la tienda (ADR 0234)", () => {
+    const sinApp = mount(ArranqueYReferidos, { props: { modo: "clases" } });
+    expect(sinApp.find('[data-prueba="app-con-tu-marca"]').exists()).toBe(
+      false,
+    );
+    // El arranque se contrata por contacto con el equipo.
+    expect(
+      sinApp.get('[data-prueba="contratar-arranque"]').attributes("href"),
+    ).toContain("mailto:");
+
+    vi.stubEnv("VITE_AGENDAUNO_PLAY_URL", "https://play.google.com/a");
     const w = mount(ArranqueYReferidos, { props: { modo: "clases" } });
     const app = w.get('[data-prueba="app-con-tu-marca"]');
     expect(app.text()).toContain("Google Play");
     expect(app.text()).toContain("Por ahora solo para Android");
+    vi.unstubAllEnvs();
   });
 });

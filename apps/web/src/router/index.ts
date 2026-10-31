@@ -14,15 +14,11 @@ import {
   fijarAmbitoActual,
 } from "@/lib/atribucion";
 import { volverSeguro } from "@/lib/destinoSeguro";
-import { navegar } from "@/lib/etiquetas";
+import { navegar, pausarGa4 } from "@/lib/etiquetas";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { preciosPublicos } from "@/marketing/preciosPublicos";
-import {
-  MODO_COMERCIAL,
-  PRODUCTO_COMERCIAL,
-  seoParaRuta,
-} from "@/marketing/seoConfig";
+import { PRODUCTO_COMERCIAL, seoParaRuta } from "@/marketing/seoConfig";
 import {
   registroDelOtroProducto,
   rutasComerciales,
@@ -63,15 +59,9 @@ const router = createRouter({
     ...rutasComerciales({
       modalidad: ModalidadView,
       solucion: () => import("@/views/SolucionView.vue"),
+      faq: () => import("@/views/PreguntasFrecuentesView.vue"),
     }),
-    {
-      path: "/preguntas-frecuentes",
-      alias: ["/faq"],
-      name: "preguntas-frecuentes",
-      component: () => import("@/views/PreguntasFrecuentesView.vue"),
-      meta: { marketing: true, modo: MODO_COMERCIAL },
-      props: (r) => ({ modo: modoDeQuery(r.query.modo) ?? MODO_COMERCIAL }),
-    },
+    { path: "/faq", redirect: { name: "preguntas-frecuentes" } },
     {
       path: "/aviso-de-privacidad",
       name: "aviso-privacidad",
@@ -883,6 +873,14 @@ router.beforeEach(async (to) => {
   }
 
   return true;
+});
+
+// Lo que dispare GA4 durante la navegación no debe llevar una ruta que no se mide.
+router.beforeEach((to) => {
+  const ambito = ambitoDeRuta(to);
+  if (rutaMedible(to, ambito, seoParaRuta(to.path).index === true) === null) {
+    pausarGa4();
+  }
 });
 
 router.afterEach((to, _from, failure) => {

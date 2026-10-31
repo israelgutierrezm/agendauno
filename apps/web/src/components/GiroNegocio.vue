@@ -96,7 +96,7 @@ async function enviar(): Promise<void> {
         v-if="listo"
         class="text-sm"
         role="status"
-        :style="{ color: 'var(--exito)' }"
+        :style="{ color: 'var(--exito-texto)' }"
         >{{ $t("modalidadNegocio.giro.guardado") }}</span
       >
     </form>

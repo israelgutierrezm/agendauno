@@ -86,6 +86,7 @@ interface Opciones {
     pais?: string | null;
     // ¿Publicó su aviso de privacidad para sus clientes?
     aviso_privacidad?: boolean;
+    aviso_version?: number | null;
     lada?: string | null;
     // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
     en_directorio?: boolean;
@@ -839,6 +840,15 @@ watch([filtro, sucursalId, fecha, servicioId], () => {
 // que ya estaba elegida).
 function elegirSede(id: string): void {
   sucursalId.value = id;
+  // El servicio del enlace (?servicio=) también aplica después de elegir sede.
+  const preServicio = String(route.query.servicio ?? "");
+  if (
+    servicioId.value === "" &&
+    opciones.value?.servicios.some((s) => s.id === preServicio)
+  ) {
+    elegirServicio(preServicio);
+    return;
+  }
   ir("servicio");
 }
 function elegirServicio(id: string): void {
@@ -895,6 +905,8 @@ const textoPolitica = computed(() => {
 
 // Un cupón del negocio (ADR 0220): se revisa antes y se aplica al agendar.
 const cupon = ref("");
+// Lo que descuenta: los montos a la vista son los que se van a cobrar.
+const descuentoCupon = ref(0);
 async function revisarCupon(
   codigo: string,
 ): Promise<{ descuento_minor: number }> {
@@ -906,6 +918,7 @@ async function revisarCupon(
 }
 watch(servicioId, () => {
   cupon.value = "";
+  descuentoCupon.value = 0;
 });
 
 async function agendar(): Promise<void> {
@@ -987,6 +1000,10 @@ async function agendar(): Promise<void> {
         // Sin cuenta: que no sea un bot llenando la agenda (en desarrollo, sin llave, null).
         recaptcha_token: await tokenRecaptcha("cita"),
         ...cita,
+        // El aviso que tuvo a la vista: se guarda con su cita (ADR 0234).
+        ...(opciones.value?.estudio.aviso_version
+          ? { aviso_version: opciones.value.estudio.aviso_version }
+          : {}),
         // Reintentar lo mismo devuelve la cita ya agendada (ADR 0201).
         idempotency_key: intento.clave([quien, cita]),
         // De dónde llegó y lo que autorizó medir (ADR 0142 y 0143).
@@ -1379,7 +1396,9 @@ onMounted(cargar);
           <IconoNav nombre="hecho" :tam="24" />
         </div>
         <h2 class="mt-3 text-2xl font-semibold text-success">
-          {{ $t("reservar.listoTitulo") }}
+          {{
+            $t(apartada ? "reservar.apartadaTitulo" : "reservar.listoTitulo")
+          }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{
@@ -2222,6 +2241,7 @@ onMounted(cargar);
                     (m: number) => dinero(m, servicioSel?.moneda ?? null)
                   "
                   :deshabilitado="agendando"
+                  @aplicado="descuentoCupon = $event"
                 />
                 <p
                   v-if="textoPolitica"
@@ -2258,7 +2278,12 @@ onMounted(cargar);
                       <span class="block text-sm">{{
                         $t("perfilPublico.agendar.anticipo.restoEnNegocio", {
                           resto: dinero(
-                            (servicioSel?.precio_minor ?? 0) - anticipoSel,
+                            Math.max(
+                              0,
+                              (servicioSel?.precio_minor ?? 0) -
+                                anticipoSel -
+                                descuentoCupon,
+                            ),
                             servicioSel?.moneda ?? null,
                           ),
                         })
@@ -2274,7 +2299,13 @@ onMounted(cargar);
                     />
                     <span class="font-medium">{{
                       $t("perfilPublico.agendar.anticipo.todo", {
-                        total: precioDe(servicioSel),
+                        total: dinero(
+                          Math.max(
+                            0,
+                            (servicioSel?.precio_minor ?? 0) - descuentoCupon,
+                          ),
+                          servicioSel?.moneda ?? null,
+                        ),
                       })
                     }}</span>
                   </label>

@@ -10,6 +10,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EditorBloqueSitio from "@/components/EditorBloqueSitio.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -782,9 +783,18 @@ onBeforeUnmount(() => {
     >
       {{ $t("comun.cargando") }}
     </p>
-    <p v-else-if="error" class="mt-6 text-sm" style="color: var(--error)">
+    <AvisoTono v-else-if="error" tono="peligro" class="mt-6" role="alert">
       {{ error }}
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
 
     <template v-else-if="borrador && datos">
       <!-- Siempre a la vista: si hay borrador o está publicado, la vista previa, ver el

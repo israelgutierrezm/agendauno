@@ -5,8 +5,9 @@ import { useI18n } from "vue-i18n";
 import DetallePresupuesto, {
   type PresupuestoCliente,
 } from "@/components/DetallePresupuesto.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import RespuestaPresupuesto from "@/components/RespuestaPresupuesto.vue";
-import { api } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api";
 import { dinero } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -18,17 +19,19 @@ const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const lista = ref<PresupuestoCliente[]>([]);
 const abierto = ref<string | null>(null);
+const errorCarga = ref<string | null>(null);
 const base = `/api/v1/app/${sesion.slug}/mi/presupuestos`;
 
 async function cargar(): Promise<void> {
   try {
     const { data } = await api.get<{ data: PresupuestoCliente[] }>(base);
     lista.value = data.data;
+    errorCarga.value = null;
     // El que espera respuesta, abierto.
     abierto.value ??= lista.value.find((p) => p.puede_responder)?.id ?? null;
-  } catch {
-    // Sin presupuestos visibles: la sección no aparece.
-    lista.value = [];
+  } catch (e) {
+    // Un error no es «no tiene presupuestos»: se dice y se reintenta.
+    errorCarga.value = mensajeDeError(e);
   }
 }
 
@@ -52,6 +55,23 @@ onMounted(cargar);
 </script>
 
 <template>
+  <AvisoTono
+    v-if="errorCarga"
+    tono="peligro"
+    role="alert"
+    data-prueba="error-mis-presupuestos"
+  >
+    {{ errorCarga }}
+    <template #acciones>
+      <button
+        type="button"
+        class="tu-btn tu-btn-secundario tu-btn-chico"
+        @click="cargar"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </template>
+  </AvisoTono>
   <section v-if="lista.length > 0" data-prueba="mis-presupuestos">
     <h2 class="mp-seccion">{{ t("presupuestos.enLinea.misTitulo") }}</h2>
     <ul class="space-y-3">
@@ -86,6 +106,7 @@ onMounted(cargar);
             :presupuesto="p"
             :url="`${base}/${p.id}`"
             :slug="sesion.slug ?? ''"
+            en-cuenta
             @actualizado="actualizar"
           />
         </div>

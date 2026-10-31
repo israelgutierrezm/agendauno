@@ -202,11 +202,12 @@ class SegmentosRetencionTenant
             ->map(static fn (mixed $id): int => (int) $id)
             ->flip();
         $sesion = $this->modalidad->esCitas() ? 'agenda su primera cita' : 'reserva su primera clase';
+        $plan = $this->modalidad->esCitas() ? 'bono' : 'plan';
         $filas = [];
         foreach ($desde as $pid => $compro) {
             $hace = (int) $compro->diffInDays($hoy);
             if ($hace >= $dias && ! isset($yaVinieron[$pid]) && ! $conReserva->has($pid)) {
-                $filas[] = ['persona_id' => $pid, 'dato' => $compro->toDateString(), 'detalle' => 'Tiene su plan desde '.self::hace($hace)." y aún no {$sesion}.", 'orden' => -$hace];
+                $filas[] = ['persona_id' => $pid, 'dato' => $compro->toDateString(), 'detalle' => "Tiene su {$plan} desde ".self::hace($hace)." y aún no {$sesion}.", 'orden' => -$hace];
             }
         }
 

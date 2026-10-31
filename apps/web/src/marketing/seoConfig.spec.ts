@@ -126,6 +126,7 @@ describe("SEO comercial de AgendaUno", () => {
   it("la portada y las páginas por giro de clases, con título, descripción y canonical propios", () => {
     expect(rutasMarketing).toEqual([
       "/",
+      "/preguntas-frecuentes",
       ...deClases.map((s) => rutaSolucion(s.slug)),
     ]);
     expect(
@@ -206,7 +207,7 @@ describe("SEO comercial de AgendaUno", () => {
       rutasMarketing.filter(
         (path) => /^\/[^/]+$/.test(path) && !path.startsWith("/software-para-"),
       ),
-    ).toEqual([]);
+    ).toEqual(["/preguntas-frecuentes"]);
     expect(seoParaRuta("/mi-estudio").index).toBe(false);
     expect(renderSeoHead(seoParaRuta("/estudio/mi-estudio"))).toContain(
       'content="noindex,follow"',
@@ -293,6 +294,7 @@ describe("SEO comercial de TurnoUno", () => {
     expect(seo.SITE_URL).toBe("https://turnouno.mx");
     expect(seo.rutasMarketing).toEqual([
       "/",
+      "/preguntas-frecuentes",
       ...deCitas.map((s) => rutaSolucion(s.slug)),
     ]);
     expect(seo.paginasMarketing[0]).toMatchObject({ path: "/", modo: "citas" });

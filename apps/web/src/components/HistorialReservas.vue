@@ -365,6 +365,7 @@ onMounted(cargar);
               class="tu-input min-w-0 flex-1"
               maxlength="1000"
               :placeholder="$t('resenas.comentarioPh')"
+              :aria-label="$t('resenas.comentarioPh')"
             />
             <button
               type="submit"

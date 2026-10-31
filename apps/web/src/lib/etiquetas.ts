@@ -199,6 +199,10 @@ function cargarGa4(ambito: Ambito, id: string, p: Preferencias): void {
   desactivarGa4(id, false);
   if (cargados.ga4.has(id)) return;
   const prefijo = prefijoCookies(ambito);
+  // Sin parámetros: un enlace puede llevar identificadores (?pagar=, ?f=).
+  gtag("set", {
+    page_location: `${location.origin}${vista?.ruta ?? location.pathname}`,
+  });
   gtag("config", id, {
     send_page_view: false,
     ...(prefijo !== null
@@ -343,6 +347,13 @@ export function rutaParaMedir(ruta: string): string {
  * Cada navegación: qué ámbito es, si se mide y su vista de página. `ruta` es la que se
  * manda (ya sin datos de nadie); null = esta pantalla no se mide.
  */
+/** Antes de entrar a una ruta que no se mide: GA4 apagado desde ya, no al terminar. */
+export function pausarGa4(): void {
+  for (const id of cargados.ga4.keys()) {
+    desactivarGa4(id, true);
+  }
+}
+
 export async function navegar(
   ambito: Ambito | null,
   ruta: string | null,
@@ -372,6 +383,10 @@ async function medirNavegacion(
     return;
   }
   vista = { ambito, ruta: rutaParaMedir(ruta), titulo };
+  // Cada evento de GA4 lleva esta dirección, no la de la barra (con sus parámetros).
+  if (cargados.ga4.size > 0) {
+    gtag("set", { page_location: `${location.origin}${vista.ruta}` });
+  }
   if (medicion.ambito !== ambito) {
     medicion.ambito = ambito;
     medicion.destinos = null;

@@ -1,3 +1,9 @@
+import {
+  comprobada,
+  listaNatural,
+  plataformasConectadas,
+} from "./integraciones.ts";
+
 export interface Solucion {
   slug: string;
   nombre: string;
@@ -22,13 +28,36 @@ export interface Solucion {
 /**
  * Wellhub, TotalPass y Fitpass (ADR 0148, 0149, 0197 y 0202), para los giros de clases
  * donde más se usan. Sin «*»: estas páginas no llevan la nota de México y lo dicen con
- * palabras (Wellhub y TotalPass, en los países que habilita la plataforma).
+ * palabras (Wellhub y TotalPass, en los países que habilita la plataforma). Solo las
+ * comprobadas (ADR 0234); sin ninguna, la pregunta no se publica.
  */
-const PREGUNTA_PLATAFORMAS = {
-  pregunta: "¿Puedo recibir usuarios de Wellhub, TotalPass o Fitpass?",
-  respuesta:
-    "Sí. Con Wellhub y TotalPass publicas tus clases en su app: sus reservas ocupan su lugar en tu misma agenda y el check-in se valida solo. Con Fitpass apartas sus lugares y recepción registra sus reservas. Sus visitantes no cuentan como alumnos activos. Wellhub y TotalPass están en los países donde AgendaUno los ofrece; Fitpass, solo en México.",
-};
+function preguntasDePlataformas(): { pregunta: string; respuesta: string }[] {
+  const conectadas = plataformasConectadas();
+  const fitpass = comprobada("fitpass");
+  if (conectadas.length === 0 && !fitpass) {
+    return [];
+  }
+  const nombres = [...conectadas, ...(fitpass ? ["Fitpass"] : [])];
+  const partes = [
+    conectadas.length > 0
+      ? `Con ${listaNatural(conectadas)} publicas tus clases en su app: sus reservas ocupan su lugar en tu misma agenda y el check-in se valida solo.`
+      : "",
+    fitpass
+      ? "Con Fitpass apartas sus lugares y recepción registra sus reservas."
+      : "",
+    "Sus visitantes no cuentan como alumnos activos.",
+    conectadas.length > 0
+      ? `${listaNatural(conectadas)}: en los países donde AgendaUno los ofrece.`
+      : "",
+    fitpass ? "Fitpass, solo en México." : "",
+  ];
+  return [
+    {
+      pregunta: `¿Puedo recibir usuarios de ${listaNatural(nombres, "o")}?`,
+      respuesta: `Sí. ${partes.filter((p) => p !== "").join(" ")}`,
+    },
+  ];
+}
 
 /** Presupuestos en línea en los negocios de citas (ADR 0127). */
 function preguntaPresupuestos(
@@ -88,7 +117,7 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "AgendaUno se enfoca en reservas y operación del negocio. No sustituye una herramienta de programación de WOD, seguimiento de marcas deportivas o gestión de competencias, ni implica afiliación con estas marcas.",
       },
-      PREGUNTA_PLATAFORMAS,
+      ...preguntasDePlataformas(),
     ],
   },
   {
@@ -178,7 +207,7 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios; los importes son en dólares, más impuestos.",
       },
-      PREGUNTA_PLATAFORMAS,
+      ...preguntasDePlataformas(),
     ],
   },
   {
@@ -454,7 +483,7 @@ export const soluciones: readonly Solucion[] = [
         respuesta:
           "Das de alta a tus alumnos y los invitas a activar su cuenta. Con tu enlace consultan las clases disponibles y reservan según el paquete o la membresía que tienen.",
       },
-      PREGUNTA_PLATAFORMAS,
+      ...preguntasDePlataformas(),
     ],
   },
   {

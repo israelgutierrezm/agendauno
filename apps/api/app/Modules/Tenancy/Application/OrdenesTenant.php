@@ -252,7 +252,7 @@ class OrdenesTenant
      * La compra por pagar de ese producto que ya abrió en el portal (no se abre otra):
      * misma persona, un solo concepto y sin un cupón distinto. Null si no hay.
      */
-    public function compraAbiertaDe(PersonaTenant $comprador, string $productoUlid, ?string $beneficiarioId, ?string $codigoPromo): ?OrdenTenant
+    public function compraAbiertaDe(PersonaTenant $comprador, string $productoUlid, ?int $beneficiarioId, ?string $codigoPromo): ?OrdenTenant
     {
         if ($codigoPromo !== null && $codigoPromo !== '') {
             return null;

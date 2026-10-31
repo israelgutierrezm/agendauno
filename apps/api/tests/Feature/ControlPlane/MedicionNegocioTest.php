@@ -41,6 +41,10 @@ afterEach(function (): void {
  */
 function encenderMedicionNegocio(array $e, array $extra = []): void
 {
+    // La medición se informa en su aviso de privacidad: primero se publica (ADR 0234).
+    test()->postJson("/api/v1/app/{$e['slug']}/waivers", [
+        'clave' => 'aviso-privacidad', 'titulo' => 'Aviso de privacidad', 'contenido' => 'Informa la medición.',
+    ], conBearer($e['bearer']))->assertCreated();
     test()->putJson("/api/v1/app/{$e['slug']}/medicion/destinos/ga4", [
         'identificador' => 'G-NEGOCIO123', 'secreto' => 'secreto-ga4-negocio', 'activo' => true, 'aviso_confirmado' => true, ...$extra,
     ], conBearer($e['bearer']))->assertOk();

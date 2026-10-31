@@ -99,6 +99,15 @@ it('avisa antes, suspende tras la gracia y, al pagar, lo reactiva solo', functio
     // El dueño sí entra, ve que está suspendido y puede ir a pagar.
     $bearer = (string) entrarComo('estudio-a', 'a@correo.mx')->assertOk()->assertJsonPath('data.estudio.estado', 'suspended')->json('data.token');
     $this->getJson('/api/v1/app/estudio-a/renta', conBearer($bearer))->assertOk();
+    // También pagina sus cargos, sigue el retorno del pago, guarda su tarjeta y descarga
+    // sus datos; lo demás sigue cerrado.
+    $this->getJson('/api/v1/app/estudio-a/renta/cargos', conBearer($bearer))->assertOk();
+    expect($this->getJson("/api/v1/app/estudio-a/renta/cargos/{$n['cargo']->ulid}/confirmacion", conBearer($bearer))->status())->not->toBe(404);
+    $this->getJson('/api/v1/app/estudio-a/negocio/exportar', conBearer($bearer))->assertOk();
+    expect($this->postJson('/api/v1/app/estudio-a/renta/tarjeta', [], conBearer($bearer))->status())->not->toBe(404);
+    $this->getJson('/api/v1/app/estudio-a/timbres', conBearer($bearer))->assertNotFound();
+    $this->getJson('/api/v1/app/estudio-a/renta/complementos', conBearer($bearer))->assertNotFound();
+    $this->putJson('/api/v1/app/estudio-a/renta/plan', [], conBearer($bearer))->assertNotFound();
 
     // Paga (lo confirma la pasarela): se reactiva al momento.
     $n['cargo']->forceFill(['referencia_pago' => 'pi_prueba'])->save();

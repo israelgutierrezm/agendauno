@@ -6,7 +6,8 @@ import { RouterLink } from "vue-router";
 
 import { trackEvent } from "@/lib/analytics";
 import { productoDeModalidad } from "@/lib/producto";
-import { MODALIDADES, type Modo } from "@/marketing/modalidades";
+import { calendarios, listaNatural } from "@/marketing/integraciones";
+import { funcionesVisibles, type Modo } from "@/marketing/modalidades";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 
 /*
@@ -133,14 +134,19 @@ const funciones = computed<Funcion[]>(() => {
       detalle: f.detalle,
     }));
   }
-  return MODALIDADES[modo].funciones.map((clave) => {
+  // Los calendarios se nombran solo si están comprobados (ADR 0234).
+  const parametros = {
+    calendarios: listaNatural(calendarios()),
+    calendariosO: listaNatural(calendarios(), "o"),
+  };
+  return funcionesVisibles(modo).map((clave) => {
     const base = `landing.${modo}.funciones.${clave}`;
     return {
       clave,
       icono: ICONOS_MODO[clave] ?? ICONO_AGENDA,
-      titulo: t(`${base}.titulo`),
-      descripcion: t(`${base}.descripcion`),
-      detalle: t(`${base}.detalle`),
+      titulo: t(`${base}.titulo`, parametros),
+      descripcion: t(`${base}.descripcion`, parametros),
+      detalle: t(`${base}.detalle`, parametros),
     };
   });
 });

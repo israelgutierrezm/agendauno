@@ -110,7 +110,7 @@ class EnviarAlertas extends Command
             ->map(fn (Collection $grupo, string $titulo): string => "- {$titulo}: {$grupo->count()}")
             ->implode("\n");
         $tipos = $criticas->pluck('tipo')->unique()->sort()->implode(',');
-        $telegram->enviarUnaVez('resumen:'.md5($tipos), "AgendaUno: {$criticas->count()} alerta(s) crítica(s) de la plataforma.\n{$lineas}\nEl detalle está en el correo de alertas y en el superadmin.");
+        $telegram->enviarUnaVez('resumen:'.hash('sha256', $tipos), "AgendaUno: {$criticas->count()} alerta(s) crítica(s) de la plataforma.\n{$lineas}\nEl detalle está en el correo de alertas y en el superadmin.");
     }
 
     /** La cola sin latido y los trabajos que fallaron: también son alertas. */

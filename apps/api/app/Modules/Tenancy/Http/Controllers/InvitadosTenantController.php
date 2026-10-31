@@ -137,6 +137,7 @@ class InvitadosTenantController
                 'id' => $i->sesion->ulid,
                 'oferta' => $i->sesion->oferta?->nombre,
                 'inicia_en' => $i->sesion->inicia_en->toIso8601String(),
+                'zona_horaria' => $i->sesion->zona_horaria,
             ],
         ];
     }

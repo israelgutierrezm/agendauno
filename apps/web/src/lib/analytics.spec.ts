@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { analyticsPath, trackEvent } from "./analytics";
+import { ambitoEnUso } from "./atribucion";
+import { guardarPreferencias } from "./consentimiento";
 
 describe("analytics", () => {
   afterEach(() => {
@@ -63,6 +65,10 @@ describe("analytics", () => {
     });
     const request = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", request);
+    // Sin permiso de analítica no sale del navegador (ADR 0234).
+    trackEvent("tenant_activated");
+    expect(request).not.toHaveBeenCalled();
+    guardarPreferencias(ambitoEnUso(), { analitica: true, publicidad: false });
     trackEvent("tenant_activated");
     expect(request).toHaveBeenCalledWith(
       "/eventos",

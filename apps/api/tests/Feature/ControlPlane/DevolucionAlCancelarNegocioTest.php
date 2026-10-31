@@ -89,7 +89,7 @@ it('si el negocio lo activó, al cancelar una cita pagada en línea el pago se d
         ->assertOk()->assertJsonPath('data.se_devuelven', 1)
         ->assertJsonPath('data.mensaje', 'Se cancelará 1 reserva. 1 ya está pagada en línea: el pago se devolverá automáticamente.');
     $this->getJson("/api/v1/app/{$e['slug']}/reservas/{$c['reserva']}/cancelacion", conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.mensaje', 'No usa créditos. Ya está pagada en línea: el pago se devolverá automáticamente.');
+        ->assertOk()->assertJsonPath('data.mensaje', 'Ya está pagada en línea: el pago se devolverá automáticamente.');
 
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$c['sesion']}/cancelar", [], conBearer($e['bearer']))->assertOk();
     // El relay entrega el evento; aunque lo entregue dos veces, se devuelve una.
@@ -126,7 +126,7 @@ it('si cancela el cliente se aplica su política, no la devolución automática'
         ->assertOk();
 
     $this->getJson("/api/v1/app/{$e['slug']}/mi/reservas/{$c['reserva']}/cancelacion", conBearer($c['ana']['bearer']))
-        ->assertOk()->assertJsonPath('data.mensaje', 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.');
+        ->assertOk()->assertJsonPath('data.mensaje', 'Ya está pagada: el pago no se reembolsa automáticamente.');
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas/{$c['reserva']}/cancelar", [], conBearer($c['ana']['bearer']))->assertOk();
     $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 

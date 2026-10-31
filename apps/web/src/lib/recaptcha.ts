@@ -22,6 +22,8 @@ function cargar(siteKey: string): Promise<void> {
   return carga;
 }
 
+const TIEMPO_LIMITE_MS = 8000;
+
 interface Grecaptcha {
   ready: (cb: () => void) => void;
   execute: (key: string, opts: { action: string }) => Promise<string>;
@@ -32,12 +34,31 @@ export async function tokenRecaptcha(accion: string): Promise<string | null> {
     return null;
   }
   try {
-    await cargar(SITE_KEY);
+    await Promise.race([
+      cargar(SITE_KEY),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("recaptcha")), TIEMPO_LIMITE_MS);
+      }),
+    ]);
     const grecaptcha = (window as unknown as { grecaptcha: Grecaptcha })
       .grecaptcha;
     return await new Promise<string>((resolve, reject) => {
+      // Sin respuesta (bloqueador, red): el botón no se queda en «Enviando…».
+      const limite = setTimeout(
+        () => reject(new Error("recaptcha")),
+        TIEMPO_LIMITE_MS,
+      );
       grecaptcha.ready(() => {
-        grecaptcha.execute(SITE_KEY, { action: accion }).then(resolve, reject);
+        grecaptcha.execute(SITE_KEY, { action: accion }).then(
+          (token) => {
+            clearTimeout(limite);
+            resolve(token);
+          },
+          (error: unknown) => {
+            clearTimeout(limite);
+            reject(error instanceof Error ? error : new Error("recaptcha"));
+          },
+        );
       });
     });
   } catch {

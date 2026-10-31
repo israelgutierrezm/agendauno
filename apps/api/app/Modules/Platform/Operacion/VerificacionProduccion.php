@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\ProductoComercial;
 use App\Modules\Tenancy\Support\DiscosDeArchivos;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -312,6 +313,9 @@ class VerificacionProduccion
                 $this->punto('Correo', 'Servidor SMTP configurado', $servidor, "Ahora: {$host}. Define MAIL_HOST, MAIL_PORT y las credenciales de tu proveedor."),
             ] : []),
             $this->punto('Correo', 'Remitente propio', $remitente !== '' && ! str_ends_with($remitente, '@example.com'), "Ahora: {$remitente}. Usa un dominio con SPF y DKIM."),
+            // Sin el suyo, TurnoUno cotiza con ventas@{su dominio}: ese buzón debe existir.
+            $this->punto('Correo', 'Correo de ventas de TurnoUno', ConfiguracionPlataforma::ventasCorreoPropio(ProductoComercial::TurnoUno) !== null,
+                'Crea el buzón y ponlo en TURNOUNO_VENTAS_CORREO (o en Superadmin › Comercial).', critico: false),
             // Push en la web (ADR 0225): sin llaves, los avisos push solo llegan a la app.
             $this->punto('Correo', 'Avisos en el navegador (push en la web)', app(ClienteWebPush::class)->configurado(),
                 'Genera las llaves con php artisan agendauno:generar-vapid y ponlas en PUSH_WEB_PUBLICA y PUSH_WEB_PRIVADA: sin ellas, quien no tiene la app no recibe avisos push.', critico: false),

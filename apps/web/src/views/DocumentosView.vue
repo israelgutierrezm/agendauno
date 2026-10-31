@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import AvisoIncluidoPremium from "@/components/AvisoIncluidoPremium.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -143,13 +144,22 @@ async function cargar(): Promise<void> {
         },
       }),
       puedeGestionar.value
-        ? api.get<{ data: Consentimiento[] }>(`${base.value}/waivers`)
-        : Promise.resolve({ data: { data: [] as Consentimiento[] } }),
+        ? api.get<{
+            data: Consentimiento[];
+            aviso_base?: { titulo: string; contenido: string } | null;
+          }>(`${base.value}/waivers`)
+        : Promise.resolve({
+            data: {
+              data: [] as Consentimiento[],
+              aviso_base: null,
+            },
+          }),
     ]);
     tipos.value = t.data.data;
     docs.value = d.data.data;
     meta.value = d.data.meta ?? null;
     consentimientosVigentes.value = c.data.data;
+    avisoBase.value = c.data.aviso_base ?? null;
   } catch (e) {
     error.value = mensajeDeError(e);
     errorCarga.value = true;
@@ -247,6 +257,10 @@ async function ver(doc: Doc): Promise<void> {
 }
 
 // ---- Requisitos: alta y edición ----
+// Su plan no los incluye: se dice antes de llenar nada.
+const sinRequisitos = computed(
+  () => sesion.estudio?.plan?.sin.includes("documentos") === true,
+);
 function tipoVacio(): Omit<TipoDoc, "id"> {
   return {
     nombre: "",
@@ -399,7 +413,14 @@ const CLAVE_AVISO = "aviso-privacidad";
 const tieneAviso = computed(() =>
   consentimientosVigentes.value.some((c) => c.clave === CLAVE_AVISO),
 );
+// El aviso base que se generó al dar de alta el negocio (ADR 0234).
+const avisoBase = ref<{ titulo: string; contenido: string } | null>(null);
 function usarPlantillaAviso(): void {
+  if (avisoBase.value !== null) {
+    borrador.value = { ...avisoBase.value };
+    abrirEditor(CLAVE_AVISO);
+    return;
+  }
   borrador.value = {
     titulo: t("consentimientos.plantillaAviso.tituloDocumento"),
     // Con la marca y el vocabulario del negocio: TurnoUno y bonos en citas (ADR 0131).
@@ -498,14 +519,16 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t(TITULOS[pestana])">
       <template v-if="puedeGestionar && pestana !== 'documentos'" #acciones>
-        <button
-          v-if="pestana === 'requisitos'"
-          type="button"
-          class="tu-btn tu-btn-primario tu-btn-crear"
-          @click="abrirNuevoRequisito"
-        >
-          {{ $t("adminUsabilidad.documentos.nuevo") }}
-        </button>
+        <template v-if="pestana === 'requisitos'">
+          <button
+            v-if="!sinRequisitos"
+            type="button"
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            @click="abrirNuevoRequisito"
+          >
+            {{ $t("adminUsabilidad.documentos.nuevo") }}
+          </button>
+        </template>
         <button
           v-else
           type="button"
@@ -741,6 +764,10 @@ onMounted(cargar);
     </div>
 
     <!-- Requisitos -->
+    <AvisoIncluidoPremium
+      v-if="!cargando && pestana === 'requisitos' && sinRequisitos"
+      class="mt-5"
+    />
     <div
       v-if="!cargando && pestana === 'requisitos'"
       class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"

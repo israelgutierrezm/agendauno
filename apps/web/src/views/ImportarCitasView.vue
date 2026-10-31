@@ -272,7 +272,7 @@ function fechaHora(iso: string | null): string {
       role="status"
       data-prueba="exito-citas"
     >
-      <p class="text-lg font-semibold" style="color: var(--exito)">
+      <p class="text-lg font-semibold" style="color: var(--exito-texto)">
         {{ t("importarCitas.creadas", exito.creados) }}
       </p>
       <p class="mt-2 text-sm" style="color: var(--texto-suave)">

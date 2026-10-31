@@ -3,7 +3,21 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 import TextoDestacado from "@/components/TextoDestacado.vue";
-import { MODALIDADES, type Modo } from "@/marketing/modalidades";
+import { productoDeModalidad } from "@/lib/producto";
+import {
+  canalesDeBandeja,
+  carteras,
+  comprobada,
+  hayPlataformas,
+  listaNatural,
+  plataformasConectadas,
+  tiendasDeApp,
+} from "@/marketing/integraciones";
+import {
+  nombresDePlataformas,
+  novedadesVisibles,
+  type Modo,
+} from "@/marketing/modalidades";
 
 /*
 | «Lo nuevo» de cada modalidad (/clases y /citas), alto en la página: justo después de
@@ -253,15 +267,157 @@ const VISUALES: Record<Modo, Record<string, Visual>> = {
   },
 };
 
+// Las tarjetas que ocupan el lugar de lo no comprobado usan el ejemplo que ya existe
+// (ADR 0234).
+const VISUALES_RESPALDO: Record<Modo, Record<string, Visual>> = {
+  clases: {
+    pase: VISUALES.clases.wallet!,
+    instalable: {
+      tipo: "telefono",
+      titulo: "Tu próxima clase",
+      lineas: ["Pilates Reformer", "Hoy 18:00 · Lugar 4"],
+      botones: ["Cambiar lugar", "Cancelar"],
+      lado: {
+        titulo: "Pase de lista",
+        lineas: ["Pilates · 18:00", "7 de 8 llegaron"],
+      },
+    },
+    kiosco: {
+      tipo: "lista",
+      titulo: "Llegadas",
+      subtitulo: "Hoy 18:00",
+      filas: [
+        { texto: "Ana", detalle: "Pilates", valor: "Llegó", marca: "etiqueta" },
+        {
+          texto: "Carlos",
+          detalle: "Pilates",
+          valor: "Llegó",
+          marca: "etiqueta",
+        },
+      ],
+      aviso: { texto: "Asistencia registrada", punto: true },
+    },
+    apartados: {
+      tipo: "lista",
+      titulo: "Pilates Reformer",
+      subtitulo: "Apartado para hoy 18:00",
+      filas: [
+        { texto: "Ana López", detalle: "Agua", valor: "$25" },
+        { texto: "Carlos Ruiz", detalle: "Calcetines", valor: "$180" },
+      ],
+      aviso: { texto: "Por cobrar en el mostrador", punto: true },
+    },
+  },
+  citas: {
+    caja: {
+      tipo: "lista",
+      titulo: "Cierre de caja",
+      subtitulo: "Sucursal Centro",
+      filas: [
+        { texto: "Efectivo", detalle: "contado", valor: "$2,450" },
+        { texto: "Tarjeta", detalle: "según su reporte", valor: "$3,180" },
+        { texto: "Retiro", detalle: "pago a proveedor", valor: "−$400" },
+      ],
+      aviso: { texto: "Cuadra", punto: true },
+    },
+    instalable: {
+      tipo: "telefono",
+      titulo: "Tu próxima cita",
+      lineas: ["Corte y barba", "Vie 18:00 · con Marco"],
+      botones: ["Pagar", "Reprogramar"],
+      lado: {
+        titulo: "Presupuesto P-0012",
+        lineas: ["Por responder", "$2,850"],
+      },
+    },
+  },
+};
+
+/** Lo que dicen las tarjetas que nombran integraciones: solo las comprobadas. */
+function parametros(): Record<string, string> {
+  const canales = canalesDeBandeja();
+  return {
+    plataformas: listaNatural(
+      nombresDePlataformas().map((n) => (n === "Fitpass" ? "Fitpass*" : n)),
+    ),
+    carteras: listaNatural(carteras()),
+    canales: listaNatural(canales),
+    cuentas: listaNatural(
+      canales.map((c) =>
+        c === "WhatsApp" ? "tu WhatsApp Business" : `tu ${c}`,
+      ),
+    ),
+  };
+}
+
+function textoDe(clave: string): string {
+  if (clave !== "plataformas") {
+    return t(k(`items.${clave}.texto`), parametros());
+  }
+  const conectadas = plataformasConectadas();
+  return [
+    conectadas.length > 0
+      ? t(k("items.plataformas.textoConexion"), {
+          conectadas: listaNatural(conectadas, "o"),
+        })
+      : "",
+    comprobada("fitpass") ? t(k("items.plataformas.textoFitpass")) : "",
+  ]
+    .filter((parte) => parte !== "")
+    .join(" ");
+}
+
+function puntosDe(clave: string): string[] {
+  return PUNTOS.map((p) =>
+    clave === "bandeja" && p === "p3" && !comprobada("bandeja_whatsapp")
+      ? t(k("items.bandeja.p3SinWhatsapp"))
+      : t(k(`items.${clave}.puntos.${p}`)),
+  );
+}
+
+/** El ejemplo sin nombrar nada que no esté comprobado. */
+function visualDe(clave: string): Visual | undefined {
+  const visual =
+    VISUALES[props.modo][clave] ?? VISUALES_RESPALDO[props.modo][clave];
+  if (clave === "plataformas" && visual?.tipo === "lista") {
+    const nombres = new Set(["Directa", ...nombresDePlataformas()]);
+    return {
+      ...visual,
+      filas: visual.filas.filter((f) => nombres.has(f.valor ?? "")),
+    };
+  }
+  if (clave === "bandeja" && visual?.tipo === "mensajes") {
+    const canales = canalesDeBandeja();
+    return {
+      ...visual,
+      mensajes: visual.mensajes.map((m) => ({
+        ...m,
+        canal: canales.includes(m.canal) ? m.canal : (canales[0] ?? m.canal),
+      })),
+    };
+  }
+  return visual;
+}
+
 const novedades = computed(() =>
-  MODALIDADES[props.modo].novedades.map((clave) => ({
+  novedadesVisibles(props.modo).map((clave) => ({
     clave,
-    titulo: t(k(`items.${clave}.titulo`)),
-    texto: t(k(`items.${clave}.texto`)),
-    puntos: PUNTOS.map((p) => t(k(`items.${clave}.puntos.${p}`))),
-    visual: VISUALES[props.modo][clave],
+    titulo: t(k(`items.${clave}.titulo`), parametros()),
+    texto: textoDe(clave),
+    puntos: puntosDe(clave),
+    visual: visualDe(clave),
   })),
 );
+// Sin plataformas ni bandeja comprobadas, el subtítulo no las menciona (clases).
+const subtitulo = computed(() =>
+  props.modo === "clases" &&
+  !hayPlataformas() &&
+  canalesDeBandeja().length === 0
+    ? t(k("subtituloBase"))
+    : t(k("subtitulo")),
+);
+// Con la app publicada, sus enlaces van en su tarjeta.
+const tiendas = computed(() => tiendasDeApp(productoDeModalidad(props.modo)));
 // La nota de México solo si alguna novedad lleva «*».
 const conNotaMexico = computed(() =>
   novedades.value.some((n) =>
@@ -287,7 +443,7 @@ const conNotaMexico = computed(() =>
         />
       </h2>
       <p class="novedades-sub mt-4 text-lg max-w-2xl reveal">
-        {{ t(k("subtitulo")) }}
+        {{ subtitulo }}
       </p>
 
       <ul class="novedades" role="list">
@@ -476,6 +632,26 @@ const conNotaMexico = computed(() =>
               <span>{{ p }}</span>
             </li>
           </ul>
+          <p
+            v-if="n.clave === 'app' && (tiendas.play || tiendas.appStore)"
+            class="novedad-tiendas"
+            data-prueba="tiendas-app"
+          >
+            <a
+              v-if="tiendas.play"
+              :href="tiendas.play"
+              target="_blank"
+              rel="noopener"
+              >Google Play</a
+            >
+            <a
+              v-if="tiendas.appStore"
+              :href="tiendas.appStore"
+              target="_blank"
+              rel="noopener"
+              >App Store</a
+            >
+          </p>
         </li>
       </ul>
 
@@ -552,6 +728,17 @@ const conNotaMexico = computed(() =>
   font-size: 0.85rem;
   line-height: 1.4;
 }
+.novedad-tiendas {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.novedad-tiendas a {
+  color: var(--primario);
+  text-decoration: underline;
+}
 .novedad-puntos li {
   display: flex;
   align-items: flex-start;
@@ -560,7 +747,7 @@ const conNotaMexico = computed(() =>
 .novedad-puntos svg {
   flex: 0 0 auto;
   margin-top: 0.15rem;
-  color: var(--exito);
+  color: var(--exito-texto);
 }
 .novedades-pie {
   margin-top: 2.25rem;

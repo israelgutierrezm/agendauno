@@ -32,7 +32,7 @@ class ReservaTenant extends Model
         'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'oferta_expira_en',
         'motivo_cancelacion', 'cancelada_en', 'cancelada_por', 'cancelada_por_usuario_id', 'reprogramaciones_cliente',
         'sin_avisos', 'referencia_externa',
-        'nota_cliente', 'asiste',
+        'nota_cliente', 'asiste', 'aviso_version',
         'anticipo_minor', 'saldo_orden_id',
         // La cita se agendó con un servicio pagado por adelantado (ADR 0218).
         'linea_orden_id',

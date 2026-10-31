@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import type { PresupuestoCliente } from "@/components/DetallePresupuesto.vue";
@@ -18,6 +19,8 @@ const props = defineProps<{
   url: string;
   slug: string;
   token?: string;
+  /** Desde la cuenta se agenda dentro de ella, donde ya se sabe lo prepagado. */
+  enCuenta?: boolean;
 }>();
 const emit = defineEmits<{ actualizado: [p: PresupuestoCliente] }>();
 const { t } = useI18n();
@@ -118,6 +121,14 @@ async function pagar(): Promise<void> {
 function agendar(servicio: string): string {
   const sede = props.presupuesto.sucursal?.id;
   return `/agendar/${encodeURIComponent(props.slug)}?servicio=${encodeURIComponent(servicio)}${sede ? `&sucursal=${encodeURIComponent(sede)}` : ""}`;
+}
+
+function agendarEnCuenta(servicio: string): RouteLocationRaw {
+  const sede = props.presupuesto.sucursal?.id;
+  return {
+    name: "mis-reservas",
+    query: { servicio, ...(sede ? { sucursal: sede } : {}) },
+  };
 }
 </script>
 
@@ -233,15 +244,28 @@ function agendar(servicio: string): string {
     >
       <p class="tu-label">{{ $t("presupuestos.enLinea.agendarTitulo") }}</p>
       <div class="flex flex-wrap gap-2">
-        <a
-          v-for="s in presupuesto.servicios"
-          :key="s.id"
-          :href="agendar(s.id)"
-          class="tu-btn tu-btn-secundario tu-btn-chico"
-          data-prueba="presupuesto-agendar"
-        >
-          {{ $t("presupuestos.enLinea.agendar", { servicio: s.nombre }) }}
-        </a>
+        <template v-if="enCuenta">
+          <RouterLink
+            v-for="s in presupuesto.servicios"
+            :key="s.id"
+            :to="agendarEnCuenta(s.id)"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
+            data-prueba="presupuesto-agendar"
+          >
+            {{ $t("presupuestos.enLinea.agendar", { servicio: s.nombre }) }}
+          </RouterLink>
+        </template>
+        <template v-else>
+          <a
+            v-for="s in presupuesto.servicios"
+            :key="s.id"
+            :href="agendar(s.id)"
+            class="tu-btn tu-btn-secundario tu-btn-chico"
+            data-prueba="presupuesto-agendar"
+          >
+            {{ $t("presupuestos.enLinea.agendar", { servicio: s.nombre }) }}
+          </a>
+        </template>
       </div>
     </div>
   </div>

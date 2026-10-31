@@ -471,7 +471,8 @@ function cancelar(por: "cliente" | "negocio" | null): void {
     efecto = data.meta?.efecto?.mensaje ?? null;
   }, t("agendaVisual.cita.okCancelada")).then(() => {
     cancelando.value = false;
-    if (efecto !== null) {
+    // Sin bono ni pago no hay nada que decir de más: basta el aviso de cancelada.
+    if (efecto !== null && efecto !== "") {
       resultado.value = t("agendaVisual.cita.cancelada", { efecto });
     }
   });

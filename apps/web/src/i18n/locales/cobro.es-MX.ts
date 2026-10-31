@@ -88,6 +88,9 @@ export default {
     ayuda:
       "Precios mensuales sin IVA. Publicar crea una versión nueva: los cargos ya generados conservan la suya.",
     version: "Versión {n} · vigente desde {fecha}",
+    rigeDesde: "Rige desde",
+    rigeDesdeAyuda:
+      "Si subes algún precio debe regir a 30 días o más, y los dueños afectados reciben un correo al publicar. Bajar puede ser hoy.",
     // Con su producto (ADR 0132); la marca va como valor, no en el texto.
     clases: "{marca} · clases, por alumnos activos",
     citas: "{marca} · citas, por plan, nivel y profesionales",

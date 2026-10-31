@@ -21,7 +21,11 @@ interface Solicitud {
   nota: string | null;
   recibida_en: string;
 }
-const props = defineProps<{ apiUrl: string; token: string }>();
+const props = defineProps<{
+  apiUrl: string;
+  token: string;
+  soloLectura?: boolean;
+}>();
 const { t } = useI18n();
 const toast = useToastStore();
 const solicitudes = ref<Solicitud[]>([]);
@@ -47,14 +51,17 @@ function cliente() {
   });
 }
 
+const errorCarga = ref<string | null>(null);
 async function cargar(): Promise<void> {
   try {
     const { data } = await cliente().get<{ data: Solicitud[] }>(
       "/api/v1/plataforma/wellhub/solicitudes",
     );
     solicitudes.value = data.data;
-  } catch {
-    solicitudes.value = [];
+    errorCarga.value = null;
+  } catch (e) {
+    // Un error no es «no hay solicitudes».
+    errorCarga.value = mensajeDeError(e);
   }
 }
 
@@ -135,37 +142,39 @@ onMounted(cargar);
           >
           <span v-if="s.nota" class="tu-error-campo block">{{ s.nota }}</span>
         </div>
-        <label class="sr-only" :for="`negocio-${s.id}`">{{
-          $t("plataformaAdmin.wellhub.codigo")
-        }}</label>
-        <input
-          :id="`negocio-${s.id}`"
-          v-model="codigos[s.id]"
-          class="tu-input max-w-[12rem]"
-          autocomplete="off"
-          :placeholder="$t('plataformaAdmin.wellhub.codigo')"
-        />
-        <button
-          type="button"
-          class="tu-btn tu-btn-primario"
-          :disabled="ocupadoCon(s) || !(codigos[s.id] ?? '').trim()"
-          :aria-busy="ocupadoCon(s, 'asignar') || undefined"
-          :data-prueba="`asignar-${s.id}`"
-          @click="asignar(s)"
-        >
-          {{ $t("plataformaAdmin.wellhub.asignar") }}
-        </button>
-        <!-- Descartar la quita de aquí: acción de peligro, con confirmación. -->
-        <button
-          type="button"
-          class="tu-btn tu-btn-peligro"
-          :disabled="ocupadoCon(s)"
-          :aria-busy="ocupadoCon(s, 'descartar') || undefined"
-          :data-prueba="`descartar-${s.id}`"
-          @click="descartar(s)"
-        >
-          {{ $t("plataformaAdmin.wellhub.descartar") }}
-        </button>
+        <template v-if="!soloLectura">
+          <label class="sr-only" :for="`negocio-${s.id}`">{{
+            $t("plataformaAdmin.wellhub.codigo")
+          }}</label>
+          <input
+            :id="`negocio-${s.id}`"
+            v-model="codigos[s.id]"
+            class="tu-input max-w-[12rem]"
+            autocomplete="off"
+            :placeholder="$t('plataformaAdmin.wellhub.codigo')"
+          />
+          <button
+            type="button"
+            class="tu-btn tu-btn-primario"
+            :disabled="ocupadoCon(s) || !(codigos[s.id] ?? '').trim()"
+            :aria-busy="ocupadoCon(s, 'asignar') || undefined"
+            :data-prueba="`asignar-${s.id}`"
+            @click="asignar(s)"
+          >
+            {{ $t("plataformaAdmin.wellhub.asignar") }}
+          </button>
+          <!-- Descartar la quita de aquí: acción de peligro, con confirmación. -->
+          <button
+            type="button"
+            class="tu-btn tu-btn-peligro"
+            :disabled="ocupadoCon(s)"
+            :aria-busy="ocupadoCon(s, 'descartar') || undefined"
+            :data-prueba="`descartar-${s.id}`"
+            @click="descartar(s)"
+          >
+            {{ $t("plataformaAdmin.wellhub.descartar") }}
+          </button>
+        </template>
       </li>
     </ul>
   </section>

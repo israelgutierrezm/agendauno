@@ -296,18 +296,25 @@ async function guardarRecompensa(): Promise<void> {
   }
 }
 
+const alternandoRecompensa = ref(false);
 async function toggleRecompensa(r: Recompensa): Promise<void> {
-  error.value = null;
+  if (alternandoRecompensa.value) return;
+  alternandoRecompensa.value = true;
   try {
-    await api.put(`${base.value}/lealtad/recompensas/${r.id}`, {
-      nombre: r.nombre,
-      descripcion: r.descripcion,
-      costo_puntos: r.costo_puntos,
-      activa: !r.activa,
-    });
-    await recargarRecompensas();
-  } catch (e) {
-    error.value = mensajeDeError(e);
+    error.value = null;
+    try {
+      await api.put(`${base.value}/lealtad/recompensas/${r.id}`, {
+        nombre: r.nombre,
+        descripcion: r.descripcion,
+        costo_puntos: r.costo_puntos,
+        activa: !r.activa,
+      });
+      await recargarRecompensas();
+    } catch (e) {
+      error.value = mensajeDeError(e);
+    }
+  } finally {
+    alternandoRecompensa.value = false;
   }
 }
 
@@ -379,57 +386,74 @@ async function canjear(): Promise<void> {
   }
 }
 
+const ajustando = ref(false);
 async function ajustar(): Promise<void> {
-  aviso.value = null;
-  error.value = null;
-  if (miembroSel.value === "" || Number(ajuste.value.puntos) === 0) {
-    return;
-  }
-  if (
-    !(await confirmar(
-      t("confirmaciones.ajustarPuntos", {
-        puntos: Number(ajuste.value.puntos),
-      }),
-      { aceptar: t("confirmaciones.ajustar") },
-    ))
-  ) {
-    return;
-  }
+  if (ajustando.value) return;
+  ajustando.value = true;
   try {
-    await api.post(`${base.value}/miembros/${miembroSel.value}/puntos/ajuste`, {
-      puntos: Number(ajuste.value.puntos),
-      descripcion: ajuste.value.descripcion || null,
-    });
-    ajuste.value = { puntos: 0, descripcion: "" };
-    aviso.value = t("lealtad.ajustado");
-    await verMiembro();
-  } catch (e) {
-    error.value = mensajeDeError(e);
+    aviso.value = null;
+    error.value = null;
+    if (miembroSel.value === "" || Number(ajuste.value.puntos) === 0) {
+      return;
+    }
+    if (
+      !(await confirmar(
+        t("confirmaciones.ajustarPuntos", {
+          puntos: Number(ajuste.value.puntos),
+        }),
+        { aceptar: t("confirmaciones.ajustar") },
+      ))
+    ) {
+      return;
+    }
+    try {
+      await api.post(
+        `${base.value}/miembros/${miembroSel.value}/puntos/ajuste`,
+        {
+          puntos: Number(ajuste.value.puntos),
+          descripcion: ajuste.value.descripcion || null,
+        },
+      );
+      ajuste.value = { puntos: 0, descripcion: "" };
+      aviso.value = t("lealtad.ajustado");
+      await verMiembro();
+    } catch (e) {
+      error.value = mensajeDeError(e);
+    }
+  } finally {
+    ajustando.value = false;
   }
 }
 
+const canjeando = ref(false);
 async function accionCanje(
   c: Canje,
   accion: "entregar" | "cancelar",
 ): Promise<void> {
-  const seguir =
-    accion === "cancelar"
-      ? await confirmar(t("confirmaciones.cancelarCanje"), {
-          aceptar: t("confirmaciones.cancelarCanjeAceptar"),
-          peligro: true,
-        })
-      : await confirmar(t("confirmaciones.entregarCanje"), {
-          aceptar: t("confirmaciones.entregar"),
-        });
-  if (!seguir) {
-    return;
-  }
-  error.value = null;
+  if (canjeando.value) return;
+  canjeando.value = true;
   try {
-    await api.post(`${base.value}/lealtad/canjes/${c.id}/${accion}`, {});
-    await Promise.all([cargar(), verMiembro()]);
-  } catch (e) {
-    error.value = mensajeDeError(e);
+    const seguir =
+      accion === "cancelar"
+        ? await confirmar(t("confirmaciones.cancelarCanje"), {
+            aceptar: t("confirmaciones.cancelarCanjeAceptar"),
+            peligro: true,
+          })
+        : await confirmar(t("confirmaciones.entregarCanje"), {
+            aceptar: t("confirmaciones.entregar"),
+          });
+    if (!seguir) {
+      return;
+    }
+    error.value = null;
+    try {
+      await api.post(`${base.value}/lealtad/canjes/${c.id}/${accion}`, {});
+      await Promise.all([cargar(), verMiembro()]);
+    } catch (e) {
+      error.value = mensajeDeError(e);
+    }
+  } finally {
+    canjeando.value = false;
   }
 }
 
@@ -487,7 +511,7 @@ const indicadores = computed<Indicador[]>(() => {
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
-    <p v-if="aviso" class="mt-4 text-sm" style="color: var(--exito)">
+    <p v-if="aviso" class="mt-4 text-sm" style="color: var(--exito-texto)">
       {{ aviso }}
     </p>
     <p
@@ -634,6 +658,8 @@ const indicadores = computed<Indicador[]>(() => {
                     class="tu-btn tu-btn-chico"
                     :class="r.activa ? 'tu-btn-peligro' : 'tu-btn-secundario'"
                     :data-prueba="`alternar-recompensa-${r.id}`"
+                    :disabled="alternandoRecompensa"
+                    :aria-busy="alternandoRecompensa || undefined"
                     @click="toggleRecompensa(r)"
                   >
                     {{
@@ -912,15 +938,19 @@ const indicadores = computed<Indicador[]>(() => {
                   type="number"
                   class="tu-input w-28"
                   :placeholder="$t('lealtad.miembro.ajustePh')"
+                  :aria-label="$t('lealtad.miembro.ajustePh')"
                 />
                 <input
                   v-model="ajuste.descripcion"
                   class="tu-input flex-1"
                   :placeholder="$t('lealtad.miembro.motivo')"
+                  :aria-label="$t('lealtad.miembro.motivo')"
                 />
                 <button
                   type="button"
                   class="tu-btn tu-btn-secundario whitespace-nowrap"
+                  :disabled="ajustando"
+                  :aria-busy="ajustando || undefined"
                   @click="ajustar"
                 >
                   {{ $t("lealtad.miembro.ajustar") }}
@@ -1082,6 +1112,8 @@ const indicadores = computed<Indicador[]>(() => {
                       <button
                         type="button"
                         class="tu-btn tu-btn-secundario tu-btn-chico"
+                        :disabled="canjeando"
+                        :aria-busy="canjeando || undefined"
                         @click="accionCanje(c, 'entregar')"
                       >
                         {{ $t("lealtad.canjes.entregar") }}
@@ -1089,6 +1121,8 @@ const indicadores = computed<Indicador[]>(() => {
                       <button
                         type="button"
                         class="tu-btn tu-btn-peligro tu-btn-chico"
+                        :disabled="canjeando"
+                        :aria-busy="canjeando || undefined"
                         @click="accionCanje(c, 'cancelar')"
                       >
                         {{ $t("lealtad.canjes.cancelar") }}

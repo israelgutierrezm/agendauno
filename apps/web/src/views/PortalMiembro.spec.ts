@@ -221,7 +221,9 @@ describe("portal del alumno", () => {
                 zona_horaria: "America/Mexico_City",
               },
             }
-          : (datos[ruta] ?? []);
+          : ruta === "/mi/productos"
+            ? [{ id: "p1", nombre: "Mensual 8 clases" }]
+            : (datos[ruta] ?? []);
       return Promise.resolve({ data: { data: cuerpo } });
     });
     const w = montar(MiCuentaView);
@@ -233,6 +235,21 @@ describe("portal del alumno", () => {
     expect(w.find('[data-prueba="interes-clase"]').text()).toContain(
       "Te interesó Pole Nivel 1",
     );
+  });
+
+  it("el plan que le interesó no se ofrece si no lo puede comprar", async () => {
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/interes"
+          ? { plan: { id: "p1", nombre: "Mensual 8 clases" }, clase: null }
+          : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+
+    expect(w.find('[data-prueba="interes-plan"]').exists()).toBe(false);
   });
 
   it("sin nada pendiente de cuando era prospecto, no muestra el aviso", async () => {

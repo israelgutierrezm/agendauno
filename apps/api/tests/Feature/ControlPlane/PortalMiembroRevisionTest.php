@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 
@@ -238,6 +239,8 @@ it('lo que debe se pide aparte y completo: un adeudo antiguo no se pierde en el 
         $ordenes[] = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", [
             'items' => [['producto_id' => $pack, 'cantidad' => 1]],
         ], conBearer($m['bearer']))->assertCreated()->json('data.id');
+        // Sin caducidad, como las de antes (ADR 0231): la siguiente no la reutiliza.
+        app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), fn () => OrdenTenant::query()->where('ulid', end($ordenes))->update(['caduca_en' => null]));
     }
     // Paga las dos más nuevas; la primera sigue pendiente.
     foreach ([$ordenes[1], $ordenes[2]] as $orden) {

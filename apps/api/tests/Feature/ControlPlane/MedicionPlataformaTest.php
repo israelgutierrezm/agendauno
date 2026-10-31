@@ -84,6 +84,9 @@ it('el superadmin configura GA4 y Meta por producto; el secreto no vuelve a sali
         ->and($respuesta->getContent())->not->toContain('secreto-ga4-agenda')
         ->and(DB::table('destinos_medicion_plataforma')->where('proveedor', 'ga4')->value('secreto'))->not->toContain('secreto-ga4-agenda');
 
+    // Fuera de producción, el navegador no carga las etiquetas reales (ADR 0234).
+    $this->getJson('/api/v1/medicion/agendauno')->assertOk()->assertExactJson(['data' => ['ga4' => null, 'meta' => null]]);
+    app()->detectEnvironment(fn (): string => 'production');
     // Lo público: solo los IDs, y cada producto los suyos.
     $this->getJson('/api/v1/medicion/agendauno')->assertOk()->assertExactJson(['data' => ['ga4' => 'G-AGENDA123', 'meta' => '1234567890']]);
     $this->getJson('/api/v1/medicion/turnouno')->assertOk()->assertExactJson(['data' => ['ga4' => null, 'meta' => null]]);

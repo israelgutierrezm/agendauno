@@ -1141,7 +1141,11 @@ class MiTenantController
         // Comprar otra vez lo que ya dejó sin pagar es esa misma compra (ADR 0231).
         if (count($validado['items']) === 1 && (int) $validado['items'][0]['cantidad'] === 1) {
             $abierta = $this->ordenes->compraAbiertaDe($titular, (string) $validado['items'][0]['producto_id'], $paraOtro ? $persona->getKey() : null, $validado['codigo_promo'] ?? null);
-            if ($abierta !== null) {
+            // Sigue valiendo lo que se revisa al comprar: un plan archivado va al camino de
+            // siempre, que lo rechaza, y una clase de prueba ya usada no se reutiliza.
+            if ($abierta !== null && ! $items[0]['producto']->archivado) {
+                app(PrimeraVezTenant::class)->exigirEnOrden($abierta);
+
                 return response()->json(['data' => $this->presentarOrden($abierta)], 201);
             }
         }

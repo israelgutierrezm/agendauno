@@ -7,7 +7,11 @@ import perfilPublico from "@/i18n/locales/perfilPublico.es-MX";
 import EnlacesEstudioView from "./EnlacesEstudioView.vue";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock("@/lib/api", () => ({ api: { get: mocks.get } }));
+vi.mock("@/lib/api", () => ({
+  api: { get: mocks.get },
+  mensajeDeError: () => "Sin conexión",
+  noEncontrado: (e: { status?: number }) => e.status === 404,
+}));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/lib/seo", () => ({ updateSeo: vi.fn() }));
 vi.mock("vue-router", () => ({

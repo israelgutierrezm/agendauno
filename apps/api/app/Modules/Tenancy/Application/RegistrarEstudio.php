@@ -43,6 +43,9 @@ class RegistrarEstudio
         'agendauno', 'turnouno', 'clases', 'citas', 'registro', 'entrar', 'negocios',
         // El superadmin vive en /plataforma (ADR 0126).
         'plataforma',
+        // Páginas públicas del dominio principal: un negocio con ese slug quedaría tapado
+        // en su enlace corto o parecería de la plataforma (ADR 0234).
+        'demo', 'faq', 'preguntas-frecuentes', 'terminos', 'cookies', 'aviso-de-privacidad',
         // El destino del CNAME de los dominios propios (ADR 0189).
         'sitios',
         // Que nadie registre un subdominio que parezca de la plataforma (p. ej.

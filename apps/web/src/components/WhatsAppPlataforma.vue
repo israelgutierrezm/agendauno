@@ -186,6 +186,15 @@ onMounted(cargar);
 
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
 
     <form v-if="config" class="mt-4 space-y-4" @submit.prevent="guardar">

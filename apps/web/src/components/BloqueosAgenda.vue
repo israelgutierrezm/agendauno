@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import AvisoTono from "@/components/AvisoTono.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -205,6 +206,7 @@ async function bloquear(): Promise<void> {
 
 // Quitarlo libera el horario: se confirma, y no se manda dos veces.
 const { t } = useI18n();
+const sesion = useSesionTenantStore();
 const quitandoId = ref<string | null>(null);
 async function quitar(b: Bloqueo): Promise<void> {
   if (
@@ -439,7 +441,14 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
         role="status"
       >
         <p style="color: var(--aviso)">
-          {{ $t("bloqueosAgenda.afectadas", { n: afectadas.length }) }}
+          {{
+            $t(
+              sesion.esCitas
+                ? "bloqueosAgenda.afectadasCitas"
+                : "bloqueosAgenda.afectadas",
+              { n: afectadas.length },
+            )
+          }}
         </p>
         <ul
           class="mt-1 tu-lista-acotada"

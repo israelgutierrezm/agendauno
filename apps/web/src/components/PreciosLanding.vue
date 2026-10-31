@@ -159,15 +159,16 @@ const tarjetas = computed(() =>
         funciones: funciones.value[n.nivel],
       })),
 );
-// Cada marca cotiza con su correo de ventas; sin uno propio, con el general.
-const ventasCorreo = computed(
-  () =>
-    precios.datos.ventas.correo_por_producto?.[
-      productoDeModalidad(modo.value)
-    ] ??
-    precios.datos.ventas.correo ??
-    "ventas@agendauno.mx",
-);
+// Cada marca cotiza con su correo de ventas. El general es de AgendaUno: TurnoUno, sin
+// uno propio, usa el de su dominio (ADR 0234).
+const ventasCorreo = computed(() => {
+  const producto = productoDeModalidad(modo.value);
+  return (
+    precios.datos.ventas.correo_por_producto?.[producto] ??
+    (producto === "agendauno" ? precios.datos.ventas.correo : null) ??
+    `ventas@${PRODUCTOS[producto].dominio}`
+  );
+});
 const ventasWhatsApp = computed(() => {
   const numero = String(
     precios.datos.ventas.whatsapp ?? import.meta.env.VITE_VENTAS_WHATSAPP ?? "",
@@ -860,7 +861,7 @@ summary:focus-visible {
 .precio-check {
   flex: 0 0 auto;
   margin-top: 0.25rem;
-  color: var(--exito);
+  color: var(--exito-texto);
 }
 .precio-mas-funciones {
   margin: -0.75rem 0 1.25rem;

@@ -119,7 +119,7 @@ server {
         proxy_intercept_errors on;
         error_page 404 502 503 504 = @aplicacion;
     }
-    location ~ ^/software-para-[a-z0-9-]+/?$ {
+    location ~ ^/(software-para-[a-z0-9-]+|preguntas-frecuentes)/?$ {
         include /etc/nginx/snippets/agendauno-landing-proxy.conf;
         proxy_intercept_errors on;
         error_page 404 502 503 504 = @aplicacion;
@@ -169,7 +169,7 @@ server {
         proxy_intercept_errors on;
         error_page 404 502 503 504 = @aplicacion;
     }
-    location ~ ^/software-para-[a-z0-9-]+/?$ {
+    location ~ ^/(software-para-[a-z0-9-]+|preguntas-frecuentes)/?$ {
         include /etc/nginx/snippets/agendauno-landing-proxy.conf;
         proxy_intercept_errors on;
         error_page 404 502 503 504 = @aplicacion;

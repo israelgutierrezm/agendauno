@@ -39,7 +39,7 @@ interface Meta {
   ultima_pagina: number;
 }
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = `/api/v1/app/${sesion.slug}/retencion/segmentos`;
@@ -181,7 +181,14 @@ async function crearSeguimiento(s: Segmento): Promise<void> {
               >
             </p>
             <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t(`retencion.segmentos.desc.${s.clave}`) }}
+              {{
+                $t(
+                  sesion.esCitas &&
+                    te(`retencion.segmentos.descCitas.${s.clave}`)
+                    ? `retencion.segmentos.descCitas.${s.clave}`
+                    : `retencion.segmentos.desc.${s.clave}`,
+                )
+              }}
             </p>
           </div>
           <div v-if="s.total > 0" class="flex flex-wrap gap-2">

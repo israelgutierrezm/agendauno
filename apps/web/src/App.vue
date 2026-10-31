@@ -215,6 +215,9 @@ onMounted(() => {
       @click="menuLateral = false"
     />
 
+    <a href="#contenido-panel" class="tu-saltar-panel">{{
+      $t("nav.saltarContenido")
+    }}</a>
     <!-- Barra lateral (oscura) -->
     <aside
       v-show="!agendaAmpliada"
@@ -483,6 +486,8 @@ onMounted(() => {
 
       <!-- El contenido: la tarjeta redondeada dentro del marco -->
       <main
+        id="contenido-panel"
+        tabindex="-1"
         class="tu-tarjeta-panel flex-1"
         :class="{ 'tu-tarjeta-ampliada': agendaAmpliada }"
       >

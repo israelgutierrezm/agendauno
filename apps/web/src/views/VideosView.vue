@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -160,9 +161,18 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p v-else-if="error" class="mt-6" role="alert" style="color: var(--error)">
+    <AvisoTono v-else-if="error" tono="peligro" class="mt-6" role="alert">
       {{ error }}
-    </p>
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <EstadoVacio
       v-else-if="videos.length === 0"
       class="tu-card mt-6"

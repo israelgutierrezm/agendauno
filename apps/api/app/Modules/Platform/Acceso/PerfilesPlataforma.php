@@ -53,6 +53,17 @@ final class PerfilesPlataforma
     /** Lo que cualquiera hace con su propia sesión. */
     private const PROPIAS = ['salir'];
 
+    /**
+     * Las rutas que cambian algo que este perfil puede usar, para que la interfaz oculte
+     * lo demás. `*`: todas.
+     *
+     * @return list<string>
+     */
+    public static function acciones(string $perfil): array
+    {
+        return $perfil === self::TOTAL ? ['*'] : [...self::PROPIAS, ...(self::ESCRITURA[$perfil] ?? [])];
+    }
+
     public static function permite(string $perfil, string $ruta, string $metodo): bool
     {
         if ($perfil === self::TOTAL || in_array(strtoupper($metodo), ['GET', 'HEAD', 'OPTIONS'], true)) {

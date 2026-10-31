@@ -7,7 +7,18 @@ import IconoNav from "@/components/IconoNav.vue";
 import LogoProducto from "@/components/LogoProducto.vue";
 import { trackEvent } from "@/lib/analytics";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
-import { MODALIDADES, type Modo } from "@/marketing/modalidades";
+import {
+  carteras,
+  comprobada,
+  listaNatural,
+  plataformasConectadas,
+} from "@/marketing/integraciones";
+import {
+  MODALIDADES,
+  nombresDePlataformas,
+  preguntaDisponible,
+  type Modo,
+} from "@/marketing/modalidades";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { MODO_COMERCIAL } from "@/marketing/seoConfig";
@@ -34,10 +45,39 @@ const soporte = computed(() => PRODUCTOS[producto.value].soporte);
 const busqueda = ref("");
 const categoriaActiva = ref<string>("todas");
 
+// Solo las integraciones comprobadas se nombran (ADR 0234).
+function parametrosIntegraciones(): Record<string, string> {
+  return {
+    carterasO: listaNatural(carteras(), "o"),
+    plataformasO: listaNatural(nombresDePlataformas(), "o"),
+  };
+}
+function respuestaPlataformas(): string {
+  const conectadas = plataformasConectadas();
+  return [
+    t(k("faq.plataformas.a")),
+    conectadas.length > 0
+      ? t(k("faq.plataformas.aConexion"), {
+          conectadas: listaNatural(conectadas),
+        })
+      : "",
+    comprobada("fitpass") ? t(k("faq.plataformas.aFitpass")) : "",
+  ]
+    .filter((parte) => parte !== "")
+    .join(" ");
+}
+
 function traducirPregunta(clave: string) {
+  if (clave === "plataformas") {
+    return {
+      clave,
+      pregunta: t(k("faq.plataformas.q"), parametrosIntegraciones()),
+      respuesta: respuestaPlataformas(),
+    };
+  }
   return {
     clave,
-    pregunta: t(k(`faq.${clave}.q`)),
+    pregunta: t(k(`faq.${clave}.q`), parametrosIntegraciones()),
     respuesta: t(
       k(
         clave === "soporte" && soporte.value.whatsapp === ""
@@ -52,7 +92,7 @@ function traducirPregunta(clave: string) {
 const secciones = computed(() =>
   contenido.value.categoriasFaq.map((cat) => ({
     ...cat,
-    items: cat.preguntas.map(traducirPregunta),
+    items: cat.preguntas.filter(preguntaDisponible).map(traducirPregunta),
   })),
 );
 
@@ -264,13 +304,11 @@ const DatosEstructurados = () =>
 
           <div
             class="tu-faq-pestanas"
-            role="tablist"
             aria-label="Filtrar preguntas por categoría"
           >
             <button
               type="button"
-              role="tab"
-              :aria-selected="categoriaActiva === 'todas'"
+              :aria-pressed="categoriaActiva === 'todas'"
               class="tu-faq-pestana"
               :class="{ 'tu-faq-pestana--activa': categoriaActiva === 'todas' }"
               data-categoria="todas"
@@ -283,8 +321,7 @@ const DatosEstructurados = () =>
               v-for="s in secciones"
               :key="s.clave"
               type="button"
-              role="tab"
-              :aria-selected="categoriaActiva === s.clave"
+              :aria-pressed="categoriaActiva === s.clave"
               class="tu-faq-pestana"
               :class="{
                 'tu-faq-pestana--activa': categoriaActiva === s.clave,
@@ -398,7 +435,13 @@ const DatosEstructurados = () =>
             <span v-else class="tu-monograma-iniciales">TU</span>
           </div>
           <div class="tu-faq-cierre-texto">
-            <h3>¿Listo para probarlo en tu negocio?</h3>
+            <h3>
+              {{
+                registroAbierto
+                  ? "¿Listo para probarlo en tu negocio?"
+                  : "¿Quieres que te avisemos cuando abra?"
+              }}
+            </h3>
             <p>
               {{
                 registroAbierto

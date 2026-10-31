@@ -18,7 +18,11 @@ import { useToastStore } from "@/stores/toast";
  * (lo que falla primero, por sección y en dos columnas; lo que está en orden, plegado),
  * los respaldos con el último simulacro y las alertas recientes por páginas. Solo lee.
  */
-const props = defineProps<{ apiUrl: string; token: string }>();
+const props = defineProps<{
+  apiUrl: string;
+  token: string;
+  soloLectura?: boolean;
+}>();
 
 type EstadoProceso = "ok" | "atrasado" | "sin_datos" | "otra_version";
 interface Punto {
@@ -121,6 +125,7 @@ async function atender(a: Alerta): Promise<void> {
     );
     a.atendida_en = data.data.atendida_en;
     a.atendida_por = data.data.atendida_por;
+    a.avisada = true;
     if (datos.value && (datos.value.alertas_sin_atender ?? 0) > 0) {
       datos.value.alertas_sin_atender =
         (datos.value.alertas_sin_atender ?? 1) - 1;
@@ -199,17 +204,21 @@ const ultimaAlerta = computed(() => datos.value?.alertas[0] ?? null);
 const POR_PAGINA_ALERTAS = 10;
 const paginaAlertas = ref(1);
 const paginasAlertas = computed(() =>
-  Math.max(
-    1,
-    Math.ceil((datos.value?.alertas.length ?? 0) / POR_PAGINA_ALERTAS),
-  ),
+  Math.max(1, Math.ceil(alertasVisibles.value.length / POR_PAGINA_ALERTAS)),
 );
 // Al actualizar puede haber menos alertas: nunca una página vacía.
 const paginaAlertasSegura = computed(() =>
   Math.min(paginaAlertas.value, paginasAlertas.value),
 );
+// Solo las que piden atención y siguen sin atender.
+const soloAtencion = ref(false);
+const alertasVisibles = computed(() =>
+  (datos.value?.alertas ?? []).filter(
+    (a) => !soloAtencion.value || (a.pide_atencion && !a.atendida_en),
+  ),
+);
 const alertasPagina = computed(() =>
-  (datos.value?.alertas ?? []).slice(
+  alertasVisibles.value.slice(
     (paginaAlertasSegura.value - 1) * POR_PAGINA_ALERTAS,
     paginaAlertasSegura.value * POR_PAGINA_ALERTAS,
   ),
@@ -640,6 +649,24 @@ onMounted(cargar);
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("plataformaAdmin.operacion.alertas") }}
           </p>
+          <label
+            v-if="(datos.alertas_sin_atender ?? 0) > 0"
+            class="mt-2 flex items-center gap-2 text-sm"
+            data-prueba="alertas-sin-atender"
+          >
+            <input
+              v-model="soloAtencion"
+              type="checkbox"
+              @change="paginaAlertas = 1"
+            />
+            {{
+              $t(
+                "plataformaAdmin.operacion.soloPidenAtencion",
+                { n: datos.alertas_sin_atender ?? 0 },
+                datos.alertas_sin_atender ?? 0,
+              )
+            }}
+          </label>
           <p
             v-if="alertasRecortadas"
             class="op-sub"
@@ -724,7 +751,7 @@ onMounted(cargar);
                       }}
                     </span>
                     <button
-                      v-else-if="a.pide_atencion"
+                      v-else-if="a.pide_atencion && !soloLectura"
                       type="button"
                       class="tu-btn tu-btn-secundario tu-btn-chico mt-1"
                       :disabled="atendiendo !== null"

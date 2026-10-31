@@ -105,6 +105,15 @@ function dias(d: number | null): string {
     </div>
     <AvisoTono v-if="error" tono="peligro" class="mt-3" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <p
       v-else-if="cargando"

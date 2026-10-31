@@ -228,6 +228,23 @@ describe("a quién se le vende (ADR 0145)", () => {
     await flushPromises();
   }
 
+  it("un cobro que falla avisa junto al botón de cobrar", async () => {
+    mocks.post.mockRejectedValue(new Error("Abre la caja"));
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    await w.get('[data-prueba="producto"]').trigger("click");
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+
+    const aviso = w.get('[data-prueba="error-cobro"]');
+    expect(aviso.attributes("role")).toBe("alert");
+    expect(
+      w
+        .get('[data-prueba="cobrar"]')
+        .element.parentElement!.contains(aviso.element),
+    ).toBe(true);
+  });
+
   it("sin elegir a nadie es público en general y no ofrece ticket", async () => {
     mocks.post.mockResolvedValue({ data: {} });
     const w = mount(PosView, { global: { plugins: [i18n] } });

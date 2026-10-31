@@ -648,7 +648,9 @@ describe("agenda pública por pasos", () => {
       orden_id: "orden",
       metodo: "tarjeta",
     });
-    expect(vista.get("h2.text-success").text()).toBe(es.reservar.listoTitulo);
+    expect(vista.get("h2.text-success").text()).toBe(
+      es.reservar.apartadaTitulo,
+    );
     expect(vista.get('[role="status"]').text()).toContain(es.reservar.apartado);
     expect(
       vista.findAll("button").some((b) => b.text().startsWith("Pagar ahora")),
@@ -694,6 +696,26 @@ describe("agenda pública por pasos", () => {
     expect(
       vista.findAll("button").some((b) => b.text().startsWith("Pagar ahora")),
     ).toBe(true);
+    vista.unmount();
+  });
+
+  it("con cupón y anticipo, los montos a la vista ya llevan el descuento", async () => {
+    const op = opciones(1, { pago_obligatorio: false, pago_en_linea: true });
+    op.data.data.servicios[0] = {
+      ...op.data.data.servicios[0]!,
+      anticipo_minor: 5000,
+    } as (typeof op.data.data.servicios)[number];
+    api(op);
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    vista.findComponent({ name: "CampoCupon" }).vm.$emit("aplicado", 2000);
+    await flushPromises();
+    const eleccion = vista.get('[data-prueba="elegir-anticipo"]');
+    expect(eleccion.text()).toContain("El resto ($130.00)");
+    expect(eleccion.text()).toContain("Pagar todo ahora: $180");
     vista.unmount();
   });
 

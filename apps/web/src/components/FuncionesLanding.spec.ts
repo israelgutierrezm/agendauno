@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
@@ -35,6 +35,22 @@ const textos = es.landing as unknown as Record<
   }
 >;
 describe("tarjetas de funcionalidades", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_INTEGRACION_GOOGLE_CALENDAR", "1");
+    vi.stubEnv("VITE_INTEGRACION_OUTLOOK", "1");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("sin calendarios comprobados no los nombra (ADR 0234)", () => {
+    vi.unstubAllEnvs();
+    for (const modo of ["clases", "citas"] as const) {
+      const vista = montar(modo);
+      expect(vista.findAll(".funcion-visual")).toHaveLength(8);
+      expect(vista.text()).not.toMatch(/Google Calendar|Outlook|\{/);
+      vista.unmount();
+    }
+  });
+
   it("presenta seis funciones con iconos y ejemplos ilustrativos", () => {
     const vista = montar();
     expect(vista.findAll(".funcion")).toHaveLength(6);

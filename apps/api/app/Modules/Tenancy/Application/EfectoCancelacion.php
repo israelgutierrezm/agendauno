@@ -50,6 +50,16 @@ final readonly class EfectoCancelacion
     }
 
     /**
+     * En citas se habla del bono: "1 sesión de su bono", "2 sesiones de su bono".
+     */
+    public static function sesionesDeBono(int $unidades): string
+    {
+        $numero = rtrim(rtrim(number_format($unidades / 1000, 3, '.', ''), '0'), '.');
+
+        return $numero.($unidades === 1000 ? ' sesión de su bono' : ' sesiones de su bono');
+    }
+
+    /**
      * @return array{cancelable: bool, credito: string, unidades: int, a_tiempo: bool|null, limite: string|null, mensaje: string, plan_vencio: string|null, anticipo: string|null}
      */
     public function toArray(): array

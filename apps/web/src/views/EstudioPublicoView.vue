@@ -10,7 +10,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
 import CalendarioPublico from "@/components/CalendarioPublico.vue";
@@ -18,9 +17,11 @@ import TarjetaPlanPublico from "@/components/TarjetaPlanPublico.vue";
 import BloqueSitio from "@/components/BloqueSitio.vue";
 import CarruselSitio from "@/components/CarruselSitio.vue";
 import FichaIntegrante from "@/components/FichaIntegrante.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
-import { api } from "@/lib/api";
+import AvisoTono from "@/components/AvisoTono.vue";
+import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { volverConInteres } from "@/lib/destinoSeguro";
 import { eventoComercio } from "@/lib/etiquetas";
 import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
@@ -210,6 +211,7 @@ const slug = computed(() => String(route.params.slug));
 const escaparate = ref<Escaparate | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
+const errorCarga = ref<string | null>(null);
 
 // Registro cerrado (ADR 0093): nadie crea su cuenta aquí. Quien quiere reservar
 // pide su acceso al negocio (que lo da de alta y lo invita) o entra si ya lo tiene.
@@ -620,6 +622,7 @@ function abrirAcceso(
 async function cargar(): Promise<void> {
   cargando.value = true;
   noDisponible.value = false;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{ data: Escaparate }>(
       props.vistaPrevia
@@ -658,9 +661,11 @@ async function cargar(): Promise<void> {
     });
     aplicarSeo();
     trackEvent("public_studio_viewed", { business_profile: estudio.perfil });
-  } catch {
-    // 404 (estudio no publicado/privado/inexistente) u otro error: pantalla amable.
-    noDisponible.value = true;
+  } catch (e) {
+    // 404 (estudio no publicado/privado/inexistente): pantalla amable. Un fallo temporal
+    // (mala señal, un despliegue) no es «no disponible»: se reintenta.
+    if (noEncontrado(e)) noDisponible.value = true;
+    else errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -690,6 +695,7 @@ function aplicarSeo(): void {
       path: urlCanonicaEstudio(
         estudio.slug,
         `/estudio/${estudio.slug}/p/${pagina.slug}`,
+        productoDeModalidad(estudio.modalidad ?? "clases"),
       ),
       image: imagen,
       imageAlt: estudio.nombre,
@@ -708,7 +714,11 @@ function aplicarSeo(): void {
         ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
         : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`),
     // La página del negocio vive en su subdominio.
-    path: urlCanonicaEstudio(estudio.slug),
+    path: urlCanonicaEstudio(
+      estudio.slug,
+      "/",
+      productoDeModalidad(estudio.modalidad ?? "clases"),
+    ),
     image: imagen,
     imageAlt: estudio.nombre,
     type: "profile",
@@ -861,6 +871,24 @@ onBeforeUnmount(() => {
       {{ tn("escaparate.cargando") }}
     </p>
 
+    <AvisoTono
+      v-else-if="errorCarga"
+      tono="peligro"
+      class="mx-auto mt-10 max-w-md"
+      role="alert"
+      data-prueba="error-carga-publica"
+    >
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <section
       v-else-if="noDisponible"
       class="mx-auto max-w-md px-4 py-20 text-center"
@@ -1322,6 +1350,7 @@ onBeforeUnmount(() => {
             <CalendarioPublico
               v-if="!props.vistaPrevia && !calendarioFallo"
               v-model:sucursal="sedeElegida"
+              :terminos="terminosPagina"
               class="mt-6"
               :slug="slug"
               :puede-pedir="!!formularioAcceso"
@@ -1403,8 +1432,8 @@ onBeforeUnmount(() => {
                 {{
                   sec.titulo ??
                   (usaCitas
-                    ? $t("perfilPublico.publico.servicios")
-                    : $t("perfilPublico.publico.clases"))
+                    ? tn("perfilPublico.publico.servicios")
+                    : tn("perfilPublico.publico.clases"))
                 }}
               </h2>
               <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
@@ -1537,7 +1566,11 @@ onBeforeUnmount(() => {
                     >
                     <RouterLink
                       v-if="usaCitas && x.agendable"
-                      :to="{ name: 'agendar-cita', params: { slug } }"
+                      :to="{
+                        name: 'agendar-cita',
+                        params: { slug },
+                        query: { servicio: x.id },
+                      }"
                       class="tu-btn tu-btn-secundario"
                       @click="
                         trackEvent('book_appointment_clicked', {
@@ -1565,7 +1598,7 @@ onBeforeUnmount(() => {
           >
             <div class="mx-auto max-w-5xl px-4">
               <h2 class="text-2xl font-light">
-                {{ sec.titulo ?? $t("perfilPublico.publico.horarioClases") }}
+                {{ sec.titulo ?? tn("perfilPublico.publico.horarioClases") }}
               </h2>
               <div class="ep-semana mt-6">
                 <div v-for="d in horarioPorDia" :key="d.dia">
@@ -1597,7 +1630,9 @@ onBeforeUnmount(() => {
           </section>
         </template>
 
-        <template v-else-if="sec.tipo === 'precios'">
+        <template
+          v-else-if="sec.tipo === 'precios' && escaparate.productos.length > 0"
+        >
           <!-- Precios -->
           <section
             id="precios"
@@ -1704,7 +1739,7 @@ onBeforeUnmount(() => {
             >
               {{
                 tn("escaparate.profesionalesDesc", {
-                  profesional: etiquetaProfesional,
+                  profesional: etiquetaProfesional.toLowerCase(),
                 })
               }}
             </p>
@@ -2105,14 +2140,6 @@ onBeforeUnmount(() => {
             >
               {{ tn("escaparate.reservar") }}
             </button>
-            <p v-if="escaparate.estudio.aviso_privacidad" class="mt-8 text-sm">
-              <RouterLink
-                :to="{ name: 'aviso-negocio', params: { slug } }"
-                class="tu-enlace"
-                data-prueba="aviso-negocio"
-                >{{ tn("escaparate.avisoPrivacidad") }}</RouterLink
-              >
-            </p>
           </section>
         </template>
 
@@ -2167,8 +2194,10 @@ onBeforeUnmount(() => {
             >
           </nav>
           <RouterLink
+            v-if="escaparate.estudio.aviso_privacidad"
             :to="{ name: 'aviso-negocio', params: { slug } }"
             class="tu-enlace mt-3 inline-block"
+            data-prueba="aviso-negocio"
             >{{ tn("escaparate.avisoPrivacidad") }}</RouterLink
           >
           <RouterLink
@@ -2189,36 +2218,14 @@ onBeforeUnmount(() => {
       />
 
       <!-- Pedir acceso: el negocio da de alta a sus clientes (ADR 0093) -->
-      <div
-        v-if="pidiendoAcceso"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        data-prueba="pedir-acceso"
+      <ModalDialogo
+        :abierto="pidiendoAcceso"
+        :titulo="tn('escaparate.acceso.titulo')"
+        tam="md"
+        @cerrar="pidiendoAcceso = false"
       >
-        <div
-          class="absolute inset-0 bg-black/50"
-          @click="pidiendoAcceso = false"
-        />
-        <div
-          class="relative w-full max-w-md tu-card p-6 max-h-[92vh] overflow-y-auto"
-          :style="{ background: 'var(--superficie)' }"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="tn('escaparate.acceso.titulo')"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <h3 class="text-xl font-medium">
-              {{ tn("escaparate.acceso.titulo") }}
-            </h3>
-            <button
-              type="button"
-              class="tu-icono-btn shrink-0"
-              :aria-label="$t('comun.cerrar')"
-              @click="pidiendoAcceso = false"
-            >
-              <IconoNav nombre="cerrar" :tam="16" />
-            </button>
-          </div>
-          <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        <div data-prueba="pedir-acceso">
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{
               formularioAcceso
                 ? $t("captacion.publico.accesoCerrado")
@@ -2284,7 +2291,7 @@ onBeforeUnmount(() => {
             </RouterLink>
           </div>
         </div>
-      </div>
+      </ModalDialogo>
     </div>
   </div>
 </template>

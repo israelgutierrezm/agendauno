@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
@@ -107,8 +107,10 @@ describe("página pública del estudio", () => {
       .findAll("button")
       .find((b) => b.text() === "Pedir mi primera clase")!
       .trigger("click");
-    const acceso = w.get('[data-prueba="pedir-acceso"]');
-    expect(acceso.text()).toContain("Pide tu acceso");
+    // ModalDialogo va en un Teleport al body.
+    const cuerpo = new DOMWrapper(document.body);
+    expect(cuerpo.text()).toContain("Pide tu acceso");
+    const acceso = cuerpo.get('[data-prueba="pedir-acceso"]');
     expect(acceso.find('input[type="password"]').exists()).toBe(false);
     expect(acceso.get("a[href^='https://wa.me']").text()).toBe(
       "Pedirlo por WhatsApp",
@@ -461,7 +463,11 @@ describe("página pública del estudio", () => {
       "Solo para quien viene por primera vez",
     );
     await precios[0]!.get('[data-prueba="lo-quiero"]').trigger("click");
-    expect(w.get('[data-prueba="form-captacion"]').text()).toBe("p1");
+    await flushPromises();
+    expect(
+      [...document.querySelectorAll('[data-prueba="form-captacion"]')].at(-1)
+        ?.textContent,
+    ).toBe("p1");
 
     // Clases para principiantes: qué saber, qué llevar y su filtro.
     const servicios = w.get('[data-prueba="servicios"]');
@@ -556,6 +562,17 @@ describe("página pública del estudio", () => {
   it("su sitio decide el orden, lo que se ve, sus textos, banners y color (ADR 0114)", async () => {
     const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
     Object.assign(respuesta.data.data, {
+      productos: [
+        {
+          id: "p1",
+          nombre: "Pack 8",
+          tipo: "paquete",
+          precio_minor: 100000,
+          moneda: "MXN",
+          ilimitado: false,
+          creditos_incluidos: 8000,
+        },
+      ],
       sitio: {
         plantilla: "compacta",
         secciones: [
@@ -644,8 +661,8 @@ describe("página pública del estudio", () => {
     );
     expect(w.find('[data-prueba="aviso-vista-previa"]').exists()).toBe(true);
     expect(updateSeo).not.toHaveBeenCalled();
-    // Sin sitio en la respuesta, la página de siempre.
-    expect(w.find("#precios").exists()).toBe(true);
+    // Sin nada a la venta, sin sección de precios (ADR 0234).
+    expect(w.find("#precios").exists()).toBe(false);
   });
 
   it("la plantilla «Portada» pone la foto a todo lo ancho; sin foto, la esencial", async () => {

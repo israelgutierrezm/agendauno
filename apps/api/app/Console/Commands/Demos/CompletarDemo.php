@@ -44,7 +44,7 @@ trait CompletarDemo
      */
     protected function avisoDePrivacidad(string $servicios, string $planes, string $domicilio, string $correo, int $porcientoAcepta): void
     {
-        $plantilla = base_path('../web/src/marketing/legales/aviso-negocio.txt');
+        $plantilla = resource_path('legales/aviso-negocio.txt');
         $producto = $this->estudio->producto();
         $texto = File::exists($plantilla)
             ? (string) File::get($plantilla)

@@ -696,9 +696,6 @@ onMounted(async () => {
       :subtitulo="$t('mostradorVisual.subtitulo')"
     />
 
-    <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
-      {{ error }}
-    </AvisoTono>
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
@@ -1159,6 +1156,15 @@ onMounted(async () => {
                 {{ $t("mostradorVisual.recibidoAyuda") }}
               </p>
             </div>
+            <AvisoTono
+              v-if="error"
+              tono="peligro"
+              class="mt-3"
+              role="alert"
+              data-prueba="error-cobro"
+            >
+              {{ error }}
+            </AvisoTono>
             <button
               class="tu-btn tu-btn-primario mt-3 w-full"
               type="button"

@@ -174,8 +174,15 @@ describe("presupuesto en línea", () => {
       true,
     );
 
-    api.get.mockRejectedValue(new Error("404"));
+    api.get.mockRejectedValue({ isAxiosError: true, response: { status: 404 } });
     const viejo = await montar("?t=viejo");
     expect(viejo.text()).toContain("Este enlace ya no es válido");
+  });
+
+  it("un fallo temporal no dice que el enlace es inválido: se reintenta", async () => {
+    api.get.mockRejectedValue(new Error("Network Error"));
+    const w = await montar("?t=bueno");
+    expect(w.text()).not.toContain("Este enlace ya no es válido");
+    expect(w.find('[data-prueba="presupuesto-error"]').exists()).toBe(true);
   });
 });

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -315,4 +317,27 @@ it('el anticipo es un monto menor que el precio o un porcentaje, no los dos', fu
         ->assertJsonPath('data.anticipo_pct', null)->assertJsonPath('data.anticipo_resultante_minor', 5000);
     $this->putJson($url, ['lugares' => 0, 'anticipo_minor' => null], conBearer($e['bearer']))->assertOk()
         ->assertJsonPath('data.anticipo_minor', null)->assertJsonPath('data.anticipo_resultante_minor', null);
+});
+
+it('agendar sin cuenta guarda la versión del aviso y, en producción, sin aviso publicado responde 422', function (): void {
+    $ctx = barberiaConAnticipo(['anticipo_minor' => 10000]);
+    $slug = $ctx['e']['slug'];
+
+    app()->detectEnvironment(fn (): string => 'production');
+    agendarConAnticipo($ctx)->assertStatus(422)->assertJsonValidationErrors(['aviso_version'], 'meta.errors');
+    app()->detectEnvironment(fn (): string => 'testing');
+
+    $this->postJson("/api/v1/app/{$slug}/waivers", [
+        'clave' => 'aviso-privacidad', 'titulo' => 'Aviso de privacidad', 'contenido' => 'Tratamos tus datos.',
+    ], conBearer($ctx['e']['bearer']))->assertCreated();
+    $this->getJson("/api/v1/app/{$slug}/citas/opciones")->assertJsonPath('data.estudio.aviso_version', 1);
+
+    agendarConAnticipo($ctx, ['aviso_version' => 9])->assertStatus(422)->assertJsonValidationErrors(['aviso_version'], 'meta.errors');
+    $reserva = agendarConAnticipo($ctx, ['aviso_version' => 1])->assertCreated()->json('data.reserva');
+
+    $version = app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $slug)->firstOrFail(),
+        fn () => ReservaTenant::query()->where('ulid', $reserva)->value('aviso_version'),
+    );
+    expect((int) $version)->toBe(1);
 });

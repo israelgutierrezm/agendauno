@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoIncluidoPremium from "@/components/AvisoIncluidoPremium.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -364,6 +365,10 @@ function rolBloqueado(rol: string): boolean {
 
 // ---- Invitar a alguien del equipo (rol y, con varias sedes, su sucursal) ----
 const puedeInvitar = computed(() => sesion.puede("usuarios.invitar"));
+// Su plan no incluye equipo: se dice antes de llenar nada.
+const sinEquipo = computed(
+  () => sesion.estudio?.plan?.sin.includes("equipo") === true,
+);
 // Los roles que se pueden dar al invitar: el de dueño no, ni el de cliente.
 const rolesInvitables = computed(() =>
   rolesDisponibles.value.filter((r) => r !== "propietario" && r !== "miembro"),
@@ -532,7 +537,7 @@ onMounted(cargar);
           : usuarios.length
       "
     >
-      <template v-if="puedeInvitar" #acciones>
+      <template v-if="puedeInvitar && !sinEquipo" #acciones>
         <button
           type="button"
           class="tu-btn tu-btn-primario"
@@ -543,6 +548,11 @@ onMounted(cargar);
         </button>
       </template>
     </EncabezadoSeccion>
+    <AvisoIncluidoPremium
+      v-if="puedeInvitar && sinEquipo"
+      class="mt-4"
+      data-prueba="equipo-premium"
+    />
 
     <ModalDialogo
       :abierto="invitarAbierto"
@@ -716,6 +726,15 @@ onMounted(cargar);
     </p>
     <AvisoTono v-if="error" tono="peligro" class="mt-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
 
     <input
@@ -1027,6 +1046,7 @@ onMounted(cargar);
           class="tu-input"
           maxlength="500"
           :placeholder="$t('bajas.motivo')"
+          :aria-label="$t('bajas.motivo')"
         />
         <button
           type="button"

@@ -10,7 +10,11 @@ import ContactoDuenoPlataforma from "./ContactoDuenoPlataforma.vue";
 | corregir su contacto.
 */
 
-const mocks = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  post: vi.fn(),
+  put: vi.fn(),
+  errores: vi.fn(() => ({})),
+}));
 vi.mock("@/lib/clientePlataforma", () => ({
   crearClientePlataforma: () => ({ post: mocks.post, put: mocks.put }),
 }));
@@ -19,13 +23,81 @@ vi.mock("@/stores/toast", () => ({
 }));
 vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: Error) => e.message,
-  erroresPorCampo: () => ({}),
+  erroresPorCampo: mocks.errores,
 }));
 
 enableAutoUnmount(afterEach);
 beforeEach(() => vi.clearAllMocks());
 
 describe("alta asistida y contacto del dueño", () => {
+  it("el teléfono rechazado se dice junto a su campo y lo escrito se queda", async () => {
+    mocks.post.mockRejectedValue(new Error("Revisa los datos"));
+    mocks.errores.mockReturnValueOnce({
+      contacto_telefono: "El teléfono no es válido.",
+    });
+    const w = mount(AltaNegocioPlataforma, {
+      props: { apiUrl: "", token: "t" },
+      global: { plugins: [i18n] },
+    });
+    await w.get('[data-prueba="abrir-alta"]').trigger("click");
+    await w.get('input[inputmode="tel"]').setValue("5512345678");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[role="alert"]').text()).toBe("El teléfono no es válido.");
+    expect(
+      (w.get('input[inputmode="tel"]').element as HTMLInputElement).value,
+    ).toBe("5512345678");
+    expect(w.emitted("creado")).toBeUndefined();
+  });
+
+  it("un rechazo sin campo se dice dentro del formulario, sin cerrarlo", async () => {
+    mocks.post.mockRejectedValue(new Error("Sin conexión"));
+    const w = mount(AltaNegocioPlataforma, {
+      props: { apiUrl: "", token: "t" },
+      global: { plugins: [i18n] },
+    });
+    await w.get('[data-prueba="abrir-alta"]').trigger("click");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-alta"]').text()).toContain(
+      "Sin conexión",
+    );
+    expect(w.find("form").exists()).toBe(true);
+  });
+
+  it("corregir el contacto: un error de un campo oculto también se dice", async () => {
+    mocks.put.mockRejectedValue(new Error("Nombre muy largo"));
+    mocks.errores.mockReturnValueOnce({
+      contacto_segundo_nombre: "Es muy largo.",
+    });
+    const w = mount(ContactoDuenoPlataforma, {
+      props: {
+        apiUrl: "",
+        token: "t",
+        slug: "luna",
+        campos: {
+          contacto_nombre: "Ana",
+          contacto_segundo_nombre: "x",
+          contacto_primer_apellido: "Luna",
+          contacto_segundo_apellido: null,
+          contacto_email: "a@correo.mx",
+          contacto_whatsapp_pais: "52",
+          contacto_telefono: "5512345678",
+        },
+      },
+      global: { plugins: [i18n] },
+    });
+    await w.get('[data-prueba="abrir-contacto"]').trigger("click");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-contacto"]').text()).toContain(
+      "Nombre muy largo",
+    );
+  });
+
   it("da de alta el negocio con su giro y su dueño, y abre su ficha", async () => {
     mocks.post.mockResolvedValue({ data: { data: { slug: "pilates-luna" } } });
     const w = mount(AltaNegocioPlataforma, {

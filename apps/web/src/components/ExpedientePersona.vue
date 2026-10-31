@@ -106,15 +106,22 @@ async function ver(d: Documento): Promise<void> {
   }
 }
 
+const validando = ref(false);
 async function validar(
   d: Documento,
   estado: "aprobado" | "rechazado",
 ): Promise<void> {
+  if (validando.value) return;
+  validando.value = true;
   try {
-    await api.post(`${base.value}/documentos/${d.id}/validar`, { estado });
-    await cargar();
-  } catch (e) {
-    toast.error(mensajeDeError(e, t("expediente.error")));
+    try {
+      await api.post(`${base.value}/documentos/${d.id}/validar`, { estado });
+      await cargar();
+    } catch (e) {
+      toast.error(mensajeDeError(e, t("expediente.error")));
+    }
+  } finally {
+    validando.value = false;
   }
 }
 
@@ -308,6 +315,8 @@ async function subir(): Promise<void> {
                 <button
                   type="button"
                   class="tu-btn tu-btn-secundario tu-btn-chico"
+                  :disabled="validando"
+                  :aria-busy="validando || undefined"
                   @click="validar(d, 'aprobado')"
                 >
                   {{ $t("expediente.aprobar") }}
@@ -315,6 +324,8 @@ async function subir(): Promise<void> {
                 <button
                   type="button"
                   class="tu-btn tu-btn-peligro tu-btn-chico"
+                  :disabled="validando"
+                  :aria-busy="validando || undefined"
                   @click="validar(d, 'rechazado')"
                 >
                   {{ $t("expediente.rechazar") }}

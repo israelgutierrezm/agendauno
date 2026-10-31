@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import IconoNav from "@/components/IconoNav.vue";
 import { confirmarSinGuardar } from "@/lib/cambiosPendientes";
+import { useFocoPanel } from "@/lib/focoPanel";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
+import { useAnchoMinimo } from "@/lib/pantalla";
 
 /**
  * El armazón del superadmin (ADR 0126, 0203): el mismo marco que el panel de un
@@ -38,6 +40,21 @@ const { t } = useI18n();
 
 // Cajón en el teléfono y barra contraída (solo íconos) en escritorio, como el panel.
 const menuLateral = ref(false);
+// En el teléfono, cerrado no lo alcanza Tab; abierto atrapa el foco y Escape lo cierra
+// (ADR 0229). En escritorio el lateral siempre se ve y nunca es `inert`.
+const escritorio = useAnchoMinimo(1024);
+const cajon = ref<HTMLElement | null>(null);
+const cajonInerte = computed(() => !menuLateral.value && !escritorio.value);
+useFocoPanel(
+  () => menuLateral.value && !escritorio.value,
+  cajon,
+  () => {
+    menuLateral.value = false;
+  },
+);
+watch(escritorio, (si) => {
+  if (si) menuLateral.value = false;
+});
 const compacto = ref(false);
 const compactoEfectivo = computed(() => compacto.value && !menuLateral.value);
 const CLAVE_COMPACTA = "tu.plataforma.compacta";
@@ -87,7 +104,9 @@ async function salir(): Promise<void> {
     />
 
     <aside
-      class="tu-sin-imprimir fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200"
+      ref="cajon"
+      :inert="cajonInerte || undefined"
+      class="tu-sin-imprimir fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200 outline-none"
       :class="[
         compacto ? 'lg:w-16' : 'lg:w-64',
         menuLateral ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
@@ -183,6 +202,7 @@ async function salir(): Promise<void> {
             type="button"
             class="tu-icono-btn tu-barra-menu relative"
             :aria-label="t('nav.menu')"
+            :aria-expanded="menuLateral"
             data-prueba="boton-menu-plataforma"
             @click="menuLateral = true"
           >

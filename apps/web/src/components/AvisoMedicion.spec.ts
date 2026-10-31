@@ -71,9 +71,16 @@ describe("barra de cookies", () => {
     expect(w.get('[data-prueba="am-elegir"]').text()).toBe(
       "Cookies y configuración",
     );
+    // Rechazar está a un clic, con el mismo estilo que aceptar (ADR 0234).
     expect(w.findAll("button.tu-btn").map((b) => b.text())).toEqual([
+      "Solo necesarias",
       "Aceptar",
     ]);
+    await w.get('[data-prueba="am-solo-necesarias"]').trigger("click");
+    expect(etiquetas.elegir).toHaveBeenLastCalledWith({
+      analitica: false,
+      publicidad: false,
+    });
 
     await w.get('[data-prueba="am-aceptar"]').trigger("click");
     expect(etiquetas.elegir).toHaveBeenLastCalledWith({

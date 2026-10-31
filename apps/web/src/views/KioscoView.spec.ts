@@ -85,11 +85,37 @@ describe("kiosco de llegada", () => {
 
   it("dada de baja, olvida la llave y pide activarla", async () => {
     localStorage.setItem("kiosco:demo", "kio_vieja");
-    api.get.mockRejectedValueOnce(new Error("401"));
+    api.get.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 401 },
+    });
     const w = montar();
     await flushPromises();
 
     expect(w.text()).toContain("Esta tableta no está activada");
     expect(localStorage.getItem("kiosco:demo")).toBeNull();
+  });
+
+  it.each([
+    ["sin red", new Error("Network Error")],
+    ["un 503", { isAxiosError: true, response: { status: 503 } }],
+    ["un 429", { isAxiosError: true, response: { status: 429 } }],
+  ])("con %s conserva la llave y ofrece reintentar", async (_caso, fallo) => {
+    localStorage.setItem("kiosco:demo", "kio_buena");
+    api.get.mockRejectedValueOnce(fallo);
+    api.get.mockResolvedValueOnce({
+      data: { data: { negocio: "Demo", sucursal: null } },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(localStorage.getItem("kiosco:demo")).toBe("kio_buena");
+    expect(w.text()).not.toContain("Esta tableta no está activada");
+
+    await w.get('[data-prueba="kiosco-reintentar"]').trigger("click");
+    await flushPromises();
+
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(w.text()).toContain("Demo");
   });
 });

@@ -39,6 +39,9 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
  */
 class GenerarComunicaciones
 {
+    /** Los avisos a quien agendó que llevan el enlace de su cita (ADR 0221). */
+    private const AVISOS_CON_ENLACE_DE_CITA = ['reserva.confirmada', 'reserva.recordatorio_24h', 'reserva.reprogramada'];
+
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
         private readonly EntregarPushTenant $push,
@@ -129,7 +132,7 @@ class GenerarComunicaciones
                 'canal' => $plantilla->canal->value,
                 'destinatario' => $destinatario,
                 'asunto' => $this->render($plantilla->asunto, $contexto),
-                'cuerpo' => $this->render($plantilla->cuerpo, $contexto),
+                'cuerpo' => $this->render($this->conEnlaceDeCita($plantilla, $contexto), $contexto),
                 'estado' => EstadoMensaje::Encolado->value,
                 'evento_ulid' => $evento->eventoUlid,
             ]);
@@ -311,6 +314,25 @@ class GenerarComunicaciones
         }
 
         return $contexto;
+    }
+
+    /**
+     * Los correos que prometen el enlace para cancelar o cambiar la cita lo llevan aunque
+     * el negocio haya editado su plantilla sin el marcador (ADR 0234).
+     *
+     * @param  array<string, string>  $contexto
+     */
+    private function conEnlaceDeCita(PlantillaMensajeTenant $plantilla, array $contexto): string
+    {
+        $cuerpo = (string) $plantilla->cuerpo;
+        if ($plantilla->canal !== CanalComunicacion::Email
+            || ($contexto['enlace_cita'] ?? '') === ''
+            || ! in_array($plantilla->clave, self::AVISOS_CON_ENLACE_DE_CITA, true)
+            || str_contains($cuerpo, 'enlace_cita')) {
+            return $cuerpo;
+        }
+
+        return $cuerpo."\n\nSi no puedes asistir, cancélala o cámbiala aquí:\n{{enlace_cita}}";
     }
 
     /**

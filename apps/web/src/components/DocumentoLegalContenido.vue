@@ -28,10 +28,21 @@ const BORRADORES = {
 const vistaPrevia = import.meta.env.DEV ? BORRADORES[props.tipo] : null;
 const publicado = computed(() => Boolean(props.contenido?.trim()));
 const bloques = computed(() =>
-  bloquesLegales(publicado.value ? props.contenido! : (vistaPrevia ?? "")),
+  bloquesLegales(
+    conCorreoDeLaMarca(
+      publicado.value ? props.contenido! : (vistaPrevia ?? ""),
+    ),
+  ),
 );
 // El soporte del producto del dominio (ADR 0131).
 const soporte = PRODUCTOS[productoActual()].soporte.correo;
+
+/** El documento es uno para las dos marcas; en TurnoUno, nunca un correo de AgendaUno. */
+function conCorreoDeLaMarca(texto: string): string {
+  return productoActual() === "turnouno"
+    ? texto.replace(/[w.+-]+@agendauno.mx/g, soporte)
+    : texto;
+}
 </script>
 
 <template>

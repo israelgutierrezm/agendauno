@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Medicion;
 
+use App\Modules\Tenancy\Application\WaiversTenant;
+use App\Modules\Tenancy\Models\DestinoMedicionTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -75,6 +77,10 @@ final class ConfigurarDestino
             }
             if ($destino->getAttribute('aviso_confirmado_en') === null) {
                 throw ValidationException::withMessages(['aviso_confirmado' => ['Confirma que el aviso de privacidad vigente ya informa esta medición.']]);
+            }
+            // La medición de un negocio informa en su propio aviso (ADR 0234).
+            if ($destino instanceof DestinoMedicionTenant && app(WaiversTenant::class)->avisoPrivacidad() === null) {
+                throw ValidationException::withMessages(['activo' => ['Publica primero tu aviso de privacidad (Documentos): ahí se informa esta medición.']]);
             }
             if (! $destino->getAttribute('activo')) {
                 $destino->setAttribute('activo_desde', Carbon::now());

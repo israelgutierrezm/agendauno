@@ -5,7 +5,7 @@ import { RouterLink } from "vue-router";
 
 import AvisoTono from "@/components/AvisoTono.vue";
 import { trackEvent } from "@/lib/analytics";
-import { api, camposConError, mensajeDeError } from "@/lib/api";
+import { api, camposConError, mensajeDeError, noEncontrado } from "@/lib/api";
 import { leerAtribucion, type Ambito } from "@/lib/atribucion";
 import { camposDeMedicion } from "@/lib/etiquetas";
 import type { FormularioPublico } from "@/lib/captacion";
@@ -46,6 +46,7 @@ const { t } = useI18n();
 const definicion = ref<FormularioPublico | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
+const errorCarga = ref<string | null>(null);
 const enviando = ref(false);
 const mensaje = ref<string | null>(null);
 const error = ref<string | null>(null);
@@ -65,6 +66,7 @@ const base = computed(
 async function cargar(): Promise<void> {
   cargando.value = true;
   noDisponible.value = false;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{ data: FormularioPublico }>(
       props.formulario
@@ -78,8 +80,9 @@ async function cargar(): Promise<void> {
       }
     }
     emit("cargado", data.data);
-  } catch {
-    noDisponible.value = true;
+  } catch (e) {
+    if (noEncontrado(e)) noDisponible.value = true;
+    else errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -180,6 +183,23 @@ onMounted(cargar);
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+    <AvisoTono
+      v-else-if="errorCarga"
+      tono="peligro"
+      role="alert"
+      data-prueba="error-carga-publica"
+    >
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <p v-else-if="noDisponible || !definicion" class="text-sm" role="status">
       {{ t("captacion.publico.noDisponible") }}
     </p>

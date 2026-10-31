@@ -29,6 +29,21 @@ ARG VITE_VENTAS_WHATSAPP=""
 ARG VITE_SOPORTE_CORREO=""
 ARG VITE_TURNOUNO_SOPORTE_CORREO=""
 ARG VITE_SOPORTE_WHATSAPP=""
+# Enlaces de la app en cada tienda y lo que se puede anunciar (ADR 0234).
+ARG VITE_AGENDAUNO_PLAY_URL=""
+ARG VITE_AGENDAUNO_APP_STORE_URL=""
+ARG VITE_TURNOUNO_PLAY_URL=""
+ARG VITE_TURNOUNO_APP_STORE_URL=""
+ARG VITE_INTEGRACION_WELLHUB=""
+ARG VITE_INTEGRACION_TOTALPASS=""
+ARG VITE_INTEGRACION_FITPASS=""
+ARG VITE_INTEGRACION_BANDEJA_WHATSAPP=""
+ARG VITE_INTEGRACION_BANDEJA_INSTAGRAM=""
+ARG VITE_INTEGRACION_BANDEJA_MESSENGER=""
+ARG VITE_INTEGRACION_APPLE_WALLET=""
+ARG VITE_INTEGRACION_GOOGLE_WALLET=""
+ARG VITE_INTEGRACION_GOOGLE_CALENDAR=""
+ARG VITE_INTEGRACION_OUTLOOK=""
 ARG VITE_APP_VERSION="dev"
 ARG GOOGLE_SITE_VERIFICATION=""
 # La API de donde se leen los precios publicados al pre-generar (p. ej. https://agendauno.mx):
@@ -40,7 +55,7 @@ RUN case "$PRODUCTO" in agendauno|turnouno) ;; *) echo "PRODUCTO desconocido: $P
  && find "dist/$PRODUCTO" -name '*.map' -delete \
  && mkdir /landing \
  && cp -r "dist/$PRODUCTO/index.html" "dist/$PRODUCTO/sitemap.xml" "dist/$PRODUCTO/robots.txt" \
-      "dist/$PRODUCTO/assets-$PRODUCTO" /landing/ \
+      "dist/$PRODUCTO/assets-$PRODUCTO" "dist/$PRODUCTO/preguntas-frecuentes" /landing/ \
  && for pagina in "dist/$PRODUCTO"/software-para-*; do cp -r "$pagina" /landing/; done
 
 FROM nginx:1.27-alpine

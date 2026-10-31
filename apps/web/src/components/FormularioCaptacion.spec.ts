@@ -15,6 +15,7 @@ vi.mock("@/lib/api", () => ({
   api,
   camposConError: () => [],
   mensajeDeError: () => "Error",
+  noEncontrado: (e: { status?: number }) => e.status === 404,
 }));
 vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
@@ -108,7 +109,7 @@ describe("FormularioCaptacion", () => {
   });
 
   it("si el formulario no existe o la captación está apagada, lo dice", async () => {
-    api.get.mockRejectedValueOnce(new Error("404"));
+    api.get.mockRejectedValueOnce({ status: 404 });
     const w = montar();
     await flushPromises();
 

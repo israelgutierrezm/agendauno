@@ -1219,3 +1219,20 @@
   font-size: 1.125rem;
   font-weight: 500;
 }
+
+/* Saltar al contenido en el panel: solo se ve con el foco del teclado. */
+.tu-saltar-panel {
+  position: fixed;
+  left: 0.75rem;
+  top: -4rem;
+  z-index: 100;
+  padding: 0.6rem 1rem;
+  border-radius: 0.6rem;
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.tu-saltar-panel:focus {
+  top: 0.75rem;
+}

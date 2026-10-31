@@ -117,15 +117,22 @@ async function cargar(): Promise<void> {
   }
 }
 
+const alternando = ref(false);
 async function alternar(r: Resena): Promise<void> {
+  if (alternando.value) return;
+  alternando.value = true;
   try {
-    const { data } = await api.put<{ data: Resena }>(
-      `${base.value}/resenas/${r.id}/visible`,
-      { visible: !r.visible },
-    );
-    Object.assign(r, data.data);
-  } catch (e) {
-    toast.error(mensajeDeError(e));
+    try {
+      const { data } = await api.put<{ data: Resena }>(
+        `${base.value}/resenas/${r.id}/visible`,
+        { visible: !r.visible },
+      );
+      Object.assign(r, data.data);
+    } catch (e) {
+      toast.error(mensajeDeError(e));
+    }
+  } finally {
+    alternando.value = false;
   }
 }
 
@@ -371,6 +378,8 @@ onMounted(cargar);
               v-if="puedeOcultar && r.comentario"
               type="button"
               class="tu-enlace shrink-0 text-sm"
+              :disabled="alternando"
+              :aria-busy="alternando || undefined"
               @click="alternar(r)"
             >
               {{ r.visible ? $t("resenas.ocultar") : $t("resenas.mostrar") }}

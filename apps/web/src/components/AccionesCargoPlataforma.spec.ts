@@ -58,6 +58,47 @@ describe("acciones de un cargo de la renta", () => {
     mocks.post.mockResolvedValue({ data: { data: {} } });
   });
 
+  it("el timbre rechazado dice el motivo y refresca el cargo", async () => {
+    mocks.post.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 422,
+        data: { data: { estado: "error", motivo_error: "RFC inválido" } },
+      },
+    });
+    const w = montar({ estado: "pagado", factura_detalle: null });
+    await w.get('[data-prueba="facturar-cargo"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.error).toHaveBeenCalledWith("RFC inválido");
+    expect(w.emitted("cambiado")).toHaveLength(1);
+  });
+
+  it("si falla el pago, el formulario se queda abierto con lo escrito", async () => {
+    mocks.post.mockRejectedValue(new Error("Rechazado"));
+    const w = montar({ estado: "pendiente" });
+    await w.get('[data-prueba="abrir-pago-manual"]').trigger("click");
+    await w.get('input:not([type="date"])').setValue("Caja 3");
+    await w.get('[data-prueba="pago-manual"]').trigger("submit");
+    await flushPromises();
+
+    expect(mocks.error).toHaveBeenCalledWith("Rechazado");
+    expect(
+      (w.get('input:not([type="date"])').element as HTMLInputElement).value,
+    ).toBe("Caja 3");
+    expect(w.emitted("cambiado")).toBeUndefined();
+  });
+
+  it("la fecha de pago es la del calendario local, no la de UTC", async () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 31, 23, 30) });
+    const w = montar({ estado: "pendiente" });
+    await w.get('[data-prueba="abrir-pago-manual"]').trigger("click");
+    expect(
+      (w.get('input[type="date"]').element as HTMLInputElement).value,
+    ).toBe("2026-10-31");
+    vi.useRealTimers();
+  });
+
   it("registra el pago de un cargo pendiente con su método y referencia", async () => {
     const w = montar({ estado: "pendiente" });
     await w.get('[data-prueba="abrir-pago-manual"]').trigger("click");

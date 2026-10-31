@@ -118,6 +118,15 @@ onMounted(() => void cargar());
     </h2>
     <AvisoTono v-if="error" tono="peligro" class="px-5 py-4" role="alert">
       {{ error }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar()"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
     </AvisoTono>
     <p
       v-else-if="cargando && tickets.length === 0"

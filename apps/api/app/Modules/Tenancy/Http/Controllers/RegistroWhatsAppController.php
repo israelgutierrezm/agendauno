@@ -32,7 +32,7 @@ class RegistroWhatsAppController
         $telefono = $this->telefono($request, ['recaptcha_token' => ['nullable', 'string']]);
         if (! $this->recaptcha->aprobado($request->string('recaptcha_token')->value(), $request->ip(), 'registro')) {
             throw ValidationException::withMessages([
-                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
+                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo; si usas un bloqueador de anuncios, desactívalo en esta página.'],
             ]);
         }
 

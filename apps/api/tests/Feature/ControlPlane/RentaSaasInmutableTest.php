@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\TarifaSaas;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
@@ -58,7 +59,10 @@ function publicarTarifaNueva(): void
     test()->postJson('/api/v1/plataforma/tarifas/clases', [
         'dias_prueba' => 30, 'iva_porcentaje' => 16,
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => null, 'monto_minor' => 99900]],
+        'vigente_desde' => now()->addDays(30)->toDateString(),
     ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 5);
+    // Ya pasaron los 30 días de aviso (ADR 0234).
+    TarifaSaas::query()->where('version', 5)->where('modalidad', 'clases')->update(['vigente_desde' => now()]);
 }
 
 it('no emite el cargo de un mes que aún no cierra en la zona del negocio', function (): void {

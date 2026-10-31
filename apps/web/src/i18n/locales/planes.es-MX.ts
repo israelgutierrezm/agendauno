@@ -285,7 +285,8 @@ export default {
     tituloCitas: "Mis bonos",
     tituloEquipo: "Planes",
     tituloEquipoCitas: "Bonos",
-    vacio: "Aún no tienes planes.",
+    vacio: "Aún no tiene planes.",
+    vacioCitas: "Aún no tiene bonos.",
     estados: {
       vigente: "Vigente",
       por_empezar: "Por empezar",
@@ -333,9 +334,11 @@ export default {
     anteriores: "Planes anteriores",
     // Los anteriores, plegados: una línea por plan.
     verAnteriores: "Ver planes anteriores ({n})",
+    verAnterioresCitas: "Ver bonos anteriores ({n})",
     ocultarAnteriores: "Ocultar planes anteriores",
     plegar: "Plegar",
     sinVigentes: "Sin plan vigente.",
+    sinVigentesCitas: "Sin bono vigente.",
     resumenUso: "Usaste {usadas} de {total}",
     resumenIlimitado: "{usadas} usadas",
     aplicaAMas: "Sirve para: {clases} y {n} más",

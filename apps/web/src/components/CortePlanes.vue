@@ -269,7 +269,7 @@ defineExpose({ cargar });
       class="mt-3 text-sm"
       :style="{ color: 'var(--texto-suave)' }"
     >
-      {{ $t("planes.corte.vacio") }}
+      {{ tm("planes.corte.vacio") }}
     </p>
 
     <template v-else>
@@ -278,7 +278,7 @@ defineExpose({ cargar });
         class="mt-3 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        {{ $t("planes.corte.sinVigentes") }}
+        {{ tm("planes.corte.sinVigentes") }}
       </p>
       <template v-for="p in visibles" :key="p.id">
         <!-- Anterior y plegado: una línea -->
@@ -521,7 +521,14 @@ defineExpose({ cargar });
         {{
           verAnteriores
             ? $t("planes.corte.ocultarAnteriores")
-            : $t("planes.corte.verAnteriores", { n: anteriores.length })
+            : $t(
+                claveSegunModalidad(
+                  "planes.corte.verAnteriores",
+                  sesion.esCitas,
+                  te,
+                ),
+                { n: anteriores.length },
+              )
         }}
       </button>
     </template>

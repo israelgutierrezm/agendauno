@@ -47,6 +47,10 @@ export default {
     anualSinCortesia: "El pago anual cubre 12 meses y cuesta {meses}.",
   },
   plan: {
+    incluidoPremium: "Incluido en Premium.",
+    incluidoPremiumAyuda:
+      "Tu plan actual no lo incluye. Sube de plan para usarlo.",
+    subirDePlan: "Subir de plan",
     titulo: "Tu plan",
     resumen: "{nivel} · {n} profesional | {nivel} · {n} profesionales",
     cubiertoHasta: "Pagado hasta el {fecha}.",
@@ -221,6 +225,8 @@ export default {
       valor: "Pesos por dólar",
       guardar: "Guardar",
       guardado: "Tipo de cambio guardado.",
+      confirmar:
+        "¿Guardar 1 USD = {valor} MXN? Con este valor se cobra en pesos la renta en dólares.",
     },
     tarifas: {
       moneda: "Moneda",

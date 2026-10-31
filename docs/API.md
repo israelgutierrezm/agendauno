@@ -110,6 +110,17 @@ Cada negocio es solo de clases o solo de citas, y la modalidad está guardada
   terminología y flags; con uno de la otra modalidad responde 422 `MODALITY_LOCKED`
   («Este negocio trabaja con citas; cambiar a clases lo hace AgendaUno.») con
   `meta.modalidad`.
+- **Suspendido por renta (ADR 0073).** Además de `/renta`, siguen abiertas para quien ve
+  la facturación `GET /renta/cargos`, `GET /renta/cargos/{cargo}/confirmacion`,
+  `POST /renta/tarjeta`, `POST /renta/tarjeta/confirmar`, `DELETE /renta/tarjeta` y
+  `/negocio/exportar` (pedir, consultar y descargar). Lo demás responde 404.
+- **Perfiles de operador (ADR 0215).** `GET /plataforma/yo` suma
+  `administrador.acciones`: las rutas que cambian algo y puede usar (`["*"]` en el perfil
+  total). `GET /plataforma/estudios/{slug}` acepta `?cargos=` (de 12 a 240) y trae
+  `cargos_total`. `GET /plataforma/operacion` siempre incluye las alertas que piden
+  atención y siguen sin atender, aunque no estén entre las 50 recientes.
+- **Mis compras.** Cada orden de `/mi/ordenes` suma `devuelto_minor`. Los invitados de
+  `/mi/invitados` suman `sesion.zona_horaria`.
 - **Superadmin.** `GET /plataforma/estudios/{slug}` trae `modalidad` y
   `modalidad_cambiable` (sin sesiones ni reservas en su base).
   `PUT /plataforma/estudios/{slug}/modalidad` (`{modalidad, perfil_negocio?}`) responde
@@ -2153,3 +2164,15 @@ en el negocio.
 - `GET /cobranza/pendientes`: cada orden trae `renovacion: {vence_el, situacion}` o
   `null`; la lista no cambia (se puede cobrar antes). `resumen.renovaciones_por_vencer`
   cuenta las que aún no vencen (también en `data.cobros` de `GET /inicio/hoy`).
+
+## Landings y legales para producción (ADR 0234)
+
+- `POST /api/v1/app/{slug}/citas`: acepta `aviso_version`. En producción responde 422
+  (`aviso_version`) sin aviso publicado, y también si la versión ya cambió. `GET …/citas/opciones`
+  devuelve `estudio.aviso_version`.
+- `GET /api/v1/app/{slug}/waivers`: además de `data`, `aviso_base` (`titulo`, `contenido`) mientras el
+  negocio no publique su aviso.
+- `POST /api/v1/plataforma/tarifas/{modalidad}`: una subida con `vigente_desde` a menos de 30 días
+  responde 422 (`vigente_desde`); al publicarla sale un correo a los dueños de esa modalidad.
+- `PUT /api/v1/app/{slug}/medicion/destinos/{proveedor}`: encender sin aviso publicado responde 422 (`activo`).
+- `GET /api/v1/medicion/{producto}`: fuera de producción devuelve `ga4` y `meta` en `null`.

@@ -120,6 +120,8 @@ export interface Orden {
   quitable?: boolean;
   estado: string;
   total_minor: number;
+  // Lo que ya regresó de esta compra (devolución total o parcial).
+  devuelto_minor?: number;
   moneda: string;
   fecha: string | null;
   pagada_en?: string | null;

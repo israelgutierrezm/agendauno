@@ -87,7 +87,18 @@ async function eliminar(): Promise<void> {
             })
           }}
         </p>
-        <div>
+        <!-- Entra con Google y nunca creó contraseña: primero hay que crearla. -->
+        <AvisoTono
+          v-if="sesion.usuario?.tiene_contrasena === false"
+          tono="info"
+          data-prueba="eliminar-sin-contrasena"
+        >
+          {{ $t("eliminarCuenta.sinContrasena") }}
+          <a class="tu-enlace" href="#mp-acceso" @click="cerrar">{{
+            $t("eliminarCuenta.irAAcceso")
+          }}</a>
+        </AvisoTono>
+        <div v-else>
           <label class="tu-label" for="emc-contrasena">{{
             $t("eliminarCuenta.contrasena")
           }}</label>

@@ -4,6 +4,7 @@ import { renderToString } from "vue/server-renderer";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import PublicShell from "@/components/PublicShell.vue";
 import ModalidadView from "@/views/ModalidadView.vue";
+import PreguntasFrecuentesView from "@/views/PreguntasFrecuentesView.vue";
 import SolucionView from "@/views/SolucionView.vue";
 import { aplicarMarca, i18n } from "@/i18n";
 import { PRODUCTO_COMERCIAL } from "@/marketing/seoConfig";
@@ -37,6 +38,7 @@ export async function render(
       ...rutasComerciales({
         modalidad: ModalidadView,
         solucion: SolucionView,
+        faq: PreguntasFrecuentesView,
       }),
       {
         path: "/aviso-de-privacidad",
@@ -49,13 +51,11 @@ export async function render(
         component: { render: () => null },
       },
       // Destinos de los enlaces por nombre: aquí no se renderizan.
-      ...["registro", "entrar", "directorio", "preguntas-frecuentes"].map(
-        (name) => ({
-          path: name === "directorio" ? "/negocios" : `/${name}`,
-          name,
-          component: { render: () => null },
-        }),
-      ),
+      ...["registro", "entrar", "directorio"].map((name) => ({
+        path: name === "directorio" ? "/negocios" : `/${name}`,
+        name,
+        component: { render: () => null },
+      })),
     ],
   });
   // Los textos con la marca del producto de esta landing (ADR 0108).

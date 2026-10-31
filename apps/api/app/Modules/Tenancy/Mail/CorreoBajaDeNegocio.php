@@ -53,7 +53,7 @@ class CorreoBajaDeNegocio extends Mailable implements ShouldQueue
             : '<p>'.$marca.' dio de baja '.e($this->estudioNombre).'. Tu equipo y tus clientes ya no entran, tu página y tu app dejan de verse y se quitaron los pagos automáticos de tus clientes. Si crees que es un error, comunícate con el soporte de '.$marca.'.</p>';
         $html = $quien
             .'<p>Hasta el <strong>'.$fecha.'</strong> puedes entrar con tu cuenta de dueño para descargar tus datos, pagar lo que quede de tu suscripción'
-            .($this->laPidioElDueno ? ' o revertir la baja' : '').'. Ese día se borran tus datos, tus archivos y tus respaldos, y ya no se pueden recuperar.</p>'
+            .($this->laPidioElDueno ? ' o revertir la baja' : '').'. Ese día se borran tus datos, tus archivos y tus respaldos, y ya no se pueden recuperar. Las copias de seguridad generales de la plataforma, cifradas, los conservan hasta 12 meses más, hasta que caducan.</p>'
             .'<p>Las facturas y los cobros de tu suscripción se conservan, como lo pide la ley.</p>';
 
         return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html, $this->producto));

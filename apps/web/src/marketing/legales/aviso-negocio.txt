@@ -24,12 +24,16 @@ Finalidades secundarias: enviarte promociones y encuestas. Puedes oponerte desde
 
 4. Con quién los compartimos
 
-Usamos AgendaUno (agendauno.mx) para administrar nuestra agenda; trata tus datos por nuestra cuenta y solo para ese fin. Los pagos en línea los procesa la pasarela de pago, que no nos comparte los datos completos de tu tarjeta. No compartimos tus datos con terceros, salvo cuando una ley o una autoridad lo exijan.
+Usamos AgendaUno (agendauno.mx) para administrar nuestra agenda; trata tus datos por nuestra cuenta y solo para ese fin. Los pagos en línea los procesa la pasarela de pago, que no nos comparte los datos completos de tu tarjeta. Si tenemos activa la medición de nuestra página, Google Analytics y Meta reciben tu dirección IP, los datos de tu navegador y lo que haces en ella, solo si lo autorizas en «Cookies y configuración». No compartimos tus datos con otros terceros, salvo cuando una ley o una autoridad lo exijan.
 
-5. Tus derechos
+5. Cookies y medición
+
+Nuestra página usa cookies necesarias para funcionar. Las de analítica y publicidad solo se usan con tu permiso, y puedes cambiar tu elección cuando quieras en «Cookies y configuración», al pie de la página.
+
+6. Tus derechos
 
 Puedes acceder a tus datos, rectificarlos, cancelarlos u oponerte a su tratamiento, y revocar tu consentimiento. Desde tu cuenta puedes descargar tus datos, dejar de recibir promociones y pedir tu baja; también puedes escribirnos a [CORREO DE CONTACTO] con tu nombre, una identificación y lo que solicitas. Te responderemos en un máximo de 20 días hábiles.
 
-6. Cambios
+7. Cambios
 
 Publicaremos cualquier cambio a este aviso en nuestra página de AgendaUno y te pediremos aceptarlo de nuevo desde tu cuenta.

@@ -53,6 +53,8 @@ class PlataformaEstudiosController
 
     private const CARGOS = 12;
 
+    private const CARGOS_MAXIMO = 240;
+
     public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad, PlanCitasSaas $planes, GestorDeConexionTenant $gestor, CondicionesDeCobroSaas $condiciones): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
@@ -82,7 +84,8 @@ class PlataformaEstudiosController
             ->where('estudio_id', $modelo->getKey())
             ->orderByDesc('periodo')
             ->orderByDesc('id')
-            ->limit(self::CARGOS)
+            // 12 de entrada; «Ver más» pide más, para actuar sobre un cargo más viejo.
+            ->limit(min(max(request()->integer('cargos', self::CARGOS), self::CARGOS), self::CARGOS_MAXIMO))
             ->get()
             ->map(static fn (CargoRenta $c): array => [
                 'id' => $c->ulid,
@@ -151,6 +154,7 @@ class PlataformaEstudiosController
             'plan_citas' => $planes->aplica($modelo) && $gestor->baseDeDatosExiste($modelo) ? $planes->resumen($modelo) : null,
             'uso' => $uso,
             'cargos' => $cargos,
+            'cargos_total' => CargoRenta::query()->where('estudio_id', $modelo->getKey())->count(),
             // Los últimos avisos de la plataforma al dueño (ADR 0071), para soporte.
             'avisos' => AvisoDueno::query()
                 ->where('estudio_id', $modelo->getKey())
@@ -506,7 +510,7 @@ class PlataformaEstudiosController
         return array_map(static fn (ModuloNegocio $m): array => [
             'clave' => $m->value,
             'etiqueta' => $m->etiqueta(),
-            'descripcion' => $m->descripcion(),
+            'descripcion' => $m->descripcion($estudio->producto()),
             'habilitado' => $estudio->moduloHabilitado($m),
         ], ModuloNegocio::cases());
     }

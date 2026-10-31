@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvisoTono from "@/components/AvisoTono.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { cuandoCorto } from "@/lib/miCuenta";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -23,7 +23,12 @@ interface Invitado {
   id: string;
   nombre: string;
   estado: string;
-  sesion: { id: string; oferta: string | null; inicia_en: string } | null;
+  sesion: {
+    id: string;
+    oferta: string | null;
+    inicia_en: string;
+    zona_horaria?: string | null;
+  } | null;
 }
 
 const props = defineProps<{ base: string }>();
@@ -43,10 +48,11 @@ async function cargar(): Promise<void> {
     }>(`${props.base}/mi/invitados`);
     pases.value = data.data.pases ?? [];
     proximos.value = data.data.proximos ?? [];
-  } catch {
-    // Sin pases (o sin perfil de alumno en el negocio) no hay nada que mostrar.
+  } catch (e) {
+    // Sin perfil en el negocio (404) no hay nada que mostrar; un fallo temporal se dice.
     pases.value = [];
     proximos.value = [];
+    if (!noEncontrado(e)) error.value = mensajeDeError(e);
   }
 }
 
@@ -54,7 +60,12 @@ function clase(i: Invitado): string {
   return i.sesion?.oferta ?? "—";
 }
 function cuando(i: Invitado): string {
-  return i.sesion ? cuandoCorto(i.sesion.inicia_en, sesion.zonaHoraria) : "";
+  return i.sesion
+    ? cuandoCorto(
+        i.sesion.inicia_en,
+        i.sesion.zona_horaria ?? sesion.zonaHoraria,
+      )
+    : "";
 }
 
 async function cancelar(i: Invitado): Promise<void> {
@@ -88,7 +99,7 @@ onMounted(cargar);
 
 <template>
   <section
-    v-if="pases.length > 0 || proximos.length > 0 || aviso"
+    v-if="pases.length > 0 || proximos.length > 0 || aviso || error"
     class="tu-card p-5"
     data-prueba="mis-invitados"
   >

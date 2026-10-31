@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoIncluidoPremium from "@/components/AvisoIncluidoPremium.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import BarraListado from "@/components/BarraListado.vue";
@@ -95,6 +96,13 @@ const organizaciones = ref<Organizacion[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
+// Más de una sede es de Premium (ADR 0107): se dice antes de llenar nada.
+const sinMasSedes = computed(
+  () =>
+    !cargando.value &&
+    totalSucursales.value > 0 &&
+    sesion.estudio?.plan?.sin.includes("sucursales") === true,
+);
 const totalSucursales = computed(() =>
   organizaciones.value.reduce((n, o) => n + o.sucursales.length, 0),
 );
@@ -421,7 +429,7 @@ onMounted(cargar);
     >
       <template #acciones>
         <button
-          v-if="puedeGestionar"
+          v-if="puedeGestionar && !sinMasSedes"
           class="tu-btn tu-btn-primario tu-btn-crear"
           type="button"
           @click="abrirNueva"
@@ -430,6 +438,11 @@ onMounted(cargar);
         </button>
       </template>
     </EncabezadoSeccion>
+    <AvisoIncluidoPremium
+      v-if="puedeGestionar && sinMasSedes"
+      class="mt-4"
+      data-prueba="sedes-premium"
+    />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

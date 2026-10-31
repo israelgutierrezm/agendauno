@@ -37,7 +37,7 @@ De quien registra un Negocio y de su Equipo:
 • Inicio de sesión con Google, si lo eliges: el nombre, el correo y la fotografía que Google comparte.
 • Suscripción y facturación: el plan contratado, la medición de uso para el cobro (solo cifras de alumnos o profesionales), cargos, pagos, referencias de la pasarela, el tipo de cambio aplicado, los timbres comprados y, si guardas una tarjeta para el cobro automático, solo su marca, sus últimos 4 dígitos y su vencimiento (la tarjeta la guarda la pasarela); si solicitas factura, tus datos fiscales (RFC, nombre o razón social, régimen fiscal y código postal).
 • Nómina del Equipo, si el Negocio la usa: el esquema de pago y lo que corresponde a cada quien.
-• Atención: los mensajes que nos envías.
+• Atención: los mensajes que nos envías y, si usas el asistente de ayuda del panel, lo que le preguntas.
 
 De los clientes del Negocio (como encargado), según lo que cada Negocio active y capture:
 • Nombre, correo, celular, fecha de nacimiento, género y fotografía.
@@ -45,6 +45,7 @@ De los clientes del Negocio (como encargado), según lo que cada Negocio active 
 • Documentos y consentimientos aceptados, respuestas a los formularios del Negocio y reseñas.
 • Pase de entrada con código QR, en los negocios de acceso libre.
 • Preferencias de comunicación y dispositivos para notificaciones.
+• Conversaciones con el Negocio por WhatsApp, Instagram o Messenger, con sus archivos, si el Negocio usa la bandeja de mensajes.
 • Quien agenda sin cuenta en la página de un Negocio: los datos que captura para su cita (nombre, correo, celular y lo que quiera comentar).
 
 Algunos negocios (por ejemplo, consultorios, fisioterapia o estética) pueden registrar datos de salud en sus formularios o expedientes. Son datos sensibles: el Negocio debe obtener el consentimiento expreso y por escrito de su titular. La Plataforma no solicita datos sensibles para registrar un Negocio; no los incluyas en campos de contacto o de soporte.
@@ -85,17 +86,20 @@ Al registrar un Negocio, aceptar una invitación o usar la plataforma después d
 7. Con quién compartimos los datos
 
 No vendemos ni rentamos datos personales. Para prestar el servicio nos apoyamos en proveedores que los tratan por nuestra cuenta, con obligaciones de confidencialidad y seguridad:
-• Infraestructura: servidores y almacenamiento de respaldos.
+• Infraestructura: servidores y almacenamiento de archivos y de respaldos (compatible con S3).
 • Envío de correo electrónico.
-• WhatsApp Business (Meta), para los mensajes que se aceptaron recibir.
-• Firebase Cloud Messaging (Google), para las notificaciones de la aplicación.
+• WhatsApp Business (Meta), para los mensajes que se aceptaron recibir; e Instagram y Messenger (Meta), si el Negocio conecta esas cuentas a su bandeja, para las conversaciones de quien le escribe por ahí.
+• Firebase Cloud Messaging (Google), para las notificaciones de la aplicación, y el servicio de avisos de tu navegador (Google, Mozilla, Apple u otro), para las del navegador si las activas.
+• Google Wallet y Apple Wallet, si guardas tu pase en la cartera de tu teléfono: tu nombre, tu plan y su saldo.
+• Google Calendar y Microsoft Outlook, si alguien del Equipo conecta su calendario: fecha y hora de sus clases o citas, sin datos de los clientes; de su calendario solo se lee si está ocupado.
+• Anthropic, para el asistente de ayuda del panel: lo que el Equipo le pregunta.
 • Google, para iniciar sesión con Google y para la verificación contra registros automatizados (reCAPTCHA).
 • Google Analytics y Meta, solo si aceptas las cookies de analítica o de publicidad (lo explica la Política de cookies).
 • Pasarelas de pago (Stripe, Mercado Pago y OpenPay), con las que el Negocio cobra a sus clientes y la Plataforma cobra la suscripción.
 • FacturAPI, para timbrar facturas electrónicas.
 • Wellhub y TotalPass, solo si el Negocio activa esa integración (en México), para validar la visita de sus usuarios.
 
-Algunos de estos proveedores están fuera de México (por ejemplo, en Estados Unidos). Los datos de los clientes del Negocio se comparten con ese Negocio, que es su responsable. También compartiremos datos con autoridades cuando una ley o una orden lo exija. Conforme a la ley, estas comunicaciones no requieren tu consentimiento.
+Algunos de estos proveedores están fuera de México (por ejemplo, Anthropic, Meta, Google, Apple y Microsoft, en Estados Unidos), así que esos datos se transfieren a ese país. Los datos de los clientes del Negocio se comparten con ese Negocio, que es su responsable. También compartiremos datos con autoridades cuando una ley o una orden lo exija. Conforme a la ley, estas comunicaciones no requieren tu consentimiento.
 
 8. Tus derechos ARCO y cómo ejercerlos
 
@@ -127,6 +131,7 @@ Si ocurre una vulneración de seguridad que afecte de forma significativa tus de
 
 Los conservamos mientras la cuenta esté activa y, después, el tiempo necesario para cumplir obligaciones legales y fiscales o atender aclaraciones; luego los bloqueamos y los suprimimos. En particular:
 • Un Negocio que se registra y no se activa en el plazo indicado al registrarse se borra junto con sus datos.
+• Los datos de un Negocio dado de baja se borran al terminar el plazo que se le indica al darse de baja, nunca menor a 30 días naturales. Permanecen hasta 12 meses más en las copias de respaldo cifradas de la Plataforma, sin usarse para nada más, hasta que caducan.
 • Los datos de la lista de interesados se conservan hasta que el producto abra su registro y te avisemos, o hasta que pidas que los borremos.
 • Los datos de una solicitud de demostración se conservan mientras le damos seguimiento, o hasta que pidas que los borremos.
 • Las sesiones que no se usan vencen y se borran.

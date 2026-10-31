@@ -66,10 +66,16 @@ class PlataformaOperacionController
                 'archivos' => $fecha(RespaldosPlataforma::ARCHIVOS),
                 'simulacro' => $respaldos->detalleUltimoSimulacro(),
             ],
+            // Las recientes y, aunque sean más viejas, las que piden atención y siguen sin
+            // atender: una ráfaga de errores no saca de la lista una disputa de renta.
             'alertas' => AlertaPlataforma::query()
                 ->orderByDesc('ultima_en')
                 ->limit(self::ALERTAS)
                 ->get()
+                ->merge(AlertaPlataforma::query()->whereIn('tipo', AlertasPlataforma::PIDEN_ATENCION)->whereNull('atendida_en')->get())
+                ->unique(fn (AlertaPlataforma $a): mixed => $a->getKey())
+                ->sortByDesc(fn (AlertaPlataforma $a): int => $a->ultima_en->getTimestamp())
+                ->values()
                 ->map(fn (AlertaPlataforma $a): array => [
                     'tipo' => $a->tipo,
                     'clave' => $a->clave,

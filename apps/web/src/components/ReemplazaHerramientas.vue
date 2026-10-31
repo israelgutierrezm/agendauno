@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import type { Modo } from "@/marketing/modalidades";
+import {
+  canalesDeBandeja,
+  hayPlataformas,
+  listaNatural,
+} from "@/marketing/integraciones";
+import { nombresDePlataformas, type Modo } from "@/marketing/modalidades";
 
 /**
  * «Reemplaza estas herramientas» y lo que incluye la suscripción (comparativo del
  * 2026-10-20): lo que un negocio paga hoy por separado contra un solo pago. Sin cifras
  * inventadas, sin nombres de competidores y sin decir que nadie más lo da (no se puede
- * sostener). Cada modalidad dice solo lo que su plan incluye. El título de la sección
- * (`landing.porQue.titulo`) dice cuántas filas hay.
+ * sostener). Cada modalidad dice solo lo que su plan incluye, y solo lo comprobado
+ * (ADR 0234): sin bandeja ni plataformas, esas filas no salen.
  */
 const props = defineProps<{ modo: Modo }>();
 
-const HERRAMIENTAS = [
+const HERRAMIENTAS: { hoy: string; con: string; requiere?: () => boolean }[] = [
   {
     hoy: "Hoja de cálculo para la agenda y los saldos",
     con: "AGENDA_SALDOS",
@@ -35,10 +40,15 @@ const HERRAMIENTAS = [
   },
   { hoy: "Facturación por fuera", con: "CFDI" },
   {
-    hoy: "WhatsApp e Instagram en el celular de alguien",
+    hoy: "BANDEJA_HOY",
     con: "BANDEJA",
+    requiere: () => canalesDeBandeja().length > 0,
   },
-  { hoy: "EXTRA_HOY", con: "EXTRA_CON" },
+  {
+    hoy: "EXTRA_HOY",
+    con: "EXTRA_CON",
+    requiere: () => props.modo !== "clases" || hayPlataformas(),
+  },
 ];
 
 // Las palabras de cada modalidad (la página de clases no habla de profesionales; la
@@ -50,7 +60,7 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
     AGENDA_SEDES: "Una agenda con sedes, salas y equipo",
     // Wellhub, TotalPass y Fitpass (ADR 0202); Fitpass, solo en México.
     EXTRA_HOY: "El portal de cada app de bienestar, por separado",
-    EXTRA_CON: "Wellhub, TotalPass y Fitpass* en tu misma agenda",
+    EXTRA_CON: `${listaNatural(nombresDePlataformas().map((n) => (n === "Fitpass" ? "Fitpass*" : n)))} en tu misma agenda`,
     CAMPANAS: "Campañas y segmentos con tus propios clientes",
     CFDI: "CFDI a tus clientes desde la venta*",
     BANDEJA: "Una bandeja de mensajes para todo tu equipo",
@@ -69,8 +79,11 @@ const POR_MODO: Record<Modo, Record<string, string>> = {
   },
 };
 const herramientas = computed(() =>
-  HERRAMIENTAS.map((h) => ({
-    hoy: POR_MODO[props.modo][h.hoy] ?? h.hoy,
+  HERRAMIENTAS.filter((h) => h.requiere?.() ?? true).map((h) => ({
+    hoy:
+      h.hoy === "BANDEJA_HOY"
+        ? `${listaNatural(canalesDeBandeja())} en el celular de alguien`
+        : (POR_MODO[props.modo][h.hoy] ?? h.hoy),
     con: POR_MODO[props.modo][h.con] ?? h.con,
   })),
 );

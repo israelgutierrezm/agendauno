@@ -161,7 +161,7 @@ onMounted(async () => {
           v-if="listo"
           class="text-sm"
           role="status"
-          :style="{ color: 'var(--exito)' }"
+          :style="{ color: 'var(--exito-texto)' }"
           >{{ $t("terminologiaNegocio.guardado") }}</span
         >
       </div>

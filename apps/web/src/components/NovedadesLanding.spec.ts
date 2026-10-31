@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
@@ -25,12 +25,63 @@ function montar(modo: Modo, slot?: string) {
 interface TextoNovedad {
   titulo: string;
   texto: string;
+  textoFitpass?: string;
   puntos: Record<"p1" | "p2" | "p3", string>;
 }
 const textos = (modo: Modo) =>
   es.landing[modo].novedades.items as Record<string, TextoNovedad>;
 
+const COMPROBADAS = [
+  "WELLHUB",
+  "TOTALPASS",
+  "FITPASS",
+  "BANDEJA_WHATSAPP",
+  "BANDEJA_INSTAGRAM",
+  "APPLE_WALLET",
+  "GOOGLE_WALLET",
+];
+
+describe("«Lo nuevo» sin nada comprobado (ADR 0234)", () => {
+  it("clases no nombra integraciones ni apps nativas y dice que la página se instala", () => {
+    const vista = montar("clases");
+    const texto = vista.text();
+    expect(texto).not.toMatch(
+      /Wellhub|TotalPass|Fitpass|Wallet|Instagram|Google Play/,
+    );
+    expect(vista.findAll("[data-novedad]")).toHaveLength(6);
+    expect(vista.get("[data-novedad='instalable']").text()).toContain(
+      "se instala como app",
+    );
+    expect(vista.find("[data-novedad='app']").exists()).toBe(false);
+    expect(texto).not.toContain("{");
+    vista.unmount();
+  });
+  it("citas tampoco, y con el enlace de la tienda la tarjeta de la app aparece sola", () => {
+    const vista = montar("citas");
+    expect(vista.text()).not.toMatch(/Wallet|Instagram|Google Play/);
+    expect(vista.findAll("[data-novedad]")).toHaveLength(6);
+    vista.unmount();
+    vi.stubEnv("VITE_TURNOUNO_PLAY_URL", "https://play.google.com/t");
+    const conApp = montar("citas");
+    expect(conApp.find("[data-novedad='app']").exists()).toBe(true);
+    expect(conApp.get("[data-prueba='tiendas-app']").text()).toBe(
+      "Google Play",
+    );
+    conApp.unmount();
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("«Lo nuevo» de cada modalidad", () => {
+  beforeEach(() => {
+    for (const i of COMPROBADAS) {
+      vi.stubEnv(`VITE_INTEGRACION_${i}`, "1");
+    }
+    vi.stubEnv("VITE_AGENDAUNO_PLAY_URL", "https://play.google.com/a");
+    vi.stubEnv("VITE_TURNOUNO_PLAY_URL", "https://play.google.com/t");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
   it.each(MODOS)(
     "%s: seis novedades, cada una con su ejemplo, su título, su texto y tres puntos",
     (modo) => {
@@ -40,11 +91,15 @@ describe("«Lo nuevo» de cada modalidad", () => {
       expect(tarjetas.map((n) => n.attributes("data-novedad"))).toEqual([
         ...MODALIDADES[modo].novedades,
       ]);
+      expect(vista.text()).not.toContain("{");
       for (const tarjeta of tarjetas) {
         const clave = tarjeta.attributes("data-novedad")!;
         const texto = textos(modo)[clave]!;
         expect(texto, clave).toBeDefined();
-        expect(tarjeta.get("h3").text()).toBe(texto.titulo);
+        // Los que nombran integraciones llevan solo las comprobadas.
+        if (!texto.titulo.includes("{")) {
+          expect(tarjeta.get("h3").text()).toBe(texto.titulo);
+        }
         expect(texto.texto.length, clave).toBeGreaterThan(60);
         expect(tarjeta.findAll(".novedad-puntos li")).toHaveLength(3);
         // El ejemplo es decorativo, pero existe y no está vacío.
@@ -72,10 +127,12 @@ describe("«Lo nuevo» de cada modalidad", () => {
     expect(texto).not.toMatch(/crea tu cuenta|regístrate/i);
     // Fitpass solo en México (con «*»); Wellhub y TotalPass, según el país.
     const plataformas = textos("clases").plataformas!;
-    expect(plataformas.titulo).toContain("Fitpass*");
-    expect(plataformas.titulo).not.toMatch(/Wellhub\*|TotalPass\*/);
+    expect(texto).toContain("Wellhub, TotalPass y Fitpass*");
+    expect(texto).not.toMatch(/Wellhub\*|TotalPass\*/);
     // Fitpass no tiene API: sus reservas las registra recepción (ADR 0197).
-    expect(plataformas.texto).toContain("recepción registra sus reservas");
+    expect(plataformas.textoFitpass).toContain(
+      "recepción registra sus reservas",
+    );
     expect(texto).toContain("Apple Wallet y Google Wallet");
     expect(texto).toContain("WhatsApp e Instagram");
     expect(vista.get(".tu-nota-mexico").text()).toBe(es.landing.soloMexico);

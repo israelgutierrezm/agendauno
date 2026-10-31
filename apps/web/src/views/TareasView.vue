@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvisoIncluidoPremium from "@/components/AvisoIncluidoPremium.vue";
 import AvisoTono from "@/components/AvisoTono.vue";
 import BotonWhatsApp from "@/components/BotonWhatsApp.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -75,6 +76,10 @@ const puedeEliminarReglas = computed(() =>
   sesion.puede("automatizaciones.eliminar"),
 );
 const puedeGestionar = computed(() => sesion.puede("tareas.gestionar"));
+// Su plan no incluye crear reglas: se dice antes de llenar nada.
+const sinAutomatizacion = computed(
+  () => sesion.estudio?.plan?.sin.includes("mensajes") === true,
+);
 
 // Pendientes | Automatización, en la dirección (`?pestana=reglas`): recargar o un
 // enlace abre la misma. Sin permiso para las reglas, solo las pendientes.
@@ -1459,6 +1464,7 @@ onMounted(() => {
           {{ $t("tareas.reglas.subtitulo") }}
         </p>
         <button
+          v-if="!sinAutomatizacion"
           class="tu-btn tu-btn-primario tu-btn-crear"
           type="button"
           @click="nuevaRegla"
@@ -1466,6 +1472,7 @@ onMounted(() => {
           {{ $t("tareas.reglas.nueva") }}
         </button>
       </div>
+      <AvisoIncluidoPremium v-if="sinAutomatizacion" class="mt-3" />
 
       <!-- Nueva / editar regla (drawer lateral) -->
       <PanelLateral
@@ -1860,7 +1867,7 @@ button.ta-check-completar:is(:hover, :focus-visible):not(:disabled) {
   color: #fff;
 }
 .ta-hecha .ta-check {
-  border-color: var(--exito);
+  border-color: var(--exito-texto);
   background: var(--exito);
   color: #fff;
 }

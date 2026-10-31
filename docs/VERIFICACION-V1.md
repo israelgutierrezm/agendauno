@@ -369,3 +369,30 @@ Con Mercado Pago u OpenPay en modo Pruebas y una alumna con pago automático act
   «Dar por pagada»; si cobró de más, «Devolver el excedente».
 - [ ] **Reactivar.** Con un pago automático pendiente de autorizar, actívalo de nuevo:
   la referencia anterior se cancela en la pasarela y queda uno solo.
+
+### 15. Integraciones anunciadas en las landings (ADR 0234)
+
+Las landings y el SEO solo nombran una integración cuando su bandera
+`VITE_INTEGRACION_*` vale 1 (`infra/produccion/web.env.example`). Enciéndela solo
+después de pasar su caso real, con credenciales de producción del proveedor.
+
+- [ ] **Wellhub** (`VITE_INTEGRACION_WELLHUB`): con un Gym ID real, publica una clase, reserva
+  desde la app de Wellhub y comprueba que ocupa un lugar sin sobrecupo y que su check-in se valida
+  solo; el visitante no cuenta como alumno activo.
+- [ ] **TotalPass** (`VITE_INTEGRACION_TOTALPASS`): igual, con su llave de API y la dirección de
+  check-in de producción confirmada con TotalPass (`agendauno.php`).
+- [ ] **Fitpass** (`VITE_INTEGRACION_FITPASS`): aparta lugares, registra en recepción una reserva con
+  su folio y concilia el reporte de pagos real.
+- [ ] **Bandeja, WhatsApp** (`VITE_INTEGRACION_BANDEJA_WHATSAPP`): con un número de WhatsApp Business
+  real, recibe y contesta un mensaje en el panel, con un archivo; fuera de las 24 horas, con plantilla.
+- [ ] **Bandeja, Instagram** (`VITE_INTEGRACION_BANDEJA_INSTAGRAM`): con la app de Meta aprobada,
+  conecta una cuenta, recibe y contesta un mensaje directo.
+- [ ] **Bandeja, Messenger** (`VITE_INTEGRACION_BANDEJA_MESSENGER`): igual, con una página de Facebook.
+- [ ] **Apple Wallet** (`VITE_INTEGRACION_APPLE_WALLET`): con el certificado real, guarda un pase en un
+  iPhone, gasta un crédito, comprueba que se actualiza solo y que el kiosco lo escanea.
+- [ ] **Google Wallet** (`VITE_INTEGRACION_GOOGLE_WALLET`): igual en un Android, con la cuenta de emisor.
+- [ ] **Google Calendar** (`VITE_INTEGRACION_GOOGLE_CALENDAR`): con la app de Google aprobada, conecta
+  el calendario de un profesional; su cita aparece allá y un evento de allá se marca ocupado aquí al momento.
+- [ ] **Outlook** (`VITE_INTEGRACION_OUTLOOK`): igual, con una cuenta de Microsoft 365.
+- [ ] **Apps en las tiendas**: con `VITE_{PRODUCTO}_PLAY_URL` o `VITE_{PRODUCTO}_APP_STORE_URL`, la
+  landing muestra la tarjeta de la app con su enlace y este abre la ficha publicada.

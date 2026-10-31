@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
+
 import IconoNav from "@/components/IconoNav.vue";
 import { api } from "@/lib/api";
 
@@ -19,6 +21,8 @@ const props = withDefaults(
   defineProps<{
     slug: string;
     puedePedir?: boolean;
+    /** Las palabras del negocio (ADR 0234). */
+    terminos?: TerminosNegocio | null;
     sucursal?: string;
     actividad?: string;
   }>(),
@@ -61,6 +65,11 @@ interface Calendario {
 }
 
 const { t, locale } = useI18n();
+/** Con las palabras del negocio («Maestros», no «instructores»). */
+function tn(clave: string, valores?: Record<string, unknown>): string {
+  const texto = valores ? t(clave, valores) : t(clave);
+  return props.terminos ? adaptarTexto(texto, props.terminos) : texto;
+}
 const datos = ref<Calendario | null>(null);
 const cargando = ref(true);
 const inicioSemana = ref<string | null>(null);
@@ -303,9 +312,9 @@ onMounted(cargar);
         v-if="datos.filtros.actividades.length > 1 || filtros.actividad"
         v-model="filtros.actividad"
         class="tu-input w-auto text-sm"
-        :aria-label="$t('calendarioPublico.actividad')"
+        :aria-label="tn('calendarioPublico.actividad')"
       >
-        <option value="">{{ $t("calendarioPublico.todasActividades") }}</option>
+        <option value="">{{ tn("calendarioPublico.todasActividades") }}</option>
         <option
           v-for="o in datos.filtros.actividades"
           :key="o.id"
@@ -318,10 +327,10 @@ onMounted(cargar);
         v-if="datos.filtros.instructores.length > 1 || filtros.instructor"
         v-model="filtros.instructor"
         class="tu-input w-auto text-sm"
-        :aria-label="$t('calendarioPublico.instructor')"
+        :aria-label="tn('calendarioPublico.instructor')"
       >
         <option value="">
-          {{ $t("calendarioPublico.todosInstructores") }}
+          {{ tn("calendarioPublico.todosInstructores") }}
         </option>
         <option
           v-for="o in datos.filtros.instructores"
@@ -350,7 +359,7 @@ onMounted(cargar);
         role="status"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        <p>{{ $t("calendarioPublico.sinClasesDia") }}</p>
+        <p>{{ tn("calendarioPublico.sinClasesDia") }}</p>
         <button
           v-if="otroDiaConClases"
           type="button"
@@ -370,7 +379,7 @@ onMounted(cargar);
           @click="irA(datos.siguiente)"
         >
           {{
-            $t("calendarioPublico.siguiente", {
+            tn("calendarioPublico.siguiente", {
               fecha: fechaLarga(datos.siguiente),
             })
           }}
@@ -415,7 +424,7 @@ onMounted(cargar);
             data-prueba="pedir-lugar"
             @click="pedir(s)"
           >
-            {{ $t("escaparate.pedirLugar") }}
+            {{ tn("escaparate.pedirLugar") }}
           </button>
         </li>
       </ul>

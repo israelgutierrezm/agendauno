@@ -806,7 +806,7 @@ class ReservasTenant
             return EfectoCancelacion::noCancelable('Ya se registró la asistencia de esta reserva; no se puede cancelar.');
         }
         if ($reserva->estado === EstadoReserva::EnEspera) {
-            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, 'Sale de la lista de espera. No usa créditos.');
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, $sesion->esCita() ? 'Sale de la lista de espera.' : 'Sale de la lista de espera. No usa créditos.');
         }
         // Empezada la clase o la cita, el cliente ya no la cancela: es asistencia o falta
         // (si no, cancelaría después de faltar y recuperaría el crédito). El negocio sí.
@@ -830,19 +830,27 @@ class ReservasTenant
                 return $this->efectoDelAnticipo($reserva, $sesion, $horasLimite);
             }
 
-            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, match (true) {
-                ! $pagada => 'No usa créditos.',
-                $quien === QuienCancela::Negocio && $this->seDevuelveSolo($reserva) => 'No usa créditos. Ya está pagada en línea: el pago se devolverá automáticamente.',
-                default => 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.',
-            });
+            // En citas no se habla de créditos (ADR 0130): sin bono, no hay nada que decir.
+            $sinCreditos = $sesion->esCita() ? '' : 'No usa créditos. ';
+
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, trim(match (true) {
+                ! $pagada => $sinCreditos,
+                $quien === QuienCancela::Negocio && $this->seDevuelveSolo($reserva) => $sinCreditos.'Ya está pagada en línea: el pago se devolverá automáticamente.',
+                default => $sinCreditos.'Ya está pagada: el pago no se reembolsa automáticamente.',
+            }));
         }
 
         $unidades = (int) $retencion->unidades;
-        $devuelve = 'Se devolverá '.EfectoCancelacion::creditos($unidades).'.';
+        $esCita = $sesion->esCita();
+        $cuanto = $esCita ? EfectoCancelacion::sesionesDeBono($unidades) : EfectoCancelacion::creditos($unidades);
+        $devuelve = ($esCita && $unidades !== 1000 ? 'Se devolverán ' : 'Se devolverá ').$cuanto.'.';
         // Un reintegro no le devuelve la vigencia a un plan vencido (M05): se dice.
         $vencio = $this->vencioElPlan($retencion);
         if ($vencio !== null) {
-            $devuelve .= ' Tu plan venció el '.CarbonImmutable::parse($vencio)->format('d/m/Y').': el crédito vuelve a él, pero ya no podrás usarlo.';
+            $fechaVencio = CarbonImmutable::parse($vencio)->format('d/m/Y');
+            $devuelve .= $esCita
+                ? " El bono venció el {$fechaVencio}: la sesión vuelve a él, pero ya no se podrá usar."
+                : " Tu plan venció el {$fechaVencio}: el crédito vuelve a él, pero ya no podrás usarlo.";
         }
         // Rechazar un lugar ofrecido de la lista de espera nunca penaliza.
         if ($reserva->estado === EstadoReserva::Ofrecida) {
@@ -867,7 +875,7 @@ class ReservasTenant
         }
 
         return new EfectoCancelacion(true, EfectoCancelacion::COBRA, $unidades, false, $limite,
-            'Se cobrará '.EfectoCancelacion::creditos($unidades).": se cancela con menos de {$horas} h de anticipación.");
+            'Se cobrará '.$cuanto.": se cancela con menos de {$horas} h de anticipación.");
     }
 
     /**
@@ -1521,7 +1529,7 @@ class ReservasTenant
             $mensaje = 'No tiene reservas.';
         } else {
             $mensaje = ($n === 1 ? 'Se cancelará 1 reserva' : "Se cancelarán {$n} reservas")
-                .($unidades > 0 ? ($unidades === 1000 ? ' y se devolverá ' : ' y se devolverán ').EfectoCancelacion::creditos($unidades) : '')
+                .($unidades > 0 ? ($unidades === 1000 ? ' y se devolverá ' : ' y se devolverán ').($sesion->esCita() ? EfectoCancelacion::sesionesDeBono($unidades) : EfectoCancelacion::creditos($unidades)) : '')
                 .'.'
                 .($solas > 0 ? ($solas === 1
                     ? ' 1 ya está pagada en línea: el pago se devolverá automáticamente.'

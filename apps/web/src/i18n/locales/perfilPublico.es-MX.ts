@@ -297,7 +297,7 @@ export default {
     tituloPara: "{oferta} · para {nombre}",
     nosConocioPor: "Nos conoció por",
     notaPh:
-      "Algo que debamos saber: alergias, preferencias, si es tu primera vez…",
+      "Algo que debamos saber: preferencias, si es tu primera vez… No escribas datos de salud.",
     pagaTuCita: "Paga tu cita",
     pagaAntesDe:
       "Págala antes de las {hora} para confirmarla; después el horario se libera.",

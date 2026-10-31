@@ -150,6 +150,7 @@ it('el superadmin publica la tarifa de citas por niveles; con huecos o distinta 
     $this->postJson('/api/v1/plataforma/tarifas/citas', [
         'dias_prueba' => 30, 'iva_porcentaje' => 16, 'meses_anual' => 10,
         'niveles' => ['individual' => ['1' => 900], 'premium' => $precios(5, 1200), 'pro' => $precios(5, 1700)],
+        'vigente_desde' => now()->addDays(30)->toDateString(),
     ], conPlataforma())
         ->assertCreated()
         ->assertJsonPath('data.definicion.moneda', 'USD')

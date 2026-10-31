@@ -130,16 +130,19 @@ function rutasDeOtrosProductos(): RouteRecordRaw[] {
  * carga cada vista. Salen de `paginasMarketing`, la lista única de seoConfig.
  */
 export function rutasComerciales(
-  vistas: Record<VistaMarketing, Vista>,
+  vistas: Record<Exclude<VistaMarketing, "faq">, Vista> & { faq?: Vista },
 ): RouteRecordRaw[] {
+  // Quien no renderiza las preguntas frecuentes solo necesita la ruta para enlazarla.
+  const vista = (nombre: VistaMarketing): Vista =>
+    vistas[nombre] ?? { render: () => null };
   return [
     ...paginasMarketing.map((pagina) => ({
       path: pagina.path,
       name: pagina.name,
-      component: vistas[pagina.vista],
+      component: vista(pagina.vista),
       meta: { marketing: true, modo: pagina.modo, giro: pagina.giro ?? null },
       props:
-        pagina.vista === "modalidad"
+        pagina.vista === "modalidad" || pagina.vista === "faq"
           ? { modo: pagina.modo }
           : pagina.vista === "solucion"
             ? { slug: pagina.slug }

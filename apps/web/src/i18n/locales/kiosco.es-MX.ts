@@ -8,6 +8,7 @@ export default {
   bienvenida: "¡Bienvenido!",
   revisa: "Pasa a recepción",
   lugar: "lugar {n}",
+  sinConexion: "No pudimos conectar con el negocio",
   sinActivar: "Esta tableta no está activada",
   sinActivarAyuda:
     "Actívala desde el panel del negocio: Configuración → Negocio → Kiosco de llegada, y abre aquí el enlace de activación.",

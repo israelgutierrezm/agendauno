@@ -120,9 +120,10 @@ describe("atribución", () => {
       "grecon.agendauno.mx",
       AHORA,
     );
-    expect(leerAtribucion("negocio:grecon", AHORA).ultimo_toque?.fbclid).toBe(
-      "IwAR0abcDEF123",
-    );
+    // Sin permiso de publicidad ni se guardan (ADR 0234).
+    expect(
+      leerAtribucion("negocio:grecon", AHORA).ultimo_toque?.fbclid,
+    ).toBeUndefined();
     const enviado = atribucionParaEnviar("negocio:grecon", AHORA);
     expect(enviado?.ultimo_toque).toEqual({
       fuente: "facebook",
@@ -139,10 +140,10 @@ describe("atribución", () => {
       "grecon.agendauno.mx",
       AHORA,
     );
-    expect(atribucionParaEnviar("negocio:grecon", dias(91))?.ultimo_toque).toBe(
-      null,
-    );
-    expect(atribucionParaEnviar("negocio:grecon", dias(400))).toBeNull();
+    expect(
+      atribucionParaEnviar("negocio:grecon", dias(89))?.ultimo_toque,
+    ).not.toBeNull();
+    expect(atribucionParaEnviar("negocio:grecon", dias(91))).toBeNull();
   });
 
   it("el ámbito sale de la ruta: el negocio por su slug o su subdominio, el producto en sus páginas", () => {

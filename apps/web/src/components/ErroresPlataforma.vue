@@ -19,7 +19,11 @@ import { useToastStore } from "@/stores/toast";
  * Por páginas cortas (no una lista que crece con «Ver más»): cada error en dos
  * renglones y lo de consulta rara (traza, contexto) en el panel al abrirlo.
  */
-const props = defineProps<{ apiUrl: string; token: string }>();
+const props = defineProps<{
+  apiUrl: string;
+  token: string;
+  soloLectura?: boolean;
+}>();
 
 type Estado = "abierto" | "resuelto" | "ignorado";
 type Origen = "api" | "web" | "app";
@@ -495,7 +499,7 @@ onMounted(() => void cargar());
         </section>
       </div>
       <template #pie>
-        <div v-if="detalle" class="flex gap-2">
+        <div v-if="detalle && !soloLectura" class="flex gap-2">
           <template v-if="detalle.estado === 'abierto'">
             <button
               type="button"

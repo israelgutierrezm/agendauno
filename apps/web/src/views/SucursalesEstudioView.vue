@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { api } from "@/lib/api";
+import AvisoTono from "@/components/AvisoTono.vue";
+import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import {
   capacidadesDeNegocio,
   type Capacidades,
@@ -51,6 +52,7 @@ const slug = computed(() => String(route.params.slug));
 const opciones = ref<Opciones | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
+const errorCarga = ref<string | null>(null);
 
 function destinoSucursal(s: Sucursal): {
   name: string;
@@ -67,6 +69,7 @@ function destinoSucursal(s: Sucursal): {
 async function cargar(): Promise<void> {
   cargando.value = true;
   noDisponible.value = false;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{ data: Opciones }>(
       `/api/v1/app/${slug.value}/escaparate`,
@@ -107,8 +110,9 @@ async function cargar(): Promise<void> {
           : { name: "estudio-publico", params: { slug: slug.value } },
       );
     }
-  } catch {
-    noDisponible.value = true;
+  } catch (e) {
+    if (noEncontrado(e)) noDisponible.value = true;
+    else errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
@@ -136,6 +140,24 @@ onMounted(cargar);
       {{ $t("sucursalesPub.cargando") }}
     </p>
 
+    <AvisoTono
+      v-else-if="errorCarga"
+      tono="peligro"
+      class="mx-auto mt-10 max-w-md"
+      role="alert"
+      data-prueba="error-carga-publica"
+    >
+      {{ errorCarga }}
+      <template #acciones>
+        <button
+          type="button"
+          class="tu-btn tu-btn-secundario tu-btn-chico"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
+      </template>
+    </AvisoTono>
     <section
       v-else-if="noDisponible"
       class="mx-auto max-w-md px-4 py-20 text-center"

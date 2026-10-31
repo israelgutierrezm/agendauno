@@ -47,7 +47,7 @@ export function reproductorDe(url: string | null | undefined): string | null {
   if (host === "vimeo.com") {
     const id = u.pathname.split("/").filter(Boolean)[0];
     return id && /^\d{4,12}$/.test(id)
-      ? `https://player.vimeo.com/video/${id}`
+      ? `https://player.vimeo.com/video/${id}?dnt=1`
       : null;
   }
   return null;

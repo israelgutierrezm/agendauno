@@ -465,7 +465,6 @@ async function agendar(): Promise<void> {
     emit("agendada");
   } catch (e) {
     error.value = mensajeDeError(e);
-    toast.error(error.value);
   } finally {
     guardando.value = false;
   }

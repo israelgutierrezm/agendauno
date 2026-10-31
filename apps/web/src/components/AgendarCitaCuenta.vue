@@ -128,7 +128,8 @@ const profesionalesSede = computed(() =>
         servicio.value.profesionales.includes(p.id)),
   ),
 );
-// Al cambiar de sede, si quien estaba elegido no atiende ahí, se parte de nuevo:
+// Al cambiar de sede o de servicio, si quien estaba elegido no atiende ahí o no da ese
+// servicio, se parte de nuevo:
 // todo el equipo de la sede o, si es una sola persona, ella.
 function ajustarProfesional(): void {
   const lista = profesionalesSede.value;
@@ -140,7 +141,7 @@ function ajustarProfesional(): void {
   }
   profesionalId.value = lista.length > 1 ? CUALQUIERA : (lista[0]?.id ?? "");
 }
-watch(sucursalId, ajustarProfesional);
+watch(profesionalesSede, ajustarProfesional);
 const sucursal = computed(
   () => sucursales.value.find((s) => s.id === sucursalId.value) ?? null,
 );

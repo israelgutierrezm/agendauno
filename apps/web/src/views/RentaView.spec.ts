@@ -3,6 +3,12 @@ import { createPinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
+import ComplementosNegocio from "@/components/ComplementosNegocio.vue";
+import DarDeBajaNegocio from "@/components/DarDeBajaNegocio.vue";
+import DescargarDatosNegocio from "@/components/DescargarDatosNegocio.vue";
+import ReferidosRenta from "@/components/ReferidosRenta.vue";
+import TimbresRenta from "@/components/TimbresRenta.vue";
+import WhatsAppRenta from "@/components/WhatsAppRenta.vue";
 import RentaView from "./RentaView.vue";
 
 /*
@@ -15,11 +21,16 @@ const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 const sesion = vi.hoisted(() => ({
   slug: "demo",
   suspendido: false,
+  dadoDeBaja: false,
+  cargarYo: vi.fn(),
+  usuario: { rol: "propietario" },
   puede: vi.fn(() => true),
   modalidad: "clases",
   esCitas: false,
   estudio: { facturacion_disponible: true } as {
     facturacion_disponible?: boolean;
+    factura_posible?: boolean;
+    whatsapp_clientes?: boolean;
   },
 }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
@@ -105,6 +116,53 @@ it("con el negocio suspendido, quien no ve la facturación ve un aviso neutro, s
   );
   expect(w.find('[data-prueba="suspendido"]').exists()).toBe(false);
   expect(api.get).not.toHaveBeenCalled();
+});
+
+describe("negocio suspendido por renta", () => {
+  it("ve sus cargos y sus datos, y no se le ofrece lo que sigue cerrado", async () => {
+    sesion.suspendido = true;
+    sesion.estudio = {
+      facturacion_disponible: true,
+      factura_posible: true,
+      whatsapp_clientes: true,
+    };
+    api.get.mockResolvedValue({
+      data: { data: renta(true), meta: null },
+    });
+    const w = mount(RentaView, {
+      global: {
+        plugins: [i18n, createPinia()],
+        stubs: {
+          AvisosAgendaUno: true,
+          TimbresRenta: true,
+          WhatsAppRenta: true,
+          ReferidosRenta: true,
+          ComplementosNegocio: true,
+          DarDeBajaNegocio: true,
+          DescargarDatosNegocio: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    // La lista de cargos abre: el aviso rojo con Reintentar ya no sale.
+    expect(w.find('[data-prueba="suspendido"]').exists()).toBe(true);
+    expect(w.findComponent(DescargarDatosNegocio).exists()).toBe(true);
+    for (const cerrado of [
+      TimbresRenta,
+      WhatsAppRenta,
+      ReferidosRenta,
+      ComplementosNegocio,
+      DarDeBajaNegocio,
+    ]) {
+      expect(w.findComponent(cerrado).exists()).toBe(false);
+    }
+    // Pagar puede reactivarlo: la sesión se vuelve a pedir, sin recargar la página.
+    expect(sesion.cargarYo).toHaveBeenCalled();
+    sesion.suspendido = false;
+    sesion.estudio = { facturacion_disponible: true };
+    api.get.mockReset();
+  });
 });
 
 describe("factura o recibo de la renta", () => {

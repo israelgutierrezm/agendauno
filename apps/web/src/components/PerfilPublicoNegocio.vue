@@ -249,7 +249,7 @@ onMounted(cargar);
         <span
           v-if="guardado"
           class="text-sm"
-          :style="{ color: 'var(--exito)' }"
+          :style="{ color: 'var(--exito-texto)' }"
         >
           {{ $t("perfilPublico.config.guardado") }}
         </span>

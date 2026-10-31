@@ -253,7 +253,7 @@ final class CatalogoParametros
                 'Si el dueño no activa su cuenta en este plazo y el negocio no tiene nada, se borra y su nombre queda libre.', $e, 14, 3, 365, 'días', porNegocio: false),
             // Baja de un negocio (ADR 0213, solo la plataforma): el plazo para revertirla.
             new DefinicionParametro(BajaDeNegocio::CLAVE_DIAS, 'Cuentas', 'Días para borrar los datos de un negocio dado de baja',
-                'Hasta entonces su dueño entra a descargar sus datos y pagar lo pendiente, y la baja se puede revertir. Ese día se borran su base, sus archivos y sus respaldos.', $e, 30, 7, 365, 'días', porNegocio: false),
+                'Hasta entonces su dueño entra a descargar sus datos y pagar lo pendiente, y la baja se puede revertir. Ese día se borran su base, sus archivos y sus respaldos.', $e, 30, 30, 365, 'días', porNegocio: false),
 
             // Lo más que el superadministrador extiende una prueba de una vez.
             new DefinicionParametro('negocios.dias_max_extender_prueba', 'Cuentas', 'Días máximos para extender la prueba de un negocio',

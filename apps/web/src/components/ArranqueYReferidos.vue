@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
+import { appPublicada, tiendasDeApp } from "@/marketing/integraciones";
 import type { Modo } from "@/marketing/modalidades";
 import { pesosRedondos } from "@/marketing/precios";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
@@ -8,7 +10,8 @@ import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 /**
  * Lo que se cobra aparte, con precio publicado (ADR 0188): el arranque acompañado
  * (gratis con el plan anual), la app con tu marca (solo en clases: la marca blanca es
- * de AgendaUno, ADR 0111, y hoy solo en Google Play) y los referidos. Los precios salen
+ * de AgendaUno, ADR 0111, y solo cuando su app ya está en la tienda, ADR 0234) y los
+ * referidos. Los precios salen
  * de `GET /api/v1/precios` (los fija el superadmin); sin respuesta, los de respaldo.
  */
 const props = defineProps<{ modo: Modo }>();
@@ -24,6 +27,16 @@ const queDejamos = computed(() =>
     ? "listos tus servicios, tu equipo y su horario"
     : "listas tus clases, paquetes y horario",
 );
+const producto = computed(() => productoDeModalidad(props.modo));
+const conAppDeMarca = computed(
+  () => props.modo !== "citas" && appPublicada(producto.value),
+);
+const soloEnPlay = computed(() => tiendasDeApp(producto.value).appStore === "");
+// El arranque lo hace el equipo (ADR 0234): por su correo se contrata.
+const contactoArranque = computed(() => {
+  const { correo } = PRODUCTOS[producto.value].soporte;
+  return `mailto:${correo}?subject=${encodeURIComponent("Arranque acompañado")}`;
+});
 const RESPALDO = {
   arranque_minor: 390000,
   arranque_migracion_minor: 490000,
@@ -39,8 +52,9 @@ const meses = computed(() => precios.datos.referidos?.meses_gratis ?? 1);
     <article>
       <h3>Arranque acompañado</h3>
       <p>
-        Si no quieres configurarlo solo: te dejamos {{ queDejamos }}, tu
-        pasarela de pago y tu sitio con plantilla.
+        Si prefieres que lo hagamos por ti: nuestro equipo te deja
+        {{ queDejamos }}, tu pasarela de pago y tu sitio con plantilla. La
+        orientación con guías, importadores y dudas no tiene costo.
       </p>
       <p class="arranque-precio">
         {{ pesosRedondos(s.arranque_minor) }} MXN + IVA, un solo pago
@@ -54,12 +68,20 @@ const meses = computed(() => precios.datos.referidos?.meses_gratis ?? 1);
         >
         Darte de alta tú mismo sigue sin costo.
       </p>
+      <p class="arranque-nota">
+        <a :href="contactoArranque" data-prueba="contratar-arranque"
+          >Contáctanos para contratarlo</a
+        >
+      </p>
     </article>
-    <article v-if="modo !== 'citas'" data-prueba="app-con-tu-marca">
+    <article v-if="conAppDeMarca" data-prueba="app-con-tu-marca">
       <h3>Tu app con tu marca</h3>
       <p>
-        Tu propia app en Google Play, con tu nombre, tu logo y tus colores. Por
-        ahora solo para Android. La app y la web de siempre siguen incluidas.
+        Tu propia app en Google Play, con tu nombre, tu logo y tus
+        colores.<template v-if="soloEnPlay">
+          Por ahora solo para Android.</template
+        >
+        La app y la web de siempre siguen incluidas.
       </p>
       <p class="arranque-precio">
         {{ pesosRedondos(s.app_marca_alta_minor) }} MXN de alta y
@@ -93,6 +115,10 @@ const meses = computed(() => precios.datos.referidos?.meses_gratis ?? 1);
 .arranque h3 {
   font-weight: 600;
   font-size: 1.05rem;
+}
+.arranque a {
+  color: var(--primario);
+  text-decoration: underline;
 }
 .arranque p {
   margin-top: 0.5rem;

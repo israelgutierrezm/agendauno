@@ -1,4 +1,4 @@
-TÉRMINOS Y CONDICIONES DE USO DE AGENDAUNO
+TÉRMINOS Y CONDICIONES DE USO DE AGENDAUNO Y TURNOUNO
 
 1. Aceptación y partes
 
@@ -35,10 +35,11 @@ Cada negocio nuevo cuenta con una prueba gratuita, sin tarjeta, por el plazo pub
 
 • En clases, la suscripción se calcula por mes calendario según los alumnos activos del mes (quienes tuvieron al menos una reserva o una compra pagada) y se cobra mes vencido: al cerrar cada mes se emite el cargo por el uso de ese mes. El Negocio puede consultar quién cuenta en «Mi suscripción».
 • En citas, el Negocio elige un plan (Individual, Premium o Pro) y los profesionales que contrata, con pago mensual o anual, y se cobra por adelantado al inicio de cada periodo. El pago anual equivale a 10 meses. Si sube de plan o de profesionales, se cobra al momento la diferencia de los días que faltan del periodo pagado; si baja, el cambio aplica desde el siguiente periodo. No puede tener más profesionales de los contratados. Las funciones de cada plan se publican en turnouno.mx.
-• Los precios se publican en el sitio de cada marca (agendauno.mx para clases y turnouno.mx para citas) en dólares de los Estados Unidos, más impuestos. A los negocios en México se les cobra en pesos mexicanos, al tipo de cambio FIX publicado por el Banco de México vigente el día en que se emite el cargo, más IVA; a los demás, en dólares. Cada parte paga los impuestos que le correspondan. Si lo solicitas, emitimos la factura de los cargos en pesos.
-• Los cargos se pagan en línea con tarjeta desde «Mi suscripción». El Negocio puede guardar su tarjeta para que cada cargo se cobre automáticamente; si un cobro automático no pasa, se reintenta a los 3 y a los 7 días, y el Negocio puede quitar su tarjeta en cualquier momento.
+• Los precios se publican en el sitio de cada marca (agendauno.mx para clases y turnouno.mx para citas) en dólares de los Estados Unidos, más impuestos. A los negocios en México se les cobra en pesos mexicanos, al tipo de cambio FIX publicado por el Banco de México vigente el día en que se emite el cargo, más IVA; a los demás, en dólares. Cada parte paga los impuestos que le correspondan. Si un día no hay FIX publicado, rige el último publicado o, en su defecto, el tipo de cambio de respaldo que registra la Plataforma. Si lo solicitas, emitimos la factura de los cargos en pesos.
+• Los cargos se pagan desde «Mi suscripción» en línea, con tarjeta y, en México, con OXXO o transferencia; también por transferencia u otro medio acordado, que la Plataforma registra al recibirlo. El Negocio puede guardar su tarjeta para que cada cargo se cobre automáticamente; si un cobro automático no pasa, se reintenta a los 3 y a los 7 días, y el Negocio puede quitar su tarjeta en cualquier momento.
+• Se cobran aparte, con su precio publicado o acordado: los timbres de facturación, el arranque acompañado (configurar y migrar los hace nuestro equipo; la orientación con guías, importadores y dudas no tiene costo), la aplicación con la marca del Negocio y, si se activa, los mensajes de WhatsApp.
 • Los negocios que superan 20 profesionales o 1,000 alumnos activos pueden acordar con la Plataforma una cuota a la medida.
-• Podemos actualizar los precios. Los cambios no afectan los cargos ya emitidos ni el periodo ya pagado, y se avisan con al menos 30 días naturales de anticipación.
+• Podemos actualizar los precios. Los cambios no afectan los cargos ya emitidos ni el periodo ya pagado. Una subida se avisa por correo a los negocios afectados y rige con al menos 30 días naturales de anticipación; una baja puede aplicar de inmediato.
 • Los pagos de la suscripción no son reembolsables, salvo un cobro indebido atribuible a la Plataforma.
 
 6. Falta de pago y suspensión
@@ -57,7 +58,7 @@ Disponible para negocios en México mediante un proveedor autorizado de certific
 
 9. Servicios de terceros
 
-Algunas funciones usan servicios de terceros: pasarelas de pago, WhatsApp Business (Meta), Google, Firebase, FacturAPI, Wellhub y TotalPass. Su uso queda sujeto también a los términos de cada proveedor. La Plataforma no responde por sus fallas, cambios o suspensiones, ni por las decisiones que tomen sobre la cuenta del Negocio con ellos.
+Algunas funciones usan servicios de terceros: pasarelas de pago, WhatsApp Business, Instagram y Messenger (Meta), Google (incluidos Google Calendar y Google Wallet), Apple Wallet, Microsoft Outlook, Firebase, Anthropic (asistente de ayuda), FacturAPI, Wellhub, TotalPass y Fitpass. Su uso queda sujeto también a los términos de cada proveedor. La Plataforma no responde por sus fallas, cambios o suspensiones, ni por las decisiones que tomen sobre la cuenta del Negocio con ellos.
 
 10. Mensajes a los clientes
 
@@ -76,7 +77,7 @@ No se permite intentar acceder a cuentas o a información de otros negocios; vul
 
 13. Información del Negocio y privacidad
 
-La información que el Negocio y su equipo cargan (sus clientes, su agenda, sus ventas) pertenece al Negocio. Sobre los datos de sus clientes, el Negocio es el responsable y la Plataforma el encargado: los trata solo para prestar el servicio, conforme al aviso de privacidad y con las obligaciones que ahí se describen. El Negocio puede exportar su directorio de clientes desde el panel y solicitar una copia de su información a {contacto}. Al terminar la relación, puede pedir esa copia dentro de los 30 días naturales siguientes; después la suprimiremos, salvo lo que debamos conservar por obligación legal.
+La información que el Negocio y su equipo cargan (sus clientes, su agenda, sus ventas) pertenece al Negocio. Sobre los datos de sus clientes, el Negocio es el responsable y la Plataforma el encargado: los trata solo para prestar el servicio, conforme al aviso de privacidad y con las obligaciones que ahí se describen. El Negocio puede exportar su directorio de clientes desde el panel y solicitar una copia de su información a {contacto}. Al darse de baja, puede descargar sus datos dentro del plazo que le indicamos en ese momento, nunca menor a 30 días naturales; después los suprimimos, salvo lo que debamos conservar por obligación legal. Lo suprimido permanece hasta 12 meses más en las copias de respaldo cifradas de la Plataforma, sin usarse para nada más, hasta que caducan.
 
 14. Confidencialidad
 
@@ -104,7 +105,7 @@ Ninguna parte responde por incumplimientos causados por hechos fuera de su contr
 
 20. Terminación
 
-El Negocio puede dejar de usar la Plataforma en cualquier momento avisándonos a {contacto}; pagará el uso del mes en curso, que se cobra al cierre de ese mes. La Plataforma puede suspender o terminar el servicio por falta de pago, por uso prohibido o por un incumplimiento grave de estos términos. Los apartados de pagos pendientes, confidencialidad, propiedad intelectual, limitación de responsabilidad e indemnización siguen vigentes después de terminar.
+El Negocio puede darse de baja en cualquier momento desde «Mi suscripción». En clases pagará el uso del mes en curso, que se cobra al cierre de ese mes; en citas, lo ya pagado por adelantado no se reembolsa. La Plataforma puede suspender o terminar el servicio por falta de pago, por uso prohibido o por un incumplimiento grave de estos términos. Los apartados de pagos pendientes, confidencialidad, propiedad intelectual, limitación de responsabilidad e indemnización siguen vigentes después de terminar.
 
 21. Avisos
 

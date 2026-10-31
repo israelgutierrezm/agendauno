@@ -435,8 +435,10 @@ const MENU_NEGOCIO_BASE: GrupoMenu[] = [
           // La caja del turno (ADR 0175), junto al mostrador donde se cobra.
           v("turno-caja", "caja", "nav.vistas.cajaTurno"),
           v("inventario", "inventario", "planes.nav.inventario"),
+          // Sin bonos en su plan, Bonos no tendría qué vender (ADR 0107).
           v("paquetes", "ventas", "nav.vistas.paquetesCitas", {
             modalidad: "citas",
+            funcion: "paquetes",
           }),
           // Presupuestos (ADR 0127): solo los negocios de citas.
           v("presupuestos", "presupuestos", "nav.vistas.presupuestos", {

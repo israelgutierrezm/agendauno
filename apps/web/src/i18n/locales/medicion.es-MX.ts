@@ -13,6 +13,7 @@ export default {
       "{negocio} utiliza cookies que obtienen datos de tu navegación para que su página funcione, analizar el tráfico y medir sus campañas. Acepta o elige cuáles en",
     esteNegocio: "Este negocio",
     aceptar: "Aceptar",
+    soloNecesarias: "Solo necesarias",
     elegir: "Cookies y configuración",
     guardar: "Guardar mi elección",
     analitica: "Analítica",
@@ -123,7 +124,7 @@ export default {
       "Siempre quedan en tu seguimiento interno. Enciéndelos solo si también quieres mandarlos a este destino.",
     extra: {
       asistencia: "Primera asistencia",
-      renovacion: "Renovaciones pagadas",
+      renovacion: "Compras repetidas",
     },
   },
   reporte: {
@@ -139,6 +140,7 @@ export default {
       devoluciones: "Devoluciones",
       reservas: "Primeras reservas",
       renovaciones: "Renovaciones (aparte)",
+      recompras: "Compras repetidas (aparte)",
     },
     leyenda:
       "Las renovaciones van aparte para no mezclarlas con la adquisición. Sin gasto publicitario capturado, no se calcula costo por resultado.",
