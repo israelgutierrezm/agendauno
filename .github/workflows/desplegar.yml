@@ -110,6 +110,8 @@ jobs:
             exit 1
           fi
           echo "CI en verde: $sha"
+          # Se publica este commit, el que se revisó: un push entre pasos no se cuela.
+          echo "REF_REVISADO=$sha" >> "$GITHUB_ENV"
 
       - name: Llave SSH
         run: |
@@ -125,10 +127,11 @@ jobs:
           set -euo pipefail
           script="./actualizar.sh"
           [ "$ACCION" = "volver" ] && script="./volver.sh"
+          destino="${REF_REVISADO:-$REF}"
           if [ "$COMPONENTE" = "todo" ]; then
-            orden="$script $REF"
+            orden="$script $destino"
           else
-            orden="$script --solo $COMPONENTE $REF"
+            orden="$script --solo $COMPONENTE $destino"
           fi
           echo "En ${{ inputs.entorno }}: cd $RUTA_PLATAFORMA && $orden"
           ssh -i ~/.ssh/despliegue -o StrictHostKeyChecking=yes -o BatchMode=yes \

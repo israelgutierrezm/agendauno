@@ -71,11 +71,18 @@ componente_atiende() {
 
 # Las imágenes de los servicios dados (todos los que se construyen, si no se dan), con la
 # versión exportada de cada uno: del registro que publica el CI (REGISTRO en web.env,
-# p. ej. ghcr.io/dueno; ADR 0113), etiquetadas como las nombra docker-compose.yml, o
-# construidas aquí si no hay registro.
+# p. ej. ghcr.io/dueno; ADR 0113), etiquetadas como las nombra docker-compose.yml. Lo que
+# se publica es lo que pasó por el CI (ADR 0232): construirlas aquí hay que pedirlo con
+# CONSTRUIR_EN_SERVIDOR=1 en web.env, solo para staging.
 obtener_imagenes() {
   registro="$(sed -n 's/^REGISTRO=//p' web.env 2>/dev/null | tr -d '\r' | head -n 1)"
   if [ -z "$registro" ]; then
+    construir="$(sed -n 's/^CONSTRUIR_EN_SERVIDOR=//p' web.env 2>/dev/null | tr -d '\r' | head -n 1)"
+    if [ "$construir" != "1" ]; then
+      echo "!! Falta REGISTRO en web.env: producción usa las imágenes publicadas por el CI."
+      echo "   Para construirlas aquí (solo en staging), agrega CONSTRUIR_EN_SERVIDOR=1."
+      return 1
+    fi
     $COMPOSE build "$@"
     return
   fi

@@ -101,6 +101,8 @@ describe("solicitudes de privacidad", () => {
 
   it("se buscan, se filtran por vencimiento y las vencidas se distinguen", async () => {
     vi.useFakeTimers();
+    // Las fechas de la prueba son literales: con el reloj real, un día se vencen todas.
+    vi.setSystemTime(new Date("2026-10-15T18:00:00Z"));
     api.get.mockResolvedValue({
       data: {
         data: [{ ...solicitud(1), vence_en: "2026-09-01" }, solicitud(2)],

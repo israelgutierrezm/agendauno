@@ -93,6 +93,22 @@ it('un estudio que falla no frena a los demás y el comando termina con error', 
     expect(esquemaReal('estudio-b'))->toBe(ultimaMigracionTenant());
 });
 
+it('un negocio con sus datos ya borrados no detiene la migración de los demás', function (): void {
+    estudioConSesion('estudio-a', 'a@correo.mx');
+    estudioConSesion('estudio-b', 'b@correo.mx');
+    retrasarEsquema('estudio-a');
+    retrasarEsquema('estudio-b');
+    // Su fila sigue en el control plane y, en MySQL, nada dice que su base ya no existe.
+    Estudio::query()->where('slug', 'estudio-b')->update(['datos_borrados_en' => now()]);
+
+    $this->artisan('agendauno:migrar-estudios')
+        ->expectsOutputToContain('sin BD')
+        ->assertSuccessful();
+
+    expect(esquemaReal('estudio-a'))->toBe(ultimaMigracionTenant());
+    expect(esquemaReal('estudio-b'))->not->toBe(ultimaMigracionTenant());
+});
+
 it('con --estudio migra solo ese, y se salta los estudios sin BD', function (): void {
     estudioConSesion('estudio-a', 'a@correo.mx');
     estudioConSesion('estudio-b', 'b@correo.mx');

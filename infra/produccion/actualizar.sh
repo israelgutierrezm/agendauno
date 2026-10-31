@@ -43,6 +43,14 @@ set -eu
 # mientras corre, y sh lo lee conforme avanza. Así se lee completo antes de empezar.
 principal() {
   cd "$(dirname "$0")"
+  # Un solo despliegue a la vez: dos a la vez se pisarían las migraciones (ADR 0232).
+  if command -v flock >/dev/null 2>&1; then
+    exec 9>.despliegue.lock
+    if ! flock -n 9; then
+      echo "!! Ya hay otro despliegue en curso en este servidor."
+      exit 1
+    fi
+  fi
   . ./versiones.sh
   # La versión en marcha de cada componente y los archivos de compose de web.env.
   cargar_versiones
@@ -108,13 +116,19 @@ principal() {
   echo "==> Migraciones (plataforma y cada negocio)"
   if ! $COMPOSE run --rm api php artisan migrate --force \
     || ! $COMPOSE run --rm api php artisan agendauno:migrar-estudios --force; then
-    echo "!! Falló una migración. Todo sigue en MANTENIMIENTO, con la versión $ANTERIOR detenida a medias"
-    echo "   (sin cola ni programador). Parte del esquema pudo haber cambiado:"
-    echo "   - revisa el error y, si $ANTERIOR funciona con el esquema actual, reábrela:"
-    echo "       VERSION=$ANTERIOR $COMPOSE start worker scheduler"
-    echo "       VERSION=$ANTERIOR $COMPOSE exec -u www-data api php artisan up"
-    echo "   - si no, restaura los respaldos recién tomados (docs/DESPLIEGUE.md → Restaurar)."
     anotar "$ANTERIOR -> $VERSION (fallida: migración)"
+    if [ -z "$EN_MARCHA" ]; then
+      echo "!! Falló una migración. Primera instalación: no hay versión anterior; sigue en MANTENIMIENTO."
+      avisar "Despliegue de $VERSION: falló una migración. Primera instalación: quedó en mantenimiento."
+      exit 1
+    fi
+    # Un error en un solo negocio no deja fuera a todos (ADR 0232): la anterior funciona
+    # con el esquema nuevo (las migraciones se escriben para eso). Si una no lo fuera, se
+    # restauran los respaldos recién tomados (docs/DESPLIEGUE.md → Restaurar).
+    echo "!! Falló una migración: se reabre sola la versión $ANTERIOR."
+    reabrir_anterior
+    avisar "Despliegue de $VERSION: falló una migración. Se reabrió $ANTERIOR: revisa qué negocio falló con agendauno:migrar-estudios y corrígelo antes de volver a publicar."
+    echo "   Parte del esquema pudo haber cambiado. Revisa: $COMPOSE run --rm api php artisan agendauno:migrar-estudios"
     exit 1
   fi
 
@@ -168,6 +182,7 @@ principal() {
     avisar "Despliegue de $VERSION abierto, pero faltan puntos de la verificación de producción: revisa agendauno:verificar-produccion."
     exit 2
   fi
+  limpiar_imagenes
   echo "==> Listo: $VERSION en marcha (la anterior era $ANTERIOR; para regresar: ./volver.sh)"
 }
 
@@ -255,9 +270,36 @@ respaldar() {
     # MySQL con la herramienta del proveedor antes de usar esta opción.
     echo "    (se omite el respaldo de la plataforma: SIN_RESPALDO_PLATAFORMA=1)"
   else
-    VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan agendauno:respaldar-plataforma || return 1
+    # Sin los archivos subidos (no los toca una migración; van en el respaldo diario): con
+    # ellos, cada despliegue tardaría más cuanto más suben los negocios (ADR 0232).
+    VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan agendauno:respaldar-plataforma --sin-archivos || return 1
   fi
-  VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan agendauno:respaldar-estudios || return 1
+  if trae_migraciones_de_negocio; then
+    VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan agendauno:respaldar-estudios || return 1
+  else
+    echo "    (esta versión no migra las bases de los negocios: se conserva su respaldo diario)"
+  fi
+}
+
+# ¿Hay migraciones de negocio entre la versión en marcha y la nueva? Si no se puede saber
+# (la anterior no está en el repositorio, o es «latest»), se responde que sí: se respalda.
+trae_migraciones_de_negocio() {
+  git diff --quiet "$ANTERIOR" "$VERSION" -- ../../apps/api/database/migrations/tenant 2>/dev/null && return 1
+  return 0
+}
+
+# Cada despliegue suma cuatro imágenes: se conservan las 5 más recientes de cada una, para
+# poder volver (ADR 0232). Limpiar nunca hace fallar un despliegue que ya quedó bien.
+limpiar_imagenes() {
+  for imagen in agendauno-api agendauno-web agendauno-landing-agendauno agendauno-landing-turnouno; do
+    docker images --format '{{.Repository}}:{{.Tag}}' \
+      | grep -E "(^|/)$imagen:" | grep -v ':<none>' | awk -F: '!visto[$NF]++ { print $NF }' | tail -n +6 \
+      | while read -r etiqueta; do
+        docker images --format '{{.Repository}}:{{.Tag}}' | grep -E "(^|/)$imagen:$etiqueta\$" \
+          | xargs -r docker rmi >/dev/null 2>&1 || true
+      done
+  done
+  docker image prune -f >/dev/null 2>&1 || true
 }
 
 limpiar_senales() {

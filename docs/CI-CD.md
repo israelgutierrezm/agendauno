@@ -38,9 +38,9 @@ nada más. Los trabajos que se saltan cuentan como aprobados para las reglas de 
   `VITE_TURNOUNO_NOMBRE`, `VITE_GOOGLE_CLIENT_ID`, `VITE_ANALYTICS_ENDPOINT`,
   `VITE_VENTAS_WHATSAPP`, `GOOGLE_SITE_VERIFICATION`. Son las de **producción**: un
   servidor de staging con otros dominios construye sus propias imágenes (sin
-  `REGISTRO`).
+  `REGISTRO` y con `CONSTRUIR_EN_SERVIDOR=1`, ADR 0232).
 - En el servidor: `docker login ghcr.io` con un token de solo lectura de paquetes
-  (`read:packages`) y `REGISTRO=ghcr.io/<dueño>` en `web.env`. Desde entonces
+  (`read:packages`) y `REGISTRO=ghcr.io/<dueño>` en `web.env`, obligatorio en producción. Desde entonces
   `actualizar.sh` baja las imágenes del commit en lugar de construirlas (si el flujo
   «Imágenes» de ese commit no terminó, lo dice y no cambia nada).
 

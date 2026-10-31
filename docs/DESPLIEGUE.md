@@ -360,10 +360,16 @@ vez marca los prospectos abiertos que nadie atendió en las últimas 24 h, con s
 
 ### Imágenes del CI y despliegue desde GitHub
 
-Con `REGISTRO=ghcr.io/<dueño>` en `web.env` (y `docker login ghcr.io` con un token de
-solo lectura), `actualizar.sh` baja las imágenes que publicó el flujo «Imágenes» para
-ese commit en lugar de construirlas aquí. El flujo «Desplegar» de GitHub corre este
-mismo script por SSH, con aprobación. Ver `docs/CI-CD.md` (ADR 0113).
+`REGISTRO=ghcr.io/<dueño>` en `web.env` es obligatorio en producción (y `docker login
+ghcr.io` con un token de solo lectura): `actualizar.sh` baja las imágenes que publicó el
+flujo «Imágenes» para ese commit, así que lo publicado es lo que pasó por el CI. Solo en
+staging se construyen en el servidor, con `CONSTRUIR_EN_SERVIDOR=1` y sin `REGISTRO`
+(ADR 0232). El flujo «Desplegar» de GitHub corre este mismo script por SSH, con
+aprobación, y publica exactamente el commit cuyo CI revisó. Ver `docs/CI-CD.md` (ADR 0113).
+
+Si una migración falla (también en un solo negocio), `actualizar.sh` reabre sola la
+versión anterior y avisa por correo. Antes de migrar respalda la base central sin los
+archivos, y las bases de los negocios solo si la versión trae migraciones de negocio.
 
 ### Publicar un solo componente
 

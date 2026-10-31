@@ -70,10 +70,15 @@ class GestorDeConexionTenant
     /**
      * ¿La BD fisica del estudio existe? Evita reventar (500) cuando un estudio tiene
      * registro en el control plane pero su base no fue aprovisionada o se borro
-     * (p. ej. en dev, tras limpiar storage/tenants). En MySQL se asume aprovisionada.
+     * (p. ej. en dev, tras limpiar storage/tenants). En MySQL se asume aprovisionada,
+     * salvo la de un negocio dado de baja cuyos datos ya se borraron: su fila sigue en el
+     * control plane y conectarse fallaría (un despliegue se quedaría en mantenimiento).
      */
     public function baseDeDatosExiste(Estudio $estudio): bool
     {
+        if ($estudio->datos_borrados_en !== null) {
+            return false;
+        }
         if ($estudio->db_driver === 'sqlite') {
             return File::exists($this->rutaSqlite($estudio));
         }
