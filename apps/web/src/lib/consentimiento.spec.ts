@@ -75,7 +75,7 @@ describe("preferencias de medición", () => {
     expect(leerPreferencias("plataforma:agendauno")).toBeNull();
   });
 
-  it("con analítica la atribución sobrevive a la pestaña; con publicidad viajan los clics", () => {
+  it("con analítica la atribución sobrevive a la pestaña; los clics solo con permiso de publicidad", () => {
     const ambito = "negocio:grecon" as const;
     capturarAtribucion(
       ambito,
@@ -92,6 +92,18 @@ describe("preferencias de medición", () => {
     moverAtribucionSegunPreferencias(ambito);
     expect(window.sessionStorage.getItem(`tu.atribucion.${ambito}`)).toBeNull();
     expect(leerAtribucion(ambito, AHORA).ultimo_toque?.campana).toBe("otono");
+    // Llegó sin permiso de publicidad: ese clic no se guardó (ADR 0234).
+    expect(
+      atribucionParaEnviar(ambito, AHORA)?.ultimo_toque?.fbclid,
+    ).toBeUndefined();
+    // Con el permiso, el clic de una visita nueva sí.
+    capturarAtribucion(
+      ambito,
+      new URLSearchParams("utm_campaign=otono&fbclid=IwAR0abcDEF123"),
+      "",
+      "grecon.agendauno.mx",
+      AHORA,
+    );
     expect(atribucionParaEnviar(ambito, AHORA)?.ultimo_toque?.fbclid).toBe(
       "IwAR0abcDEF123",
     );

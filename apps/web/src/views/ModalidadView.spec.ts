@@ -15,6 +15,7 @@ import {
   frasesEncontradas,
 } from "@/marketing/prelanzamiento";
 import {
+  novedadesVisibles,
   IMAGEN_NEGOCIO,
   MODALIDADES,
   NEGOCIOS_POR_MODO,
@@ -329,12 +330,13 @@ describe("landing de una modalidad (/clases y /citas)", () => {
         novedades
           .findAll("[data-novedad]")
           .map((n) => n.attributes("data-novedad")),
-      ).toEqual([...MODALIDADES[modo].novedades]);
+      ).toEqual([...novedadesVisibles(modo)]);
       expect(novedades.get("h2").text()).toBe(
         es.landing[modo].novedades.titulo,
       );
-      // Las dos llevan algo que solo opera en México (Fitpass; anticipo y CFDI).
-      expect(novedades.find(".tu-nota-mexico").exists()).toBe(true);
+      // Citas lleva algo que solo opera en México (anticipo y CFDI); en clases era Fitpass,
+      // que no se anuncia hasta comprobarlo (ADR 0234).
+      expect(novedades.find(".tu-nota-mexico").exists()).toBe(modo === "citas");
       vista.unmount();
     },
   );
@@ -595,7 +597,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       .get('#preguntas [data-pregunta="soporte"] p')
       .text();
     expect(respuesta).toContain(
-      "Escríbenos a soporte@agendauno.mx: te ayudamos",
+      "Escríbenos a soporte@agendauno.mx: sin costo te orientamos",
     );
     expect(respuesta).not.toContain("WhatsApp");
     clases.unmount();

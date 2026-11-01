@@ -11,7 +11,11 @@ import MisInvitados from "./MisInvitados.vue";
 */
 
 const api = vi.hoisted(() => ({ get: vi.fn(), delete: vi.fn() }));
-vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "No se pudo" }));
+vi.mock("@/lib/api", () => ({
+  api,
+  mensajeDeError: () => "No se pudo",
+  noEncontrado: (e: Error) => e.message === "404",
+}));
 const confirmar = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/lib/confirmar", () => ({ confirmar }));
 vi.mock("@/stores/sesionTenant", () => ({
@@ -100,13 +104,13 @@ describe("mis invitados", () => {
     expect(w.find('[data-prueba="mi-invitado"]').exists()).toBe(true);
   });
 
-  it("sin pases ni invitados (o si no se pudo consultar) no aparece", async () => {
+  it("sin pases ni invitados (o sin perfil en el negocio) no aparece", async () => {
     api.get.mockResolvedValue({ data: { data: { pases: [], proximos: [] } } });
     const vacio = montar();
     await flushPromises();
     expect(vacio.find('[data-prueba="mis-invitados"]').exists()).toBe(false);
 
-    api.get.mockRejectedValue(new Error("403"));
+    api.get.mockRejectedValue(new Error("404"));
     const sinPerfil = montar();
     await flushPromises();
     expect(sinPerfil.find('[data-prueba="mis-invitados"]').exists()).toBe(

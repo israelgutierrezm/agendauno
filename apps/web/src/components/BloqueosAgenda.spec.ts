@@ -16,6 +16,9 @@ vi.mock("@/lib/api", () => ({
 }));
 const confirmar = vi.hoisted(() => vi.fn(async () => true));
 vi.mock("@/lib/confirmar", () => ({ confirmar }));
+vi.mock("@/stores/sesionTenant", () => ({
+  useSesionTenantStore: () => ({ esCitas: true }),
+}));
 
 function montar(extra: Record<string, unknown> = {}) {
   return mount(BloqueosAgenda, {
@@ -98,7 +101,7 @@ describe("bloqueos de agenda", () => {
     await flushPromises();
 
     expect(api.post).toHaveBeenCalledTimes(1);
-    expect(w.text()).toContain("Ya hay 1 citas o clases en ese horario");
+    expect(w.text()).toContain("Ya hay 1 citas en ese horario. No se can");
     expect(w.text()).toContain("Masaje");
     expect(boton(w, "Bloquear de todos modos")).toBeDefined();
 
