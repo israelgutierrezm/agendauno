@@ -17,6 +17,8 @@ vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
 vi.mock("@/lib/confirmar", () => ({ confirmar }));
 
 beforeEach(() => {
+  // Las fechas de la prueba son literales: con el reloj real, un día se vencen.
+  vi.setSystemTime(new Date("2026-10-15T18:00:00Z"));
   api.put.mockReset();
   confirmar.mockReset();
   confirmar.mockResolvedValue(true);

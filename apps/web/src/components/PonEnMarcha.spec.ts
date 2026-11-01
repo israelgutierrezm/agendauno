@@ -13,6 +13,7 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     suspendido: false,
     modalidad: "citas",
+    esCitas: true,
     estudio: null,
     usuario: null,
     puede: (p: string) => p !== "pagos.configurar" || permitidos.pagos,
