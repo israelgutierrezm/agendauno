@@ -63,7 +63,7 @@ silencio. También en los bordes de cupones, presupuestos y corrección de cobro
   antes de bloquear los derechos (el orden único de candados pone la reserva antes que el derecho).
 - **P14.** El candado es de la membresía antes de leer su proceso; pagar cierra todas las abiertas.
 - **P16.** Baja ARCO: se desactiva por cada acuerdo; un cobro de un acuerdo cancelado va a Por conciliar.
-- **P18.** Porcentaje y mínimo sobre anticipo + resto, restando del resto. **P19.** Una orden en $0 se cumple
+- **P18.** Porcentaje y mínimo sobre anticipo + resto, restando del resto; lo que no cabe en el resto baja el anticipo sin pagar. **P19.** Una orden en $0 se cumple
   sin pasarela ni caja (`CobrarOrdenTenant::sinCosto`); el aviso de apartado lleva el total con cupón.
 - **P20.** Un prepagado se usa con cualquier política del servicio (no se limitó el catálogo).
 - **P23.** Mercado Pago: intento sin cobro tras 24 h se cierra y el cargo vuelve a ser cobrable. **P24.**
@@ -77,10 +77,11 @@ silencio. También en los bordes de cupones, presupuestos y corrección de cobro
   ajuste de inventario; l) restaurar un cupón empieza sus usos en cero; q) devolver un paquete con extras
   abre incidencia; s) un intento de OpenPay reemplazado se sigue vigilando; t) la alerta encuentra el cargo
   de Checkout y un importe distinto alerta; u) el pago al momento corre todo lo que sigue; y) el tipo de cambio redondea y tolera la carrera.
+- **P26x.** La mensualidad de la app con marca se cobra al precio guardado al encenderla (`estudios.app_marca_mensual_minor`; lo vigente se rellenó con el precio de entonces) y se emite cada mes desde `app_marca_desde`, sin saltarse ninguno e idempotente.
 
 ## Consecuencias
 
-- Migraciones: `tenant/2026_10_31_000208_revision_de_dinero` y `2026_10_31_000420_suspensiones_de_estudio`.
+- Migraciones: `tenant/2026_10_31_000208_revision_de_dinero`, `2026_10_31_000420_suspensiones_de_estudio` y `2026_11_01_000421_precio_de_app_marca`.
 - Parámetros: `cobranza.dias_compra_sin_pagar`, `apartados.horas_para_recoger`, `referidos.meses_gratis_por_anio`.
 - Un negocio solo en caja verá moras donde antes no: es lo decidido. Sus avisos usan la frase de `SinPagoEnCaja`.
 - Sin asistencia registrada no hay comisión: marcar «llegó» ahora paga al profesional.
@@ -90,7 +91,6 @@ silencio. También en los bordes de cupones, presupuestos y corrección de cobro
 - P2: nada de esto se ha probado contra pasarelas reales; faltan los casos 1–8 con llaves sandbox.
 - P3: la app móvil sigue mandando la llave fija y debe tratar el checkout vacío como error (no se tocó `apps/mobile`).
 - P26t: la ayuda del superadmin (`es-MX.ts`) no pide `charge.refunded` ni `charge.dispute.created` (archivo en revisión).
-- P26x: la mensualidad de la app con marca usa el precio de hoy; versionarlo requiere historial del parámetro.
 - La reversión de P26w solo cubre la baja del invitado; si deja de pagar sin darse de baja no se revierte, porque el beneficio nace ya con su primer mes pagado.
 
 ## Salida a producción con las pasarelas comprobadas

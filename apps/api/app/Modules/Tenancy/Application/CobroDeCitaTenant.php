@@ -99,8 +99,8 @@ class CobroDeCitaTenant
                 if (! $ultima instanceof OrdenTenant) {
                     throw ValidationException::withMessages(['cupon' => ['Esta cita ya está cobrada: el cupón no se aplica.']]);
                 }
-                $conCupon = $this->ordenes->aplicarCupon($ultima, $cupon, (int) $principal?->total_minor + (int) $resto?->total_minor);
-                $aCobrar = $aCobrar->map(static fn (OrdenTenant $o): OrdenTenant => $o->is($conCupon) ? $conCupon : $o);
+                $conCupon = $this->ordenes->aplicarCupon($ultima, $cupon, (int) $principal?->total_minor + (int) $resto?->total_minor, $aCobrar->count() > 1 ? $aCobrar->first() : null);
+                $aCobrar = $aCobrar->map(static fn (OrdenTenant $o): OrdenTenant => $o->is($conCupon) ? $conCupon : $o->refresh());
             }
             $orden = $aCobrar->first() ?? $resto ?? $principal;
             $servicio = (int) $aCobrar->sum('total_minor');

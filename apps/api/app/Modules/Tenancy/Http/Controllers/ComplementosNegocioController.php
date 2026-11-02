@@ -95,7 +95,8 @@ class ComplementosNegocioController
             // Con precio publicado (ADR 0188); sin él, incluido.
             'precio' => $modulo === ModuloNegocio::AppConMarca ? [
                 'alta_minor' => $precios['app_marca_alta_minor'],
-                'mensual_minor' => $precios['app_marca_mensual_minor'],
+                // Encendida, paga lo que quedó al encenderla (ADR 0231).
+                'mensual_minor' => $activo ? ($estudio->app_marca_mensual_minor ?? $precios['app_marca_mensual_minor']) : $precios['app_marca_mensual_minor'],
                 'moneda' => $precios['moneda'],
                 'gratis' => false,
             ] : null,

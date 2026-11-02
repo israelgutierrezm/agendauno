@@ -76,10 +76,8 @@ class GenerarCargosRenta extends Command
                                 $generar->paraEstudio($estudio, $periodo);
                                 $emitidos++;
                             }
-                            // La app con su marca, aparte de la renta (ADR 0188).
-                            if ($complementos->emitirMensualidades($estudio, $periodo)?->wasRecentlyCreated === true) {
-                                $emitidos++;
-                            }
+                            // La app con su marca, aparte de la renta y sin saltarse meses (ADR 0188, 0231).
+                            $emitidos += count($complementos->emitirMensualidades($estudio, $periodo));
                         }
 
                         // Dado de baja, su plan por adelantado ya no se renueva.

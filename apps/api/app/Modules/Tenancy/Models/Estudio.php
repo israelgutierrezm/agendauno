@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property array<string, string>|null $redes
  * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
  * @property list<string>|null $modulos los módulos que el superadministrador encendió (ADR 0123)
+ * @property int|null $app_marca_mensual_minor mensualidad de la app con marca, fijada al encenderla (ADR 0231)
  * @property Carbon|null $publicado_en la primera vez que publicó su página (C02)
  * @property Carbon|null $primera_operacion_en su primera operación real (C02/C08)
  * @property bool $es_demo negocio de demostración: no cuenta en el embudo de la plataforma
@@ -159,6 +160,7 @@ class Estudio extends Model
         'contacto_whatsapp_aceptado_en' => 'datetime',
         'whatsapp_habilitado' => 'boolean',
         'modulos' => 'array',
+        'app_marca_mensual_minor' => 'integer',
         'seo_sitio' => 'array',
         'suspendido_en' => 'datetime',
         'sin_suspension_hasta' => 'date',

@@ -12,8 +12,9 @@ Documentos de apoyo:
 - `docs/MOBILE.md`: apps, firma y lo pendiente para publicar.
 - `docs/PILOTS.md`: qué probar en cada tipo de negocio.
 
-Estado al 2026-10-11: el punto 1 lo cubre el CI en cada rama. Los puntos 2 a 10 están
-**pendientes** (los hace el dueño).
+Estado al 2026-11-01: el punto 1 lo cubre el CI de `main`, en verde con MySQL y
+concurrencia. Los puntos 2 a 10 están **pendientes** (los hace el dueño): el código está
+listo, pero nada se ha probado aún contra proveedores reales.
 
 | # | Criterio | Cómo se demuestra | Quién |
 |---|---|---|---|
@@ -148,3 +149,7 @@ Verificar a mano, además de sus pruebas automáticas:
     conciliar» para devolverla.
 - [ ] **Prospecto que se convierte (ADR 0137):** al entrar a su cuenta ve la clase o el
   plan que pidió, hasta que lo reserva o lo compra (o pasan 30 días).
+- [ ] **Integraciones anunciadas (ADR 0234):** cada `VITE_INTEGRACION_*` encendida y cada
+  enlace de tienda pasaron su caso real (`VERIFICACION-V1.md`, caso 15).
+- [ ] **Pasarelas validadas (ADR 0231):** `PASARELAS_VALIDADAS` lista solo las que pasaron
+  los casos 1 a 8 y una compra real con su reembolso.

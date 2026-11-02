@@ -8,6 +8,7 @@ use App\Modules\Platform\Acceso\BitacoraPlataforma;
 use App\Modules\Tenancy\Application\AprovisionarNegocioRegistrado;
 use App\Modules\Tenancy\Application\BajaDeNegocio;
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
+use App\Modules\Tenancy\Application\ComplementosRentaSaas;
 use App\Modules\Tenancy\Application\CondicionesDeCobroSaas;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionRenta;
@@ -479,10 +480,11 @@ class PlataformaEstudiosController
             ])->save();
             // La app con su marca se cobra por los meses en que estuvo encendida (ADR 0188).
             if ($modulo === ModuloNegocio::AppConMarca) {
-                $hoy = CarbonImmutable::now((string) ($modelo->zona_horaria ?: 'UTC'))->toDateString();
-                $modelo->forceFill($habilitado
-                    ? ['app_marca_desde' => $hoy, 'app_marca_hasta' => null]
-                    : ['app_marca_hasta' => $hoy])->save();
+                if ($habilitado) {
+                    app(ComplementosRentaSaas::class)->encenderAppMarca($modelo);
+                } else {
+                    $modelo->forceFill(['app_marca_hasta' => CarbonImmutable::now((string) ($modelo->zona_horaria ?: 'UTC'))->toDateString()])->save();
+                }
             }
             Log::info('plataforma.estudio.modulo', ['estudio' => $modelo->slug, 'modulo' => $modulo->value, 'habilitado' => $habilitado]);
 

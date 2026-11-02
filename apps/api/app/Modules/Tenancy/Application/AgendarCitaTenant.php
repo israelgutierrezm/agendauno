@@ -286,16 +286,23 @@ class AgendarCitaTenant
             // Con cupón (ADR 0220): a lo que falta pagar (el resto, si hay anticipo). Si el
             // cupón no sirve, no se agenda: quien lo escribió lo corrige.
             if ($cupon !== null && $cupon !== '') {
+                $anticipo = $reserva->saldo_orden_id !== null ? $reserva->orden : null;
                 $orden = $reserva->saldo_orden_id !== null ? $reserva->saldoOrden : $reserva->orden;
                 if ($orden !== null) {
-                    $base = (int) $orden->total_minor + ($reserva->saldo_orden_id !== null ? (int) $reserva->orden?->total_minor : 0);
-                    $conCupon = $this->ordenes->aplicarCupon($orden, $cupon, $base);
-                    app(ReservasTenant::class)->actualizarAvisoApartada($reserva, $conCupon);
-                    // El cupón lo cubrió todo: no hay qué cobrar ni que esperar (ADR 0231).
-                    if ((int) $conCupon->total_minor === 0) {
-                        app(CobrarOrdenTenant::class)->sinCosto($conCupon);
-                        $reserva->refresh();
+                    $base = (int) $orden->total_minor + (int) $anticipo?->total_minor;
+                    $conCupon = $this->ordenes->aplicarCupon($orden, $cupon, $base, $anticipo);
+                    if ($anticipo !== null) {
+                        $anticipo->refresh();
+                        $reserva->update(['anticipo_minor' => $anticipo->total_minor]);
                     }
+                    app(ReservasTenant::class)->actualizarAvisoApartada($reserva, $anticipo ?? $conCupon);
+                    // El cupón lo cubrió todo: no hay qué cobrar ni que esperar (ADR 0231).
+                    foreach (array_filter([$conCupon, $anticipo]) as $cubierta) {
+                        if ((int) $cubierta->total_minor === 0) {
+                            app(CobrarOrdenTenant::class)->sinCosto($cubierta);
+                        }
+                    }
+                    $reserva->refresh();
                 }
             }
             // En la misma transacción: si otro intento ya guardó esta clave, el índice

@@ -378,6 +378,39 @@ const enCalendario = computed<EventoPeriodo[]>(() =>
     })),
 );
 
+// No se pudo cargar lo suyo: reservar o ver lo próximo sin eso engañaría.
+const sinCargarSuCuenta = computed(
+  () =>
+    (pestana.value === "proximas" || pestana.value === "reservar") &&
+    cuenta.error.value !== null &&
+    !cuenta.cargado.value,
+);
+
+// «Apartar» solo si la clase ofrece algo o ya tiene algo apartado; si no se pudo saber,
+// se ofrece y la pantalla de apartar dice qué pasó.
+const conApartados = ref<boolean | null>(null);
+let revisionApartados = 0;
+async function revisarApartados(e: Evento): Promise<void> {
+  const mia = ++revisionApartados;
+  conApartados.value = null;
+  if (e.estado !== "confirmada" || !e.reserva?.sesion_id || sesion.esCitas) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{
+      data: { articulos?: unknown[]; apartados?: unknown[] };
+    }>(`${cuenta.base.value}/mi/sesiones/${e.reserva.sesion_id}/articulos`);
+    if (mia === revisionApartados) {
+      conApartados.value =
+        (data.data.articulos?.length ?? 0) +
+          (data.data.apartados?.length ?? 0) >
+        0;
+    }
+  } catch {
+    conApartados.value = null;
+  }
+}
+
 // El error de una acción es de la clase en que se hizo: al abrir o cerrar otra no se
 // arrastra (el de carga, sin datos aún, se queda con su «Reintentar»).
 function olvidarErrorDeAccion(): void {
@@ -390,6 +423,7 @@ function abrir(e: Evento): void {
   abierto.value = e;
   accion.value = null;
   recienReservada.value = false;
+  void revisarApartados(e);
 }
 function abrirPorId(id: string): void {
   const e = [...mias.value, ...libres.value].find((x) => x.id === id);
@@ -676,7 +710,11 @@ onMounted(() => void cuenta.asegurar());
       "
     />
 
-    <AvisoTono v-if="cuenta.error.value" tono="peligro" class="mt-3">
+    <AvisoTono
+      v-if="cuenta.error.value && !sinCargarSuCuenta"
+      tono="peligro"
+      class="mt-3"
+    >
       {{ cuenta.error.value }}
     </AvisoTono>
     <AvisoTono v-if="aviso" tono="exito" class="mt-3" role="status">
@@ -691,12 +729,12 @@ onMounted(() => void cuenta.asegurar());
     >
       {{ $t("comun.cargando") }}
     </p>
+    <!-- Sin saber qué tiene reservado, lo suyo se vería libre: primero, reintentar. -->
     <div
-      v-else-if="
-        pestana === 'proximas' && cuenta.error.value && !cuenta.cargado.value
-      "
+      v-else-if="sinCargarSuCuenta"
       class="mt-5 tu-card p-5"
       role="alert"
+      data-prueba="error-cuenta"
     >
       <p class="text-sm" style="color: var(--error)">
         {{ cuenta.error.value }}
@@ -1196,7 +1234,8 @@ onMounted(() => void cuenta.asegurar());
               v-if="
                 abierto.estado === 'confirmada' &&
                 abierto.reserva.sesion_id &&
-                !sesion.esCitas
+                !sesion.esCitas &&
+                conApartados !== false
               "
               class="tu-btn tu-btn-secundario"
               :aria-expanded="accion === 'apartar'"

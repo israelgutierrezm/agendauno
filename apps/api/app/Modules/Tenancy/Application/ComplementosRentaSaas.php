@@ -16,8 +16,8 @@ use Carbon\CarbonImmutable;
  * el superadmin (en pesos, sin IVA):
  *
  * - App en tiendas con la marca del negocio: alta (una vez, al pedirla) y una
- *   mensualidad mientras el módulo está encendido. La mensualidad se emite cada mes
- *   cerrado como cargo `complemento`, aparte de la renta.
+ *   mensualidad mientras el módulo está encendido, al precio del día en que se encendió.
+ *   La mensualidad se emite cada mes cerrado como cargo `complemento`, aparte de la renta.
  * - Arranque acompañado (sin o con migración): un pago único; gratis con el plan anual.
  */
 class ComplementosRentaSaas
@@ -69,15 +69,81 @@ class ComplementosRentaSaas
     }
 
     /**
-     * La mensualidad de la app con su marca de un mes cerrado, si tiene el módulo
-     * encendido. Una vez por mes (clave `app_marca:AAAA-MM`).
+     * Se enciende la app con su marca: guarda el precio de hoy, que es el que paga mientras
+     * siga encendida. Si la había apagado, antes se emite lo que faltaba de esa vez, a su
+     * precio, porque las fechas nuevas ya no lo cubren.
      */
-    public function emitirMensualidades(Estudio $estudio, string $periodo): ?CargoRenta
+    public function encenderAppMarca(Estudio $estudio): void
+    {
+        $hoy = CarbonImmutable::now((string) ($estudio->zona_horaria ?: 'UTC'));
+        if ($estudio->getAttribute('app_marca_hasta') !== null) {
+            $this->emitirMensualidades($estudio, $hoy->subMonthNoOverflow()->format('Y-m'));
+        }
+        $estudio->forceFill([
+            'app_marca_desde' => $hoy->toDateString(),
+            'app_marca_hasta' => null,
+            'app_marca_mensual_minor' => $this->precios()['app_marca_mensual_minor'],
+        ])->save();
+    }
+
+    /**
+     * Las mensualidades de la app con su marca hasta ese mes cerrado, sin saltarse
+     * ninguno: una corrida que no llegó o un mes en que el negocio no se revisó se emiten
+     * en la siguiente. Una vez por mes (clave `app_marca:AAAA-MM`).
+     *
+     * @return list<CargoRenta> las que se emitieron ahora
+     */
+    public function emitirMensualidades(Estudio $estudio, string $hastaPeriodo): array
+    {
+        $emitidas = [];
+        $mes = $this->primerMesPorEmitir($estudio, $hastaPeriodo);
+        for (; $mes <= $hastaPeriodo; $mes = CarbonImmutable::parse($mes.'-01')->addMonthNoOverflow()->format('Y-m')) {
+            $cargo = $this->emitirMensualidad($estudio, $mes);
+            if ($cargo?->wasRecentlyCreated === true) {
+                $emitidas[] = $cargo;
+            }
+        }
+
+        return $emitidas;
+    }
+
+    /**
+     * Desde el mes en que se encendió. Encendida antes de guardar las fechas no se sabe
+     * desde cuándo: se sigue desde la última que se emitió.
+     */
+    private function primerMesPorEmitir(Estudio $estudio, string $hastaPeriodo): string
+    {
+        $desde = $estudio->getAttribute('app_marca_desde');
+        if ($desde !== null) {
+            return substr((string) $desde, 0, 7);
+        }
+        $ultima = CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('metrica', 'app_marca')
+            ->max('periodo');
+
+        return is_string($ultima) && $ultima !== '' ? $ultima : $hastaPeriodo;
+    }
+
+    /** El precio guardado al encenderla; si se encendió sin guardarlo, se fija hoy. */
+    private function precioMensualDe(Estudio $estudio): int
+    {
+        $guardado = $estudio->getAttribute('app_marca_mensual_minor');
+        if ($guardado !== null) {
+            return (int) $guardado;
+        }
+        $precio = $this->precios()['app_marca_mensual_minor'];
+        $estudio->forceFill(['app_marca_mensual_minor' => $precio])->save();
+
+        return $precio;
+    }
+
+    private function emitirMensualidad(Estudio $estudio, string $periodo): ?CargoRenta
     {
         if (! self::encendidaEn($estudio, $periodo)) {
             return null;
         }
-        $subtotal = $this->precios()['app_marca_mensual_minor'];
+        $subtotal = $this->precioMensualDe($estudio);
         if ($subtotal <= 0) {
             return null;
         }

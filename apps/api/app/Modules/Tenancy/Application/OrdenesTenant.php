@@ -223,9 +223,9 @@ class OrdenesTenant
      * cobrarla. Descuenta de su total (nunca más que el total) y guarda cuál fue; su
      * uso se cuenta al pagarse. Una orden pagada, cancelada o que ya tiene cupón, no.
      */
-    public function aplicarCupon(OrdenTenant $orden, string $codigo, ?int $baseMinor = null): OrdenTenant
+    public function aplicarCupon(OrdenTenant $orden, string $codigo, ?int $baseMinor = null, ?OrdenTenant $anticipo = null): OrdenTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($orden, $codigo, $baseMinor): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $codigo, $baseMinor, $anticipo): OrdenTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
                 throw new PromocionInvalida('El cupón solo se aplica a lo que falta por pagar.');
@@ -237,12 +237,23 @@ class OrdenesTenant
             // vista previa) y se descuenta del resto (ADR 0231).
             ['promocion' => $promocion, 'descuento' => $descuento] = $this->promociones->aplicarEnOrden($codigo, $baseMinor ?? (int) $bloqueada->total_minor);
             $this->promociones->exigirTopePorPersona($promocion, (int) $bloqueada->persona_id, (int) $bloqueada->getKey());
-            $descuento = min($descuento, (int) $bloqueada->total_minor);
+            $delResto = min($descuento, (int) $bloqueada->total_minor);
             $bloqueada->update([
-                'total_minor' => (int) $bloqueada->total_minor - $descuento,
-                'descuento_minor' => (int) $bloqueada->descuento_minor + $descuento,
+                'total_minor' => (int) $bloqueada->total_minor - $delResto,
+                'descuento_minor' => (int) $bloqueada->descuento_minor + $delResto,
                 'promocion_id' => $promocion->getKey(),
             ]);
+            // Lo que no cabe en el resto baja el anticipo sin pagar: se cobra lo que se mostró.
+            if ($anticipo !== null && $descuento > $delResto) {
+                $sinPagar = OrdenTenant::query()->whereKey($anticipo->getKey())->where('estado', EstadoOrden::Pendiente->value)->lockForUpdate()->first();
+                if ($sinPagar instanceof OrdenTenant) {
+                    $delAnticipo = min($descuento - $delResto, (int) $sinPagar->total_minor);
+                    $sinPagar->update([
+                        'total_minor' => (int) $sinPagar->total_minor - $delAnticipo,
+                        'descuento_minor' => (int) $sinPagar->descuento_minor + $delAnticipo,
+                    ]);
+                }
+            }
 
             return $bloqueada;
         });
