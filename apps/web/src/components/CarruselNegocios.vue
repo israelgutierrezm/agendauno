@@ -404,7 +404,7 @@ onBeforeUnmount(() => {
     filter 550ms ease;
   filter: saturate(0.72) brightness(0.84);
 }
-:global(.dark) .orbita-foto {
+.dark .orbita-foto {
   border-color: rgb(255 255 255 / 14%);
 }
 .orbita-foto.es-principal {

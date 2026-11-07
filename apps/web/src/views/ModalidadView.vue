@@ -1849,7 +1849,7 @@ function medirOtra(): void {
     0 26px 56px -28px rgb(13 59 110 / 24%),
     0 2px 10px rgb(13 59 110 / 5%);
 }
-:global(.dark) .tu-final-caja {
+.dark .tu-final-caja {
   background:
     radial-gradient(
       ellipse 48% 44% at 8% 12%,
