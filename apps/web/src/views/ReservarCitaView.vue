@@ -13,7 +13,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { tokenRecaptcha } from "@/lib/recaptcha";
-import { api, mensajeDeError, noEncontrado } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError, noEncontrado } from "@/lib/api";
 import { camposDeMedicion, eventoComercio } from "@/lib/etiquetas";
 import { separarTelefono } from "@/lib/ladas";
 import { intentoUnico } from "@/lib/intento";
@@ -87,6 +87,8 @@ interface Opciones {
     // ¿Publicó su aviso de privacidad para sus clientes?
     aviso_privacidad?: boolean;
     aviso_version?: number | null;
+    // Sin aviso publicado (en producción) no se piden datos: se dice antes (ADR 0235).
+    recibe_citas?: boolean;
     lada?: string | null;
     // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
     en_directorio?: boolean;
@@ -458,6 +460,23 @@ function relojLocal(iso: string): string {
     hour12: false,
   }).format(d);
   return `${f} ${h}`;
+}
+
+// La versión vigente del aviso, sin reiniciar el asistente.
+async function refrescarAviso(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: Opciones }>(
+      `/api/v1/app/${slug.value}/citas/opciones`,
+    );
+    if (opciones.value) {
+      opciones.value.estudio.aviso_privacidad =
+        data.data.estudio.aviso_privacidad;
+      opciones.value.estudio.aviso_version = data.data.estudio.aviso_version;
+      opciones.value.estudio.recibe_citas = data.data.estudio.recibe_citas;
+    }
+  } catch {
+    // Sin red se queda el mensaje del error; al reintentar se vuelve a revisar.
+  }
 }
 
 async function cargar(): Promise<void> {
@@ -1014,6 +1033,11 @@ async function agendar(): Promise<void> {
     intento.listo();
   } catch (e) {
     error.value = mensajeDeError(e);
+    // El aviso cambió (o falta la versión): se toma la vigente para que la relea y
+    // vuelva a agendar sin perder lo que escribió (ADR 0235).
+    if (erroresPorCampo(e).aviso_version) {
+      await refrescarAviso();
+    }
     return;
   } finally {
     agendando.value = false;
@@ -1180,6 +1204,27 @@ onMounted(cargar);
       >
     </section>
 
+    <!-- Sin aviso de privacidad publicado no se piden datos: se dice antes (ADR 0235). -->
+    <section
+      v-else-if="
+        opciones &&
+        opciones.estudio.recibe_citas === false &&
+        !porPagar &&
+        !retornoPago
+      "
+      class="mx-auto max-w-md px-4 py-20 text-center"
+      role="status"
+      data-prueba="citas-sin-aviso"
+    >
+      <p class="text-lg font-semibold">
+        {{ $t("reservar.sinAviso", { negocio: opciones.estudio.nombre }) }}
+      </p>
+      <RouterLink
+        :to="{ name: 'directorio' }"
+        class="tu-enlace mt-3 inline-block"
+        >{{ $t("reservar.volverDirectorio") }}</RouterLink
+      >
+    </section>
     <section
       v-else-if="opciones"
       class="rc-contenedor mx-auto px-4 py-8 sm:py-10"

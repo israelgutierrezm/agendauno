@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Application\BajaDeNegocio;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
+use App\Modules\Tenancy\Application\SubidaDeTarifa;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Listeners\GenerarComunicaciones;
 use App\Modules\Tenancy\Mail\CorreoSubidaDeTarifa;
@@ -75,6 +76,28 @@ it('bajar la tarifa puede ser inmediato y no manda correo', function (): void {
     $this->postJson('/api/v1/plataforma/tarifas/clases', tarifaDeClasesCon($primero - 100), conPlataforma())->assertCreated();
 
     Mail::assertNotQueued(CorreoSubidaDeTarifa::class);
+});
+
+it('una tabla de una sola banda sin tope también detecta la subida (ADR 0235)', function (): void {
+    $subida = app(SubidaDeTarifa::class);
+    $sinTope = fn (int $monto): array => ['moneda' => 'USD', 'bandas' => [['hasta' => null, 'monto_minor' => $monto]]];
+
+    expect($subida->esSubida($sinTope(1000), $sinTope(1500)))->toBeTrue()
+        ->and($subida->esSubida($sinTope(1500), $sinTope(1000)))->toBeFalse()
+        ->and($subida->esSubida(
+            ['bandas' => [['hasta' => 50, 'monto_minor' => 1000], ['hasta' => null, 'monto_minor' => 2000]]],
+            ['bandas' => [['hasta' => 50, 'monto_minor' => 1000], ['hasta' => null, 'monto_minor' => 2500]]],
+        ))->toBeTrue()
+        // Bajar el límite de la primera banda sube a quien queda entre los dos límites.
+        ->and($subida->esSubida(
+            ['bandas' => [['hasta' => 10, 'monto_minor' => 1000], ['hasta' => null, 'monto_minor' => 2000]]],
+            ['bandas' => [['hasta' => 5, 'monto_minor' => 1000], ['hasta' => null, 'monto_minor' => 2000]]],
+        ))->toBeTrue()
+        ->and($subida->esSubida(
+            ['bandas' => [['hasta' => 10, 'monto_minor' => 1000], ['hasta' => null, 'monto_minor' => 2000]]],
+            ['bandas' => [['hasta' => 20, 'monto_minor' => 900], ['hasta' => null, 'monto_minor' => 2000]]],
+        ))->toBeFalse()
+        ->and($subida->esSubida($sinTope(1000), ['moneda' => 'MXN', 'bandas' => [['hasta' => null, 'monto_minor' => 1000]]]))->toBeTrue();
 });
 
 it('al dar de alta un negocio queda su aviso base sin publicar; al publicarlo es la versión 1', function (): void {

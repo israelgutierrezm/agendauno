@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
@@ -8,7 +8,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
 import PestanasSeccion from "@/components/PestanasSeccion.vue";
 import ProgramacionSemanal from "@/components/ProgramacionSemanal.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
 import type { SerieProgramada } from "@/lib/programacion";
@@ -271,8 +271,22 @@ async function cargar(): Promise<void> {
   }
 }
 
+// Lo que impide guardar queda en su formulario (ADR 0229, regla 5), con lo escrito.
+const errorPolitica = ref<{
+  donde: "general" | "excepcion";
+  mensaje: string;
+} | null>(null);
+const errorDia = ref<string | null>(null);
+const erroresDia = ref<Record<string, string>>({});
+function enfocarError(prueba: string): void {
+  void nextTick(() =>
+    document.querySelector<HTMLElement>(`[data-prueba="${prueba}"]`)?.focus(),
+  );
+}
 async function guardarPolitica(form: FormPolitica): Promise<void> {
   guardando.value = true;
+  const donde = form === editando.value ? "excepcion" : "general";
+  errorPolitica.value = null;
   try {
     await api.put(`${base.value}/politicas-cancelacion`, form);
     toast.exito(t("reglasAgenda.guardada"));
@@ -280,13 +294,15 @@ async function guardarPolitica(form: FormPolitica): Promise<void> {
     nuevaActividad.value = "";
     await cargar();
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    errorPolitica.value = { donde, mensaje: mensajeDeError(e) };
+    enfocarError(`error-politica-${donde}`);
   } finally {
     guardando.value = false;
   }
 }
 
 function editarExcepcion(p: Politica): void {
+  errorPolitica.value = null;
   editando.value = {
     actividad_id: p.actividad_id,
     horas_limite: p.horas_limite,
@@ -302,6 +318,7 @@ function agregarExcepcion(): void {
   if (nuevaActividad.value === "") {
     return;
   }
+  errorPolitica.value = null;
   editando.value = { ...general.value, actividad_id: nuevaActividad.value };
   fotoExcepcion.fijar();
 }
@@ -311,6 +328,8 @@ function nombreActividad(id: string | null): string {
 }
 
 async function agregarDia(): Promise<void> {
+  errorDia.value = null;
+  erroresDia.value = {};
   try {
     const { data } = await api.post<{
       meta?: { cancelacion?: { canceladas: number } | null };
@@ -337,7 +356,9 @@ async function agregarDia(): Promise<void> {
     nuevoDia.value = { fecha: "", motivo: "", sucursal: sedePorOmision.value };
     await cargar();
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    erroresDia.value = erroresPorCampo(e);
+    errorDia.value = mensajeDeError(e);
+    enfocarError("error-dia");
   }
 }
 
@@ -497,6 +518,15 @@ onMounted(cargar);
               />
             </div>
           </template>
+          <AvisoTono
+            v-if="errorPolitica?.donde === 'general'"
+            tono="peligro"
+            role="alert"
+            tabindex="-1"
+            data-prueba="error-politica-general"
+          >
+            {{ errorPolitica.mensaje }}
+          </AvisoTono>
           <button
             v-if="puedePoliticas"
             type="submit"
@@ -616,6 +646,15 @@ onMounted(cargar);
                 />
               </div>
             </template>
+            <AvisoTono
+              v-if="errorPolitica?.donde === 'excepcion'"
+              tono="peligro"
+              role="alert"
+              tabindex="-1"
+              data-prueba="error-politica-excepcion"
+            >
+              {{ errorPolitica.mensaje }}
+            </AvisoTono>
             <div class="flex gap-2">
               <button
                 type="submit"
@@ -666,7 +705,14 @@ onMounted(cargar);
               type="date"
               :min="hoy"
               required
+              :aria-invalid="erroresDia.fecha ? 'true' : undefined"
             />
+            <span
+              v-if="erroresDia.fecha"
+              class="tu-error-campo"
+              data-prueba="error-dia-fecha"
+              >{{ erroresDia.fecha }}</span
+            >
           </div>
           <div class="min-w-[12rem] flex-1">
             <label class="tu-label" for="ra-motivo">{{
@@ -705,6 +751,16 @@ onMounted(cargar);
           >
             {{ $t("reglasAgenda.agregarDia") }}
           </button>
+          <AvisoTono
+            v-if="errorDia"
+            tono="peligro"
+            class="basis-full"
+            role="alert"
+            tabindex="-1"
+            data-prueba="error-dia"
+          >
+            {{ errorDia }}
+          </AvisoTono>
           <div
             v-if="afectadas && afectadas.sesiones > 0"
             class="basis-full text-sm"

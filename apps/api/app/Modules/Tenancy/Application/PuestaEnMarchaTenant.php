@@ -94,7 +94,10 @@ class PuestaEnMarchaTenant
         [$primera, $motivo] = $this->modalidad->esCitas()
             ? $this->primeraCita()
             : $this->primeraClase();
-        $reservable = $publicado && $primera !== null;
+        // Un negocio de citas pide datos al agendar: en producción, solo con su aviso de
+        // privacidad publicado (el mismo criterio que la página y el endpoint; ADR 0235).
+        $conAviso = ! $this->modalidad->esCitas() || app(WaiversTenant::class)->puedePedirDatos();
+        $reservable = $publicado && $primera !== null && $conAviso;
 
         return [
             'configurado' => $configurado,
@@ -103,7 +106,12 @@ class PuestaEnMarchaTenant
             // Listo para operar: todo configurado, la publicación revisada y una fecha reservable.
             'listo' => $configurado && $reservable && $this->hecho($estudio, 'publicacion'),
             'primera_fecha' => $primera,
-            'motivo' => $primera === null ? $motivo : ($publicado ? null : 'sin_publicar'),
+            'motivo' => match (true) {
+                $primera === null => $motivo,
+                ! $publicado => 'sin_publicar',
+                ! $conAviso => 'sin_aviso',
+                default => null,
+            },
         ];
     }
 
@@ -134,6 +142,8 @@ class PuestaEnMarchaTenant
             ['clave' => 'prueba', 'hecho' => $this->pruebaHecha($estudio), 'ruta' => 'onboarding'],
             // Abrir la página (no publicar el contenido del sitio): en el paso de publicación.
             ['clave' => 'publicar', 'hecho' => $estudio->paginaPublica(), 'ruta' => 'onboarding'],
+            // Quien agenda sin cuenta deja sus datos: con el aviso de privacidad publicado (ADR 0235).
+            ...($citas ? [['clave' => 'aviso', 'hecho' => app(WaiversTenant::class)->avisoPrivacidad() !== null, 'ruta' => 'documentos']] : []),
         ];
     }
 

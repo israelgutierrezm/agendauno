@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { api, mensajeDeError } from "@/lib/api";
+import AvisoTono from "@/components/AvisoTono.vue";
+import { api, erroresPorCampo, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -66,6 +67,18 @@ const abierta = ref<"metodo" | "anular" | null>(null);
 const metodo = ref("efectivo");
 const motivo = ref("");
 const guardando = ref(false);
+// Lo que impide guardar queda en el formulario, con lo escrito (ADR 0229, regla 5).
+const error = ref<string | null>(null);
+const errorMotivo = ref<string | null>(null);
+function mostrarError(e: unknown): void {
+  errorMotivo.value = erroresPorCampo(e).motivo ?? null;
+  error.value = mensajeDeError(e);
+  void nextTick(() =>
+    document
+      .querySelector<HTMLElement>('[data-prueba="error-corregir-cobro"]')
+      ?.focus(),
+  );
+}
 
 function nombreMetodo(m: string | null): string {
   const llave = `agendaVisual.cita.metodos.${m ?? "manual"}`;
@@ -73,6 +86,8 @@ function nombreMetodo(m: string | null): string {
 }
 function abrir(cual: "metodo" | "anular"): void {
   abierta.value = cual;
+  error.value = null;
+  errorMotivo.value = null;
   metodo.value =
     METODOS.value.find((m) => m !== props.pago.metodo) ??
     METODOS.value[0] ??
@@ -101,6 +116,8 @@ async function corregirMetodo(): Promise<void> {
     return;
   }
   guardando.value = true;
+  error.value = null;
+  errorMotivo.value = null;
   try {
     await api.put(
       props.urlMetodo ?? `${props.base}/pagos/${props.pago.id}/metodo`,
@@ -113,7 +130,7 @@ async function corregirMetodo(): Promise<void> {
     abierta.value = null;
     emit("cambiado", "metodo");
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    mostrarError(e);
   } finally {
     guardando.value = false;
   }
@@ -132,6 +149,8 @@ async function anular(): Promise<void> {
     return;
   }
   guardando.value = true;
+  error.value = null;
+  errorMotivo.value = null;
   try {
     await api.post(
       props.urlAnular ?? `${props.base}/pagos/${props.pago.id}/anular`,
@@ -143,7 +162,7 @@ async function anular(): Promise<void> {
     abierta.value = null;
     emit("cambiado", "anulado");
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    mostrarError(e);
   } finally {
     guardando.value = false;
   }
@@ -190,8 +209,19 @@ async function anular(): Promise<void> {
           maxlength="255"
           :placeholder="$t('corregirCobro.motivoMetodoPh')"
           data-prueba="motivo-metodo"
+          :aria-invalid="errorMotivo ? 'true' : undefined"
         />
+        <span v-if="errorMotivo" class="tu-error-campo">{{ errorMotivo }}</span>
       </label>
+      <AvisoTono
+        v-if="error"
+        tono="peligro"
+        role="alert"
+        tabindex="-1"
+        data-prueba="error-corregir-cobro"
+      >
+        {{ error }}
+      </AvisoTono>
       <div class="flex flex-wrap items-stretch gap-2">
         <select
           v-model="metodo"
@@ -235,8 +265,19 @@ async function anular(): Promise<void> {
           maxlength="255"
           :placeholder="$t('corregirCobro.motivoPh')"
           data-prueba="motivo-anular"
+          :aria-invalid="errorMotivo ? 'true' : undefined"
         />
+        <span v-if="errorMotivo" class="tu-error-campo">{{ errorMotivo }}</span>
       </label>
+      <AvisoTono
+        v-if="error"
+        tono="peligro"
+        role="alert"
+        tabindex="-1"
+        data-prueba="error-corregir-cobro"
+      >
+        {{ error }}
+      </AvisoTono>
       <div class="flex flex-wrap gap-2">
         <button
           type="submit"

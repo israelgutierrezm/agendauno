@@ -332,6 +332,8 @@ it('agendar sin cuenta guarda la versión del aviso y, en producción, sin aviso
     ], conBearer($ctx['e']['bearer']))->assertCreated();
     $this->getJson("/api/v1/app/{$slug}/citas/opciones")->assertJsonPath('data.estudio.aviso_version', 1);
 
+    // Con aviso publicado la versión vista es obligatoria (ADR 0235); otra, 422 para releerlo.
+    agendarConAnticipo($ctx)->assertStatus(422)->assertJsonValidationErrors(['aviso_version'], 'meta.errors');
     agendarConAnticipo($ctx, ['aviso_version' => 9])->assertStatus(422)->assertJsonValidationErrors(['aviso_version'], 'meta.errors');
     $reserva = agendarConAnticipo($ctx, ['aviso_version' => 1])->assertCreated()->json('data.reserva');
 
@@ -340,4 +342,28 @@ it('agendar sin cuenta guarda la versión del aviso y, en producción, sin aviso
         fn () => ReservaTenant::query()->where('ulid', $reserva)->value('aviso_version'),
     );
     expect((int) $version)->toBe(1);
+});
+
+it('en producción, sin aviso publicado no está listo ni recibe citas, y la página lo sabe antes de pedir datos (ADR 0235)', function (): void {
+    $ctx = barberiaConAnticipo(['anticipo_minor' => 10000]);
+    $slug = $ctx['e']['slug'];
+    $bearer = conBearer($ctx['e']['bearer']);
+    $comprobacion = fn (array $lista): ?bool => collect($lista)->firstWhere('clave', 'aviso')['hecho'] ?? null;
+
+    app()->detectEnvironment(fn (): string => 'production');
+    $this->getJson("/api/v1/app/{$slug}/citas/opciones")->assertOk()->assertJsonPath('data.estudio.recibe_citas', false);
+    $antes = $this->getJson("/api/v1/app/{$slug}/onboarding/quickstart", $bearer)->assertOk()
+        ->assertJsonPath('data.estado.reservable', false)
+        ->assertJsonPath('data.listo', false);
+    expect($comprobacion($antes->json('data.comprobaciones')))->toBeFalse();
+
+    $this->postJson("/api/v1/app/{$slug}/waivers", [
+        'clave' => 'aviso-privacidad', 'titulo' => 'Aviso de privacidad', 'contenido' => 'Tratamos tus datos.',
+    ], $bearer)->assertCreated();
+    $this->getJson("/api/v1/app/{$slug}/citas/opciones")->assertJsonPath('data.estudio.recibe_citas', true);
+    $despues = $this->getJson("/api/v1/app/{$slug}/onboarding/quickstart", $bearer)->assertOk();
+    expect($comprobacion($despues->json('data.comprobaciones')))->toBeTrue()
+        ->and($despues->json('data.estado.motivo'))->not->toBe('sin_aviso')
+        ->and($antes->json('data.estado.motivo'))->toBe($despues->json('data.estado.reservable') ? 'sin_aviso' : $despues->json('data.estado.motivo'));
+    app()->detectEnvironment(fn (): string => 'testing');
 });

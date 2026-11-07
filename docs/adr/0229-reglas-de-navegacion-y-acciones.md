@@ -106,16 +106,13 @@ Cada uno se revisa uno por uno. Algunos pueden tener ya el error visible por otr
     - `BandejaView` (`enviar`, `elegirPagina`);
     - `FichaMiembroView` (`pausar`, `quitarCreditos`, `recargar`);
     - `FormulariosCaptacionView` (`guardar`);
-    - `MiPerfilView` (`guardarDatos`, `pedirCambioCorreo`, `cambiarClave`);
     - `PresupuestosView` (`guardarAjustes`);
     - `ProspectosView` (`darAcceso`);
     - `RegionNegocioView` (`guardar`);
-    - `ReglasAgendaView` (`guardarPolitica`, `agregarDia`);
     - `VideosView` (`guardar`);
     - `PlataformaView` (`guardarLlave`, `guardarCorreoAlertas`, `guardarLegales`,
       `guardarPaisesBienestar`).
   - Componentes:
-    - `CorregirCobro` (`corregirMetodo`, `anular`);
     - `DatosFacturacionCliente`;
     - `ExpedientePersona` (`subir`);
     - `HistorialReservas` (`enviarResena`);
@@ -158,4 +155,5 @@ Cada uno se revisa uno por uno. Algunos pueden tener ya el error visible por otr
 
   Los contratos del ADR 0203 (`botones.spec.ts`, `vocabularioPanel.spec.ts`,
   `llavesLiterales.spec.ts`) siguen igual.
+- Corregidos después (ADR 0235): `MiPerfilView`, `ReglasAgendaView` y `CorregirCobro`.
 - Los pendientes se corrigen al tocar cada pantalla. No se hace un rediseño aparte.

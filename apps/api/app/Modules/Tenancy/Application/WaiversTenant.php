@@ -41,6 +41,16 @@ class WaiversTenant
     }
 
     /**
+     * ¿Se pueden pedir datos a quien agenda sin cuenta? En producción solo con el aviso
+     * publicado (ADR 0234). Es el mismo criterio para «listo para operar», «recibe
+     * citas», la página pública y el endpoint de agendar (ADR 0235).
+     */
+    public function puedePedirDatos(): bool
+    {
+        return $this->avisoPrivacidad() !== null || ! app()->environment('production');
+    }
+
+    /**
      * El aviso base con los datos del negocio, para que lo revise y lo publique (ADR 0234).
      * Es la versión 0, sin activar: nadie lo ve ni lo firma; publicar crea la versión 1.
      */

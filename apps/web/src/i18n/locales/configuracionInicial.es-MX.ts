@@ -140,6 +140,8 @@ export default {
         "No hay clases con lugar en los próximos 14 días: programa tu horario.",
       sin_planes: "Hay clases, pero ningún plan con que reservarlas.",
       sin_publicar: "Hay fechas, pero tu página está cerrada.",
+      sin_aviso:
+        "Hay fechas y tu página está abierta, pero falta publicar tu aviso de privacidad (en Documentos).",
     },
   },
   publicacion: {

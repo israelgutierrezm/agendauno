@@ -2208,6 +2208,16 @@ export default {
     pendientes: {
       titulo: "Pendientes de pago",
       vacio: "Nada pendiente de pago.",
+      buscar: "Buscar por persona, folio o concepto",
+      fechas: "Fecha del cargo",
+      tipo: {
+        etiqueta: "Tipo de cargo",
+        todos: "Todos los cargos",
+        compra: "Compras",
+        citas: "Citas",
+        clases: "Clases",
+        renovacion: "Renovaciones",
+      },
       proximas:
         "1 cita próxima se cobra al atenderla. | {n} citas próximas se cobran al atenderlas.",
       colCliente: "Alumno",
@@ -2593,6 +2603,8 @@ export default {
   reservar: {
     cargando: "Cargando…",
     noDisponible: "Este negocio no está disponible para agendar en línea.",
+    sinAviso:
+      "{negocio} aún no abre sus citas en línea: le falta publicar su aviso de privacidad. Comunícate directamente con el negocio para agendar.",
     volverDirectorio: "Ver otros negocios",
     sinServicios:
       "Este negocio aún no ofrece servicios para agendar en línea. Contáctalo para reservar.",
@@ -3046,6 +3058,8 @@ export default {
       prueba:
         "Un alumno ya reservó desde tu página o su cuenta (haz una prueba con «Ver como alumno»)",
       publicar: "Tu página está publicada",
+      aviso:
+        "Tu aviso de privacidad está publicado (sin él, tu página no recibe citas en línea)",
     },
   },
   lealtad: {

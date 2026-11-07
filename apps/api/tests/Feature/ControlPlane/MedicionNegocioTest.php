@@ -275,6 +275,8 @@ it('una cita pagada con llaves de prueba no cuenta como venta; el webhook repeti
     $cita = $this->withHeaders(['User-Agent' => 'Mozilla/5.0 (Prueba)'])->postJson("/api/v1/app/{$e['slug']}/citas", [
         'nombre' => 'Cliente', 'email' => 'cliente@correo.mx', 'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'],
         'instructor_id' => $coach, 'inicia_en_local' => '2026-10-05 10:00:00', 'duracion_minutos' => 60, 'medicion' => medicionPermitida(),
+        // El aviso que publicó al encender la medición: la versión vista es obligatoria (ADR 0235).
+        'aviso_version' => 1,
     ])->assertCreated()->json('data');
     $this->postJson("/api/v1/app/{$e['slug']}/citas/pagar", ['orden_id' => $cita['orden_id'], 'proveedor' => 'stripe', 'metodo' => 'tarjeta'])->assertCreated();
     $webhook = ['type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_medicion_1', 'payment_status' => 'paid']]];

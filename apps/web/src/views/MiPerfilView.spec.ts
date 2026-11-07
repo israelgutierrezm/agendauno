@@ -261,6 +261,29 @@ describe("perfil unificado", () => {
     w.unmount();
   });
 
+  it("si no se guardan sus datos, el error queda en el formulario con lo escrito (ADR 0235)", async () => {
+    Object.assign(sesion.usuario, { tiene_ficha: true, celular: "5511112222" });
+    api.put.mockRejectedValue({
+      campos: { celular: "Ese celular no es válido." },
+    });
+    const w = montar();
+    await w.get('[data-prueba="celular"]').setValue("55");
+    await w.get("#mp-datos form").trigger("submit");
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-datos"]').attributes("role")).toBe(
+      "alert",
+    );
+    expect(w.get('[data-prueba="error-datos-celular"]').text()).toBe(
+      "Ese celular no es válido.",
+    );
+    expect(w.get('[data-prueba="celular"]').element).toHaveProperty(
+      "value",
+      "55",
+    );
+    w.unmount();
+  });
+
   it("con ficha de cliente edita su celular (con lada) junto a su nombre", async () => {
     Object.assign(sesion.usuario, { tiene_ficha: true, celular: "5511112222" });
     api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });

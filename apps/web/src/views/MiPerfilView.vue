@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import AvisoTono from "@/components/AvisoTono.vue";
 import AvisosNavegador from "@/components/AvisosNavegador.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
@@ -211,8 +212,21 @@ watch(
   { immediate: true },
 );
 const guardandoDatos = ref(false);
+// Lo que impide guardar queda en el formulario (ADR 0229, regla 5): el resumen arriba
+// del botón y lo de cada campo junto a él; lo escrito no se pierde.
+const errorDatos = ref<string | null>(null);
+const erroresDatos = ref<Record<string, string>>({});
+const errorCorreo = ref<string | null>(null);
+const errorClave = ref<string | null>(null);
+function enfocarError(prueba: string): void {
+  void nextTick(() =>
+    document.querySelector<HTMLElement>(`[data-prueba="${prueba}"]`)?.focus(),
+  );
+}
 async function guardarDatos(): Promise<void> {
   guardandoDatos.value = true;
+  errorDatos.value = null;
+  erroresDatos.value = {};
   try {
     const { data } = await api.put<Respuesta>(`${base.value}/yo/perfil`, {
       nombre: datos.value.nombre,
@@ -233,7 +247,9 @@ async function guardarDatos(): Promise<void> {
     sesion.actualizarUsuario(data.data.usuario);
     toast.exito(t("miPerfil.guardado"));
   } catch (err) {
-    toast.error(mensajeDeError(err, t("miPerfil.error")));
+    erroresDatos.value = erroresPorCampo(err);
+    errorDatos.value = mensajeDeError(err, t("miPerfil.error"));
+    enfocarError("error-datos");
   } finally {
     guardandoDatos.value = false;
   }
@@ -248,11 +264,13 @@ const enviandoCorreo = ref(false);
 const erroresCorreo = ref<Record<string, string>>({});
 function abrirCorreo(abierto: boolean): void {
   erroresCorreo.value = {};
+  errorCorreo.value = null;
   editandoCorreo.value = abierto;
 }
 async function pedirCambioCorreo(): Promise<void> {
   enviandoCorreo.value = true;
   erroresCorreo.value = {};
+  errorCorreo.value = null;
   try {
     const { data } = await api.post<Respuesta>(`${base.value}/yo/correo`, {
       email: correo.value.email.trim(),
@@ -267,7 +285,8 @@ async function pedirCambioCorreo(): Promise<void> {
   } catch (err) {
     erroresCorreo.value = erroresPorCampo(err);
     if (Object.keys(erroresCorreo.value).length === 0) {
-      toast.error(mensajeDeError(err, t("miPerfil.error")));
+      errorCorreo.value = mensajeDeError(err, t("miPerfil.error"));
+      enfocarError("error-correo");
     }
   } finally {
     enviandoCorreo.value = false;
@@ -299,6 +318,7 @@ const noCoinciden = computed(
 async function cambiarClave(): Promise<void> {
   cambiandoClave.value = true;
   erroresClave.value = {};
+  errorClave.value = null;
   try {
     const { data } = await api.put<Respuesta>(`${base.value}/yo/contrasena`, {
       actual: clave.value.actual || null,
@@ -311,7 +331,8 @@ async function cambiarClave(): Promise<void> {
   } catch (err) {
     erroresClave.value = erroresPorCampo(err);
     if (Object.keys(erroresClave.value).length === 0) {
-      toast.error(mensajeDeError(err, t("miPerfil.error")));
+      errorClave.value = mensajeDeError(err, t("miPerfil.error"));
+      enfocarError("error-clave");
     }
   } finally {
     cambiandoClave.value = false;
@@ -518,7 +539,14 @@ const aparienciaAbierta = ref(false);
                 required
                 maxlength="80"
                 autocomplete="given-name"
+                :aria-invalid="erroresDatos.nombre ? 'true' : undefined"
               />
+              <span
+                v-if="erroresDatos.nombre"
+                class="tu-error-campo"
+                data-prueba="error-datos-nombre"
+                >{{ erroresDatos.nombre }}</span
+              >
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
@@ -558,6 +586,12 @@ const aparienciaAbierta = ref(false);
                 autocomplete="tel-national"
                 data-prueba="celular"
               />
+              <span
+                v-if="erroresDatos.celular"
+                class="tu-error-campo"
+                data-prueba="error-datos-celular"
+                >{{ erroresDatos.celular }}</span
+              >
               <p class="tu-hint mt-1">{{ $t("miPerfil.celularAyuda") }}</p>
             </div>
             <!-- Fecha de nacimiento y género (opcionales), también de su ficha -->
@@ -581,6 +615,15 @@ const aparienciaAbierta = ref(false);
               />
               <p class="tu-hint mt-1">{{ $t("miPerfil.semblanzaAyuda") }}</p>
             </div>
+            <AvisoTono
+              v-if="errorDatos"
+              tono="peligro"
+              role="alert"
+              tabindex="-1"
+              data-prueba="error-datos"
+            >
+              {{ errorDatos }}
+            </AvisoTono>
             <div class="mp-pie-formulario">
               <button
                 type="submit"
@@ -686,6 +729,15 @@ const aparienciaAbierta = ref(false);
                   >{{ erroresCorreo.password }}</span
                 >
               </div>
+              <AvisoTono
+                v-if="errorCorreo"
+                tono="peligro"
+                role="alert"
+                tabindex="-1"
+                data-prueba="error-correo"
+              >
+                {{ errorCorreo }}
+              </AvisoTono>
               <div class="flex flex-wrap gap-2">
                 <button
                   type="submit"
@@ -778,6 +830,15 @@ const aparienciaAbierta = ref(false);
                 >
               </div>
             </div>
+            <AvisoTono
+              v-if="errorClave"
+              tono="peligro"
+              role="alert"
+              tabindex="-1"
+              data-prueba="error-clave"
+            >
+              {{ errorClave }}
+            </AvisoTono>
             <div class="mp-pie-formulario">
               <button
                 type="submit"

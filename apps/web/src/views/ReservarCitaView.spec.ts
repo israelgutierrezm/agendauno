@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, post: mocks.post },
   mensajeDeError: () => "No disponible",
+  erroresPorCampo: (e: unknown) =>
+    (e as { campos?: Record<string, string> })?.campos ?? {},
   noEncontrado: (e: unknown) =>
     (e as { response?: { status?: number } }).response?.status === 404,
 }));
@@ -234,6 +236,20 @@ beforeEach(() => {
 });
 
 describe("agenda pública por pasos", () => {
+  it("sin aviso de privacidad publicado dice que las citas no están abiertas antes de pedir datos (ADR 0235)", async () => {
+    const op = opciones(1);
+    (op.data.data.estudio as Record<string, unknown>).recibe_citas = false;
+    api(op);
+    const vista = montar();
+    await flushPromises();
+
+    expect(vista.get('[data-prueba="citas-sin-aviso"]').text()).toContain(
+      "Negocio de prueba aún no abre sus citas en línea",
+    );
+    expect(vista.find("input").exists()).toBe(false);
+    vista.unmount();
+  });
+
   it("su dirección canónica vive en el subdominio del negocio, con la marca de citas (M12)", async () => {
     const vista = montar();
     await flushPromises();

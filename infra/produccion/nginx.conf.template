@@ -78,10 +78,11 @@ server_tokens off;
 client_max_body_size 22m;
 
 # El registro de accesos sin query ni referer (pueden traer llaves) y con el token del
-# calendario tachado (ADR 0232). Cada server lo pide: en este nivel se sumaría al del
-# nginx.conf de la imagen, que guarda la URL completa.
+# calendario tachado (ADR 0232): el del calendario completo y el de la descarga de una
+# sola cita o reserva (`/calendario/{token}/{evento}.ics`, ADR 0235). Cada server lo
+# pide: en este nivel se sumaría al del nginx.conf de la imagen, que guarda la URL completa.
 map $request_uri $ruta_registro {
-    "~^(?<calendario>[^?]*/calendario/)[^/?]+\.ics(\?.*)?$" "${calendario}oculto.ics";
+    "~^(?<calendario>[^?]*/calendario/)[^?]+\.ics(\?.*)?$" "${calendario}oculto.ics";
     "~^(?<ruta>[^?]*)" $ruta;
 }
 log_format agendauno '$remote_addr [$time_local] "$request_method $ruta_registro $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent"';

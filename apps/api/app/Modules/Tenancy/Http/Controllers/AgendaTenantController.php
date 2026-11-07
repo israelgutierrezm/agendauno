@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Agenda del estudio, tenant-local. Materializa una oferta en una sucursal a una
@@ -47,6 +48,9 @@ class AgendaTenantController
      * vez de perder clases en silencio.
      */
     private const LIMITE = 1500;
+
+    /** La ventana más ancha de una consulta de la agenda (un año); el tope real es LIMITE. */
+    private const VENTANA_MAXIMA_DIAS = 366;
 
     /**
      * Estados de reserva que ocupan un lugar en la sesión.
@@ -282,6 +286,19 @@ class AgendaTenantController
 
     public function sesiones(Request $request): JsonResponse
     {
+        // Fechas del día local del negocio (AAAA-MM-DD), en orden y con una ventana
+        // acotada: una fecha imposible responde 422 por campo, no 500 (ADR 0235).
+        $fechas = $request->validate([
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
+        ]);
+        if (isset($fechas['desde'], $fechas['hasta'])
+            && CarbonImmutable::parse($fechas['desde'])->diffInDays(CarbonImmutable::parse($fechas['hasta'])) > self::VENTANA_MAXIMA_DIAS) {
+            throw ValidationException::withMessages([
+                'hasta' => ['Consulta como máximo '.self::VENTANA_MAXIMA_DIAS.' días a la vez.'],
+            ]);
+        }
+
         $consulta = SesionTenant::query()
             ->with(['oferta', 'sucursal', 'instructor', 'recurso', 'serie'])
             // Ocupacion = reservas que toman un lugar (confirmadas, ofrecidas y
@@ -319,11 +336,11 @@ class AgendaTenantController
         // de zona es < 24h, este superconjunto garantiza incluir las clases del borde
         // (p. ej. domingo por la tarde en Mexico = lunes UTC); el frontend agrupa cada
         // sesion por su fecha LOCAL, asi que descarta con precision lo que sobra.
-        if (is_string($request->query('desde')) && $request->query('desde') !== '') {
-            $consulta->where('inicia_en', '>=', CarbonImmutable::parse((string) $request->query('desde'))->subDay()->utc());
+        if (($fechas['desde'] ?? null) !== null) {
+            $consulta->where('inicia_en', '>=', CarbonImmutable::parse($fechas['desde'])->subDay()->utc());
         }
-        if (is_string($request->query('hasta')) && $request->query('hasta') !== '') {
-            $consulta->where('inicia_en', '<', CarbonImmutable::parse((string) $request->query('hasta'))->addDays(2)->utc());
+        if (($fechas['hasta'] ?? null) !== null) {
+            $consulta->where('inicia_en', '<', CarbonImmutable::parse($fechas['hasta'])->addDays(2)->utc());
         }
 
         $sesiones = $consulta->limit(self::LIMITE + 1)->get();

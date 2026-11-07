@@ -210,6 +210,12 @@ const filtroSituacion = ref<"" | "proximas" | "vencidas">("");
 const paginaRenovaciones = ref(1);
 const buscarMorosos = ref("");
 const paginaMorosos = ref(1);
+// Pendientes de pago: el API busca por persona, folio o concepto y filtra por tipo y
+// fechas (ADR 0235); el total de arriba no depende de la página ni de los filtros.
+const buscarPendientes = ref("");
+const tipoPendientes = ref<"" | "compra" | "sesion" | "renovacion">("");
+const desdePendientes = ref("");
+const hastaPendientes = ref("");
 // Los filtros de renovaciones y de mora van en la dirección, con claves propias (las
 // de Movimientos, `q`, `estado`, `desde` y `hasta`, ya están tomadas). Antes de
 // vigilarlos, para no cargar dos veces.
@@ -222,7 +228,47 @@ useFiltrosEnUrl({
     "vencidas",
   ] as const),
   mora_q: buscarMorosos,
+  pend_q: buscarPendientes,
+  pend_tipo: opcionEnUrl(tipoPendientes, [
+    "",
+    "compra",
+    "sesion",
+    "renovacion",
+  ] as const),
+  pend_desde: fechaEnUrl(desdePendientes),
+  pend_hasta: fechaEnUrl(hastaPendientes),
 });
+const conFiltrosPendientes = computed(
+  () =>
+    buscarPendientes.value.trim() !== "" ||
+    tipoPendientes.value !== "" ||
+    desdePendientes.value !== "" ||
+    hastaPendientes.value !== "",
+);
+function paramsPendientes(page: number): Record<string, string | number> {
+  const q = buscarPendientes.value.trim();
+  return {
+    page,
+    ...(q !== "" ? { q } : {}),
+    ...(tipoPendientes.value !== "" ? { tipo: tipoPendientes.value } : {}),
+    ...(desdePendientes.value !== "" ? { desde: desdePendientes.value } : {}),
+    ...(hastaPendientes.value !== "" ? { hasta: hastaPendientes.value } : {}),
+  };
+}
+function limpiarFiltrosPendientes(): void {
+  buscarPendientes.value = "";
+  tipoPendientes.value = "";
+  desdePendientes.value = "";
+  hastaPendientes.value = "";
+}
+let esperaPendientes: ReturnType<typeof setTimeout> | undefined;
+watch(
+  [buscarPendientes, tipoPendientes, desdePendientes, hastaPendientes],
+  () => {
+    clearTimeout(esperaPendientes);
+    esperaPendientes = setTimeout(() => void irPendientes(1), 300);
+  },
+);
 const conFiltrosRenovaciones = computed(
   () =>
     buscarRenovaciones.value.trim() !== "" ||
@@ -430,7 +476,7 @@ async function cargar(): Promise<void> {
       const [pe] = await Promise.all([
         api.get<{ data: Pendiente[]; meta: MetaPendientes }>(
           `${base.value}/cobranza/pendientes`,
-          { params: { page: paginaPendientes.value } },
+          { params: paramsPendientes(paginaPendientes.value) },
         ),
         cargarMorosos(),
         cargarSuscripciones(),
@@ -479,14 +525,20 @@ async function recargarPagos(pagina = 1): Promise<void> {
   }
 }
 
-// Otra página de lo que se debe (sin recargar mora ni renovaciones).
+// Otra página de lo que se debe (sin recargar mora ni renovaciones). Solo la última
+// petición pinta, por si se escribe rápido en la búsqueda.
+let peticionPendientes = 0;
 async function irPendientes(n: number): Promise<void> {
   paginaPendientes.value = n;
+  const mia = ++peticionPendientes;
   try {
     const { data } = await api.get<{
       data: Pendiente[];
       meta: MetaPendientes;
-    }>(`${base.value}/cobranza/pendientes`, { params: { page: n } });
+    }>(`${base.value}/cobranza/pendientes`, { params: paramsPendientes(n) });
+    if (mia !== peticionPendientes) {
+      return;
+    }
     pendientes.value = data.data;
     metaPendientes.value = data.meta;
   } catch (e) {
@@ -1105,14 +1157,71 @@ watch(vista, cargar, { immediate: true });
           }}
         </p>
         <EstadoVacio
-          v-if="pendientes.length === 0"
+          v-if="pendientes.length === 0 && !conFiltrosPendientes"
           class="tu-card mt-3"
           icono="hecho"
           :titulo="$t('cobranza.pendientes.vacio')"
         />
         <div v-else class="mt-3 tu-card" data-prueba="pendientes">
+          <div class="tu-filtros" data-prueba="filtros-pendientes">
+            <label class="tu-buscar">
+              <IconoNav nombre="buscar" :tam="16" />
+              <input
+                v-model="buscarPendientes"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('cobranza.pendientes.buscar')"
+                :aria-label="$t('cobranza.pendientes.buscar')"
+                data-prueba="buscar-pendientes"
+              />
+            </label>
+            <select
+              v-model="tipoPendientes"
+              class="tu-input w-auto"
+              :aria-label="$t('cobranza.pendientes.tipo.etiqueta')"
+              data-prueba="tipo-pendientes"
+            >
+              <option value="">
+                {{ $t("cobranza.pendientes.tipo.todos") }}
+              </option>
+              <option value="compra">
+                {{ $t("cobranza.pendientes.tipo.compra") }}
+              </option>
+              <option value="sesion">
+                {{
+                  $t(
+                    sesion.esCitas
+                      ? "cobranza.pendientes.tipo.citas"
+                      : "cobranza.pendientes.tipo.clases",
+                  )
+                }}
+              </option>
+              <option v-if="!sesion.esCitas" value="renovacion">
+                {{ $t("cobranza.pendientes.tipo.renovacion") }}
+              </option>
+            </select>
+            <RangoFechas
+              v-model:desde="desdePendientes"
+              v-model:hasta="hastaPendientes"
+              :etiqueta="$t('cobranza.pendientes.fechas')"
+              prueba="pendientes"
+              :zona="sesion.zonaHoraria"
+            />
+            <button
+              v-if="conFiltrosPendientes"
+              type="button"
+              class="tu-btn tu-btn-discreto"
+              data-prueba="limpiar-pendientes"
+              @click="limpiarFiltrosPendientes"
+            >
+              {{ $t("tabla.limpiar") }}
+            </button>
+          </div>
+          <p v-if="pendientes.length === 0" class="tu-sin-resultados">
+            {{ $t("operacion.listadosDos.sinResultados") }}
+          </p>
           <!-- En el teléfono, una ficha por adeudo con «Registrar pago» a la vista. -->
-          <div class="relative overflow-x-auto tu-tabla-adaptable">
+          <div v-else class="relative overflow-x-auto tu-tabla-adaptable">
             <table class="tu-tabla">
               <thead>
                 <tr>

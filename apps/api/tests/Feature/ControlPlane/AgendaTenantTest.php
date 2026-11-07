@@ -54,6 +54,31 @@ it('incluye la clase del domingo por la tarde aunque en UTC caiga el lunes (bord
         ->assertJsonPath('data.0.inicia_en', '2026-10-12T03:00:00+00:00');
 });
 
+it('una fecha imposible en la agenda responde 422 por campo, no 500 (ADR 0235)', function (string $consulta, string $campo): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/sesiones?{$consulta}", conBearer($e['bearer']))
+        ->assertStatus(422)->assertJsonValidationErrors([$campo], 'meta.errors');
+})->with([
+    'desde imposible' => ['desde=2026-13-45', 'desde'],
+    'no es fecha' => ['desde=no-es-fecha', 'desde'],
+    'hasta imposible' => ['desde=2026-10-01&hasta=2026-10-45', 'hasta'],
+    'hasta antes que desde' => ['desde=2026-10-10&hasta=2026-10-01', 'hasta'],
+    'ventana de más de un año' => ['desde=2026-01-01&hasta=2027-06-01', 'hasta'],
+]);
+
+it('crear una sesión con una hora local imposible responde 422 (ADR 0235)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones", [
+        'oferta_id' => $semilla['oferta'],
+        'sucursal_id' => $semilla['sucursal'],
+        'inicia_en_local' => '2026-13-45 08:00:00',
+        'duracion_minutos' => 60,
+    ], conBearer($e['bearer']))->assertStatus(422)->assertJsonValidationErrors(['inicia_en_local'], 'meta.errors');
+});
+
 it('lista y cancela sesiones del estudio', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $semilla = agendaSemilla($e);

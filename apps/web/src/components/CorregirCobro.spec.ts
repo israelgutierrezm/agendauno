@@ -20,6 +20,8 @@ vi.mock("@/lib/api", () => ({
   api: { post: mocks.post, put: mocks.put },
   fijarBearer: vi.fn(),
   mensajeDeError: () => "Error",
+  erroresPorCampo: (e: unknown) =>
+    (e as { campos?: Record<string, string> })?.campos ?? {},
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("@/stores/toast", () => ({
@@ -65,6 +67,27 @@ describe("anular un cobro", () => {
       { motivo: "Aún no paga" },
     );
     expect(w.emitted("cambiado")).toEqual([["anulado"]]);
+  });
+
+  it("si el API lo rechaza, el error queda en el formulario con el motivo escrito (ADR 0235)", async () => {
+    mocks.confirmar.mockResolvedValue(true);
+    mocks.post.mockRejectedValue({
+      campos: { motivo: "El motivo es muy corto." },
+    });
+    const w = montar(["*"]);
+    await w.get('[data-prueba="anular-cobro"]').trigger("click");
+    await w.get('[data-prueba="motivo-anular"]').setValue("Aún no paga");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    const aviso = w.get('[data-prueba="error-corregir-cobro"]');
+    expect(aviso.attributes("role")).toBe("alert");
+    expect(w.text()).toContain("El motivo es muy corto.");
+    expect(
+      (w.get('[data-prueba="motivo-anular"]').element as HTMLInputElement)
+        .value,
+    ).toBe("Aún no paga");
+    expect(w.emitted("cambiado")).toBeUndefined();
   });
 
   it("si no se confirma, no lo anula", async () => {

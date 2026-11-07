@@ -67,14 +67,15 @@ class SubidaDeTarifa
     }
 
     /**
-     * Por alumnos activos: se compara en cada escalón de las dos tablas.
+     * Por alumnos activos: se compara en cada escalón de las dos tablas y desde el primer
+     * alumno, así una tabla de una sola banda sin tope también se compara (ADR 0235).
      */
     private function subeBanda(mixed $vigente, mixed $nueva): bool
     {
         if (! is_array($vigente) || ! is_array($nueva) || $vigente === [] || $nueva === []) {
             return false;
         }
-        $puntos = [];
+        $puntos = [1];
         foreach ([...$vigente, ...$nueva] as $banda) {
             $hasta = $banda['hasta'] ?? null;
             if ($hasta !== null) {

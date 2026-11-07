@@ -40,6 +40,8 @@ vi.mock("@/lib/api", () => ({
     delete: mocks.delete,
   },
   mensajeDeError: () => "Error",
+  erroresPorCampo: (e: unknown) =>
+    (e as { campos?: Record<string, string> })?.campos ?? {},
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
@@ -211,6 +213,26 @@ describe("reglas de la agenda", () => {
     expect(mocks.delete).toHaveBeenCalledWith(
       "/api/v1/app/demo/excepciones-horario/d1",
     );
+  });
+
+  it("si no se puede cerrar el día, el error queda junto a la fecha y no se borra (ADR 0235)", async () => {
+    mocks.ruta.hash = "#cierres";
+    mocks.get.mockResolvedValue({ data: { data: [] } });
+    mocks.post.mockRejectedValue({
+      campos: { fecha: "Ese día ya está cerrado." },
+    });
+    const w = montar();
+    await flushPromises();
+
+    await w.get("#ra-fecha").setValue("2099-12-24");
+    await w.get("#ra-fecha").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+
+    expect(w.get('[data-prueba="error-dia"]').attributes("role")).toBe("alert");
+    expect(w.get('[data-prueba="error-dia-fecha"]').text()).toBe(
+      "Ese día ya está cerrado.",
+    );
+    expect(w.get("#ra-fecha").element).toHaveProperty("value", "2099-12-24");
   });
 
   it("al cerrar un día con clases dice cuántas hay y, si se pide, las cancela (ADR 0223)", async () => {

@@ -92,6 +92,8 @@ class PublicoCitasController
                 // ¿Publicó su aviso de privacidad? (se enlaza antes de pedir los datos).
                 'aviso_privacidad' => app(WaiversTenant::class)->avisoPrivacidad() !== null,
                 'aviso_version' => app(WaiversTenant::class)->avisoPrivacidad()?->version,
+                // Sin aviso en producción no se piden datos: la página lo dice antes (ADR 0235).
+                'recibe_citas' => app(WaiversTenant::class)->puedePedirDatos(),
                 // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
                 'en_directorio' => $estudio->enDirectorio(),
             ],
@@ -237,7 +239,8 @@ class PublicoCitasController
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
             // El mismo intento (ADR 0201): un reintento devuelve la cita ya agendada.
             'idempotency_key' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-]+$/'],
-            // La versión del aviso que tenía a la vista (ADR 0234).
+            // La versión del aviso que tenía a la vista (ADR 0234): obligatoria si hay
+            // aviso publicado; se revisa en exigirAviso() (ADR 0235).
             'aviso_version' => ['nullable', 'integer', 'min:1'],
         ]);
         $aviso = $this->exigirAviso($validado['aviso_version'] ?? null);
@@ -479,10 +482,18 @@ class PublicoCitasController
      */
     private function exigirAviso(mixed $leida): ?WaiverTenant
     {
-        $aviso = app(WaiversTenant::class)->avisoPrivacidad();
-        if ($aviso === null && app()->environment('production')) {
+        $waivers = app(WaiversTenant::class);
+        $aviso = $waivers->avisoPrivacidad();
+        if (! $waivers->puedePedirDatos()) {
             throw ValidationException::withMessages([
                 'aviso_version' => ['Este negocio aún no publica su aviso de privacidad, así que no puede recibir citas en línea. Comunícate directamente con él.'],
+            ]);
+        }
+        // Con aviso publicado, la versión que vio es obligatoria: no se le atribuye la
+        // vigente en silencio a quien no la mandó (ADR 0235).
+        if ($aviso !== null && ($leida === null || $leida === '')) {
+            throw ValidationException::withMessages([
+                'aviso_version' => ['Lee el aviso de privacidad del negocio y vuelve a agendar.'],
             ]);
         }
         if ($leida !== null && $aviso !== null && (int) $leida !== (int) $aviso->version) {

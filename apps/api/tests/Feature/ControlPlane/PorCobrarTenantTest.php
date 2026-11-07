@@ -93,3 +93,27 @@ it('sin permiso de facturación no se ve lo que se debe', function (): void {
 
     $this->getJson("/api/v1/app/{$e['slug']}/cobranza/pendientes", conBearer($coach))->assertForbidden();
 });
+
+it('por cobrar se busca por persona, folio o concepto y se filtra por tipo y fecha; el total no cambia (ADR 0235)', function (): void {
+    ['e' => $e] = negocioConAdeudos();
+    $this->travelTo(CarbonImmutable::parse('2026-10-05 12:00:00', 'America/Mexico_City'));
+    $url = "/api/v1/app/{$e['slug']}/cobranza/pendientes";
+    $bearer = conBearer($e['bearer']);
+
+    $this->getJson("{$url}?q=bea", $bearer)->assertOk()
+        ->assertJsonCount(1, 'data')->assertJsonPath('data.0.persona.nombre', 'Bea')
+        ->assertJsonPath('meta.total', 1)
+        // El resumen es de todo lo que se debe, no de la búsqueda.
+        ->assertJsonPath('meta.ordenes_pendientes', 2);
+    $folio = (string) $this->getJson("{$url}?q=bea", $bearer)->json('data.0.id');
+    $this->getJson("{$url}?q={$folio}", $bearer)->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $folio);
+    $this->getJson("{$url}?q=Nivel", $bearer)->assertJsonCount(1, 'data')->assertJsonPath('data.0.persona.nombre', 'Ana');
+    $this->getJson("{$url}?tipo=sesion", $bearer)->assertJsonCount(1, 'data')->assertJsonPath('data.0.persona.nombre', 'Ana');
+    $this->getJson("{$url}?tipo=compra", $bearer)->assertJsonCount(1, 'data')->assertJsonPath('data.0.persona.nombre', 'Bea');
+    $this->getJson("{$url}?q=nadie", $bearer)->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+    $this->getJson("{$url}?desde=2026-10-02", $bearer)->assertJsonCount(0, 'data');
+    $this->getJson("{$url}?desde=2026-10-01&hasta=2026-10-01", $bearer)->assertJsonCount(2, 'data');
+    $this->getJson("{$url}?desde=2026-13-45", $bearer)->assertStatus(422)->assertJsonValidationErrors(['desde'], 'meta.errors');
+    // Sin filtros vuelve todo.
+    $this->getJson($url, $bearer)->assertJsonCount(2, 'data');
+});

@@ -422,6 +422,64 @@ describe("cobros: facturar la venta (ADR 0179)", () => {
 });
 
 describe("cobros: por cobrar", () => {
+  it("busca lo que se debe en el API, filtra por tipo y al limpiar vuelve todo (ADR 0235)", async () => {
+    vi.useFakeTimers();
+    mocks.ruta.query = { vista: "por-cobrar" };
+    const pendiente = {
+      id: "o1",
+      persona: { id: "p1", nombre: "Ana López" },
+      concepto: "Pack",
+      total_minor: 25000,
+      moneda: "MXN",
+      creada_en: "2026-10-01T18:00:00Z",
+      sesion: null,
+    };
+    mocks.get.mockImplementation(
+      (url: string, opciones?: { params?: { q?: string } }) =>
+        Promise.resolve({
+          data: url.endsWith("/cobranza/pendientes")
+            ? {
+                data: opciones?.params?.q === "nadie" ? [] : [pendiente],
+                meta: {
+                  page: 1,
+                  ultima_pagina: 1,
+                  total: opciones?.params?.q === "nadie" ? 0 : 1,
+                  per_page: 20,
+                  por_cobrar: [{ moneda: "MXN", total_minor: 25000 }],
+                  proximas: 0,
+                },
+              }
+            : { data: [] },
+        }),
+    );
+    const w = mount(CobranzaView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    const url = "/api/v1/app/demo/cobranza/pendientes";
+
+    await w.get('[data-prueba="buscar-pendientes"]').setValue("nadie");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith(url, {
+      params: { page: 1, q: "nadie" },
+    });
+    // Sin coincidencias, el buscador sigue a la vista (no el «nada pendiente»).
+    expect(w.find('[data-prueba="buscar-pendientes"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("Nada pendiente de pago.");
+
+    await w.get('[data-prueba="tipo-pendientes"]').setValue("compra");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(mocks.get).toHaveBeenLastCalledWith(url, {
+      params: { page: 1, q: "nadie", tipo: "compra" },
+    });
+
+    await w.get('[data-prueba="limpiar-pendientes"]').trigger("click");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith(url, { params: { page: 1 } });
+    expect(w.text()).toContain("Ana López");
+    vi.useRealTimers();
+  });
+
   it("en citas oculta renovaciones vacías pero conserva los cobros pendientes", async () => {
     mocks.esCitas = true;
     mocks.ruta.query = { vista: "por-cobrar" };

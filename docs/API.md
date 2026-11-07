@@ -2176,3 +2176,19 @@ en el negocio.
   responde 422 (`vigente_desde`); al publicarla sale un correo a los dueños de esa modalidad.
 - `PUT /api/v1/app/{slug}/medicion/destinos/{proveedor}`: encender sin aviso publicado responde 422 (`activo`).
 - `GET /api/v1/medicion/{producto}`: fuera de producción devuelve `ga4` y `meta` en `null`.
+
+## Revisión para producción: aviso, agenda y por cobrar (ADR 0235)
+
+- `GET /api/v1/app/{slug}/citas/opciones`: `estudio.recibe_citas` (false en producción sin aviso de
+  privacidad publicado: la página lo dice antes de pedir datos).
+- `POST /api/v1/app/{slug}/citas`: con aviso publicado, `aviso_version` es obligatoria (422 si falta o si
+  ya no es la vigente, en `meta.errors.aviso_version`).
+- `GET /onboarding/quickstart`: en un negocio de citas, `comprobaciones` suma `aviso` (ruta
+  `documentos`); en producción sin aviso, `estado.reservable` y `listo` son false con
+  `estado.motivo: sin_aviso`.
+- `GET /sesiones`: `desde` y `hasta` son `AAAA-MM-DD`, `hasta ≥ desde` y a lo más 366 días; si no,
+  422 por campo (antes, 500).
+- `GET /cobranza/pendientes`: acepta `q` (persona, folio de la orden, referencia o concepto),
+  `tipo` (`compra`, `sesion`, `renovacion`), `desde` y `hasta` (días del negocio, por la fecha de
+  la orden). `meta.total` cuenta lo filtrado; `meta.ordenes_pendientes` y `meta.por_cobrar` siguen
+  siendo de todo lo que se debe. Respeta el alcance por sucursal.
