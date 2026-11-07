@@ -795,11 +795,35 @@ summary:focus-visible {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-top: 3px solid var(--marketing-cta);
-  border-radius: 18px;
-  padding: 1.6rem;
+  background:
+    radial-gradient(
+      ellipse 70% 55% at 94% 6%,
+      color-mix(in srgb, #7dd3fc 14%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 6% 96%,
+      color-mix(in srgb, #fbcfe8 10%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  border-radius: 24px;
+  padding: 1.7rem;
+  box-shadow:
+    0 18px 42px -24px rgb(13 59 110 / 20%),
+    0 2px 8px rgb(13 59 110 / 4%);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    box-shadow 0.28s ease;
+}
+.precio-tarjeta:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, #3a8fd4 52%, var(--borde));
+  box-shadow:
+    0 24px 50px -24px rgb(58 143 212 / 28%),
+    0 4px 12px rgb(13 59 110 / 6%);
 }
 .precio-contexto {
   color: var(--texto-suave);
@@ -895,9 +919,16 @@ summary:focus-visible {
 .precios-incluye {
   margin-top: 1.25rem;
   padding: 1.5rem;
-  border: 1px solid var(--borde);
-  border-radius: 18px;
-  background: var(--superficie);
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 95% 12%,
+      color-mix(in srgb, #7dd3fc 12%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  box-shadow: 0 14px 34px -24px rgb(13 59 110 / 16%);
 }
 .precios-incluye h3 {
   font-weight: 500;
@@ -937,9 +968,10 @@ summary:focus-visible {
 }
 .precios-detalle {
   margin-top: 1.5rem;
-  border: 1px solid var(--borde);
+  border: 1px solid color-mix(in srgb, #3a8fd4 22%, var(--borde));
   background: var(--superficie);
-  border-radius: 16px;
+  border-radius: 22px;
+  box-shadow: 0 12px 28px -22px rgb(13 59 110 / 15%);
 }
 .precios-detalle summary {
   cursor: pointer;

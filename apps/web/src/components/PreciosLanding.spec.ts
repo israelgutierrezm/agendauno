@@ -369,10 +369,8 @@ describe("precios públicos (ADR 0107)", () => {
       }
       vista.unmount();
     }
-    // jsdom no aplica el CSS con scope: se revisa la regla del componente.
-    expect(fuente).toMatch(
-      /\.precio-tarjeta \{[^}]*border-top: 3px solid var\(--marketing-cta\);/,
-    );
+    // jsdom no aplica el CSS con scope: se revisa la regla del componente. Las tarjetas
+    // ya no llevan franja de color (rediseño del 2026-11); nunca la del primario.
     expect(fuente).not.toMatch(
       /\.precio-tarjeta \{[^}]*border-top: 3px solid var\(--primario\);/,
     );

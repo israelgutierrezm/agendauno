@@ -648,10 +648,12 @@ function cambiar(valor: Modo): void {
 <style scoped>
 .producto-demo {
   overflow: hidden;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-panel, 28px);
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  border-radius: 28px;
   background: var(--superficie);
-  box-shadow: 0 30px 90px -45px rgb(0 70 160 / 32%);
+  box-shadow:
+    0 28px 64px -32px rgb(13 59 110 / 24%),
+    0 2px 10px rgb(13 59 110 / 4%);
 }
 .demo-contexto {
   display: flex;
@@ -659,7 +661,13 @@ function cambiar(valor: Modo): void {
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--borde);
+  border-bottom: 1px solid color-mix(in srgb, #3a8fd4 18%, var(--borde));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #bae6fd 14%, var(--superficie)) 0%,
+    var(--superficie) 55%,
+    color-mix(in srgb, #fbcfe8 10%, var(--superficie)) 100%
+  );
 }
 .demo-marca {
   font-size: 1.05rem;

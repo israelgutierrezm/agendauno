@@ -10,7 +10,8 @@
 */
 :where(.tu-landing) {
   --landing-radius: var(--radio-tarjeta, 18px);
-  overflow: clip;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 :where(.tu-landing) .tu-ancla {
   scroll-margin-top: 6.5rem;
@@ -22,64 +23,21 @@
 }
 :where(.tu-landing) .tu-banda-estela {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
+  transform: translateY(-50%);
+  overflow: visible;
   pointer-events: none;
   z-index: 0;
 }
-:where(.tu-landing) .tu-banda > :not(.tu-banda-estela) {
+:where(.dark .tu-landing) .tu-banda-estela {
+  opacity: 0.38;
+}
+:where(.tu-landing) .tu-banda > :not(.tu-banda-estela, .fondo-hero) {
   position: relative;
   z-index: 1;
-}
-:where(.tu-landing) .tu-estrella-movil {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: tu-estrella-danza 5.2s ease-in-out infinite alternate;
-  will-change: transform, opacity;
-}
-:where(.tu-landing) .tu-estrella-movil--lenta {
-  animation: tu-estrella-danza-inv 6.8s ease-in-out infinite alternate;
-}
-:where(.tu-landing) .tu-estela-pulso {
-  stroke-dasharray: 110 1100;
-  animation: tu-estela-viaje 8s linear infinite;
-}
-@keyframes tu-estrella-danza {
-  0% {
-    transform: translate3d(-10px, 8px, 0) rotate(-14deg) scale(0.92);
-    opacity: 0.78;
-  }
-  50% {
-    transform: translate3d(8px, -10px, 0) rotate(12deg) scale(1.14);
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(20px, -4px, 0) rotate(28deg) scale(0.96);
-    opacity: 0.85;
-  }
-}
-@keyframes tu-estrella-danza-inv {
-  0% {
-    transform: translate3d(14px, -8px, 0) rotate(18deg) scale(1.08);
-    opacity: 0.92;
-  }
-  50% {
-    transform: translate3d(-8px, 10px, 0) rotate(-12deg) scale(0.88);
-    opacity: 0.72;
-  }
-  100% {
-    transform: translate3d(-18px, -6px, 0) rotate(-26deg) scale(1.12);
-    opacity: 1;
-  }
-}
-@keyframes tu-estela-viaje {
-  from {
-    stroke-dashoffset: 1210;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
 }
 
 /* Titulares ligeros; el contraste queda reservado para palabras clave. */
@@ -100,12 +58,29 @@
   font-size: clamp(1.95rem, 4.35vw, 2.625rem);
 }
 :where(.tu-landing) .tu-seccion-etiqueta {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.52rem;
+  padding: 0.34rem 0.88rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 14px -6px rgb(13 59 110 / 10%);
   color: var(--primario);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+:where(.tu-landing) .tu-seccion-etiqueta::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--acento);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--acento) 22%, transparent);
 }
 :where(.tu-landing) .tu-enfasis-rosa {
   color: var(--marketing-rosa);
@@ -114,9 +89,10 @@
 
 /* Hero de texto: titular, subtítulo, botones y prueba gratis. */
 :where(.tu-landing) .tu-hero {
-  /* Para el fondo decorativo (FondoHero), que va detrás del contenido. */
+  /* Para el fondo decorativo (FondoHero), que va detrás del contenido y de la barra flotante. */
   position: relative;
   isolation: isolate;
+  overflow: visible;
 }
 :where(.tu-landing) .tu-hero-layout {
   position: relative;
@@ -133,6 +109,21 @@
   z-index: 1;
   min-width: 0;
 }
+:where(.tu-landing) .tu-hero-actions .tu-btn {
+  border-radius: 14px;
+  padding-inline: 1.45rem;
+  font-weight: 600;
+}
+:where(.tu-landing) .tu-hero-actions .tu-btn-primario {
+  box-shadow: 0 12px 26px -8px rgb(13 59 110 / 45%);
+}
+:where(.tu-landing) .tu-hero-actions .tu-btn-secundario {
+  border: 1px solid color-mix(in srgb, #3a8fd4 22%, var(--borde));
+  background: color-mix(in srgb, var(--superficie) 88%, transparent);
+  backdrop-filter: blur(10px);
+  color: var(--primario);
+  box-shadow: 0 8px 20px -10px rgb(13 59 110 / 12%);
+}
 :where(.tu-landing) .tu-hero-proof {
   display: flex;
   flex-wrap: wrap;
@@ -143,64 +134,97 @@
 /* Tarjetas: radios propios, separados de las imágenes y de los paneles grandes. */
 :where(.tu-landing) .tu-card {
   border: 0;
-  border-radius: var(--landing-radius);
+  border-radius: 24px;
 }
 :where(.tu-landing) .tu-pasos .tu-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
-  border-top: 3px solid #3a8fd4;
-  background: var(--sobre-banda, var(--fondo));
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      ellipse 70% 55% at 95% 5%,
+      color-mix(in srgb, #7dd3fc 14%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 5% 95%,
+      color-mix(in srgb, #f472b6 9%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--sobre-banda, var(--fondo));
+  box-shadow:
+    0 18px 42px -24px rgb(13 59 110 / 18%),
+    0 2px 8px rgb(13 59 110 / 4%);
   transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    box-shadow 0.28s ease;
 }
 :where(.tu-landing) .tu-pasos .tu-card:hover {
-  transform: translateY(-2px);
-  border-color: #3a8fd4;
-  box-shadow: 0 18px 38px -24px rgb(58 143 212 / 32%);
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, #3a8fd4 52%, var(--borde));
+  box-shadow:
+    0 24px 48px -22px rgb(58 143 212 / 26%),
+    0 4px 12px rgb(13 59 110 / 6%);
 }
 :where(.tu-landing) .tu-paso-num {
   display: inline-flex;
-  height: 2.5rem;
-  width: 2.5rem;
+  height: 2.55rem;
+  width: 2.55rem;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  background: #3a8fd4;
+  background: radial-gradient(
+    circle at 32% 28%,
+    #bae6fd 0%,
+    #38bdf8 38%,
+    #0284c7 78%,
+    #0d3b6e 100%
+  );
   color: #ffffff;
-  box-shadow: 0 6px 16px -6px rgb(58 143 212 / 48%);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 :where(.tu-landing) .tu-paso-ejemplo {
   display: grid;
   gap: 0.45rem;
   margin-top: 1.5rem;
-  padding: 1.1rem;
-  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
-  border-left: 3px solid #3a8fd4;
-  border-radius: 1rem;
-  background: var(--fondo);
+  padding: 1.05rem 1.15rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 22%, var(--borde));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--superficie) 86%, var(--fondo));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 45%);
   color: var(--texto-suave);
   font-size: 0.8rem;
 }
 :where(.tu-landing) .tu-paso-ejemplo strong {
   color: var(--texto);
-  font-weight: 500;
+  font-weight: 600;
 }
 :where(.tu-landing) .tu-paso-ejemplo-label {
   color: #3a8fd4;
   font-size: 0.62rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 :where(.tu-landing) .tu-paso-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding-top: 0.3rem;
-  color: #3a8fd4;
+  color: var(--primario);
   font-weight: 600;
+}
+:where(.tu-landing) .tu-paso-status::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 18%);
 }
 
 /* Lista de beneficios con su marca. */
@@ -218,14 +242,15 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--acento) 26%, var(--borde));
+  border: 1px solid color-mix(in srgb, #3a8fd4 28%, var(--borde));
   border-radius: 999px;
-  background: color-mix(
-    in srgb,
-    var(--acento) 12%,
-    var(--sobre-banda, var(--fondo))
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #bae6fd 28%, var(--sobre-banda, var(--fondo))) 0%,
+    color-mix(in srgb, #fbcfe8 18%, var(--sobre-banda, var(--fondo))) 100%
   );
   color: var(--primario);
+  box-shadow: 0 4px 12px -4px rgb(13 59 110 / 12%);
 }
 :where(.tu-landing) .tu-link-flecha {
   display: inline-flex;
@@ -258,87 +283,43 @@
 
 /* Nota de alcance para profesionales de la salud. */
 :where(.tu-landing) .tu-alcance-salud {
-  padding: 1rem 1.15rem;
-  border: 1px solid color-mix(in srgb, var(--primario) 16%, var(--borde));
-  border-left: 3px solid var(--acento);
-  border-radius: 1rem;
-  background: color-mix(in srgb, var(--superficie) 78%, transparent);
+  padding: 1.05rem 1.25rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--superficie) 88%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 28px -20px rgb(13 59 110 / 16%);
   color: var(--texto-suave);
   font-size: 0.88rem;
   line-height: 1.6;
 }
 :where(.tu-landing) .tu-alcance-salud strong {
   color: var(--texto);
-  font-weight: 500;
+  font-weight: 600;
 }
 
-/* Aparición y coreografía al hacer scroll (estilo Apple): sin JS el contenido se ve igual. */
-:where(.tu-landing) .reveal {
+/* Aparición suave de una sola ejecución al entrar en vista: sin recalcular transforms en cada evento de scroll. */
+:where(.tu-landing) .reveal,
+:where(.tu-landing) [data-scroll] {
   opacity: 1;
   transform: none;
-  transition:
-    opacity 0.65s ease,
-    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 :where(.tu-landing) .reveal-in {
-  animation: tu-landing-entrada 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: tu-landing-entrada 0.58s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes tu-landing-entrada {
   from {
-    transform: translateY(26px) scale(0.965);
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
   }
   to {
-    transform: none;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
-}
-
-:where(.tu-landing) .tu-hero-copy {
-  transform: translate3d(0, calc(var(--hero-scroll, 0) * -22px), 0);
-}
-:where(.tu-landing) .tu-hero-visual {
-  transform: translate3d(0, calc(var(--hero-scroll, 0) * 18px), 0)
-    scale(calc(1 - var(--hero-scroll, 0) * 0.055));
-}
-:where(.tu-landing) [data-scroll="escala"] {
-  transform: translate3d(0, calc((1 - var(--entrada-vista, 1)) * 34px), 0)
-    scale(calc(0.925 + var(--foco-vista, 1) * 0.075));
-  opacity: calc(0.58 + var(--foco-vista, 1) * 0.42);
-  transition:
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.16s ease-out;
-  will-change: transform;
-}
-:where(.tu-landing) [data-scroll="acomodo"] {
-  transform: translate3d(
-      calc((1 - var(--entrada-vista, 1)) * var(--desplaza-x, 0px)),
-      calc((1 - var(--entrada-vista, 1)) * var(--desplaza-y, 32px)),
-      0
-    )
-    scale(calc(0.94 + var(--entrada-vista, 1) * 0.06));
-  opacity: calc(0.5 + var(--entrada-vista, 1) * 0.5);
-  transition:
-    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease-out;
-  will-change: transform;
-}
-:where(.tu-landing) [data-scroll="cabecera"] {
-  transform: translate3d(
-      0,
-      calc(
-        (1 - var(--entrada-vista, 1)) * 24px +
-          (0.5 - var(--progreso-vista, 0.5)) * -14px
-      ),
-      0
-    )
-    scale(calc(0.965 + var(--entrada-vista, 1) * 0.035));
-  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :where(.tu-landing) .reveal-in,
-  :where(.tu-landing) .tu-estrella-movil,
-  :where(.tu-landing) .tu-estela-pulso {
+  :where(.tu-landing) .reveal-in {
     animation: none;
   }
   :where(.tu-landing) .reveal,
@@ -355,17 +336,23 @@
   }
 }
 
+@media (min-width: 900px) and (max-width: 1023px) {
+  :where(.tu-landing) .tu-hero {
+    padding-top: 4.5rem;
+  }
+}
 @media (min-width: 1024px) {
   :where(.tu-landing) .tu-hero {
     display: flex;
     align-items: center;
-    height: calc(100svh - 7.5rem);
-    max-height: calc(100svh - 7.5rem);
-    min-height: 30rem;
+    padding-top: 4.5rem;
+    height: calc(100vh - 3.6rem);
+    max-height: calc(100vh - 3.6rem);
+    min-height: 34rem;
   }
   /* El collage con casi la mitad: sus fotos no quedan como tiras angostas. */
   :where(.tu-landing) .tu-hero-layout {
-    grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
+    grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
     min-height: 0;
   }
 }

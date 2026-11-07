@@ -38,7 +38,7 @@ const sellos = computed<Sello[]>(() =>
     ? ["prueba", "configuracion", "cobro", "cancelacion"]
     : ["proximamente", "configuracion", "cobro"],
 );
-const activo = ref(0);
+const activo = ref(2);
 
 function texto(sello: Sello): string {
   if (sello === "proximamente") {
@@ -87,20 +87,22 @@ function texto(sello: Sello): string {
   position: relative;
   z-index: 2;
   background: transparent;
-  margin-top: -0.95rem;
-  padding: 0 0 1.7rem;
+  margin-top: -0.5rem;
+  padding: 0 0 1.5rem;
 }
 .tu-confianza-grid {
   position: relative;
   overflow: hidden;
   display: grid;
-  gap: 0.4rem;
-  padding: 0.35rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--acento) 28%, var(--borde));
-  border-radius: var(--radio-tarjeta, 18px);
+  gap: 0.5rem;
+  padding: 0.36rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--superficie) 65%, var(--borde));
+  border-radius: 999px;
   background: color-mix(in srgb, var(--superficie) 92%, transparent);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 14px 36px -22px rgb(13 59 110 / 28%);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 16px 38px -18px rgb(13 59 110 / 20%),
+    0 2px 8px rgb(13 59 110 / 4%);
 }
 .tu-confianza-item {
   position: relative;
@@ -108,12 +110,13 @@ function texto(sello: Sello): string {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.32rem 0.65rem;
-  border-radius: 10px;
+  padding: 0.36rem 1.05rem;
+  border-radius: 999px;
   color: var(--texto);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 500;
   text-align: center;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background-color 0.25s ease,
@@ -123,17 +126,13 @@ function texto(sello: Sello): string {
 }
 .tu-confianza-item:hover,
 .tu-confianza-item--activo {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, #3a8fd4 13%, var(--superficie)) 0%,
-    color-mix(in srgb, #0d3b6e 8%, var(--superficie)) 100%
-  );
+  background: color-mix(in srgb, #3a8fd4 13%, var(--superficie));
   color: var(--primario);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #3a8fd4 32%, transparent);
 }
 .tu-confianza-punto {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.44rem;
+  height: 0.44rem;
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--acento);
@@ -145,35 +144,60 @@ function texto(sello: Sello): string {
 .tu-confianza-item:hover .tu-confianza-punto,
 .tu-confianza-item--activo .tu-confianza-punto {
   background: var(--primario);
-  transform: scale(1.15);
+  transform: scale(1.1);
 }
 @media (min-width: 1024px) {
   .tu-confianza {
     display: flex;
     align-items: center;
-    height: 3.25rem;
+    height: 3.6rem;
     min-height: 0;
-    padding: 0 0 0.45rem;
+    margin-top: 0;
+    padding: 0 0 0.65rem;
     box-sizing: border-box;
   }
   .tu-confianza > div {
     width: 100%;
   }
   .tu-confianza-grid {
-    grid-template-columns: repeat(var(--sellos, 4), minmax(0, 1fr));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.34rem 1.25rem;
+  }
+  .tu-confianza-item:not(:first-child)::before {
+    content: "";
+    position: absolute;
+    left: -0.65rem;
+    top: 50%;
+    width: 1px;
+    height: 1.15rem;
+    transform: translateY(-50%);
+    background: color-mix(in srgb, var(--borde) 85%, transparent);
+    pointer-events: none;
   }
 }
 @media (max-width: 1023px) and (min-width: 640px) {
   .tu-confianza-grid {
+    border-radius: 22px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tu-confianza-item {
+    white-space: normal;
   }
 }
 @media (max-width: 639px) {
-  .tu-confianza {
-    padding-bottom: 1.5rem;
-  }
   .tu-confianza-grid {
-    grid-template-columns: 1fr 1fr;
+    border-radius: 20px;
+  }
+  .tu-confianza-item {
+    white-space: normal;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-confianza-item,
+  .tu-confianza-punto {
+    transition: none;
   }
 }
 </style>

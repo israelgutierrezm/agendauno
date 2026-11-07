@@ -539,19 +539,19 @@ defineEmits<{ alternarTema: [] }>();
   align-items: center;
   min-height: 2.75rem;
 }
-/* Navegación comercial persistente, delgada y con logo al centro en escritorio. */
+/* Navegación comercial persistente, en cápsula flotante en portada y con logo al centro en escritorio. */
 .tu-public-nav {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: color-mix(in srgb, var(--superficie) 90%, transparent);
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid color-mix(in srgb, var(--borde) 70%, transparent);
 }
 .tu-public-container {
-  width: calc(100% - 6.5rem);
+  width: calc(100% - 3.25rem);
   max-width: 82rem;
-  margin-inline: auto;
+  margin-inline: 0;
   padding-inline: 1rem;
 }
 .dark .tu-public-nav {
@@ -705,23 +705,33 @@ defineEmits<{ alternarTema: [] }>();
 .tu-public-nav .tu-btn {
   min-height: 2.25rem !important;
   padding-block: 0.35rem;
+  padding-inline: 1.15rem;
+  border-radius: 999px;
   font-size: 0.82rem;
+  font-weight: 500;
+}
+.tu-public-nav .tu-btn-secundario {
+  border: 1px solid color-mix(in srgb, #0d3b6e 14%, var(--borde));
+  background: color-mix(in srgb, var(--superficie) 96%, transparent);
+  box-shadow: 0 2px 6px rgb(13 59 110 / 5%);
 }
 .tu-public-register {
-  border-radius: 10px;
-  padding-inline: 1.05rem;
+  border-radius: 999px;
+  padding-inline: 1.2rem;
+  box-shadow: 0 8px 18px -6px rgb(13 59 110 / 38%);
 }
 .tu-public-sections {
   display: none;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 .tu-public-sections a {
-  padding: 0.38rem 0.65rem;
-  border-radius: 0.55rem;
+  padding: 0.36rem 0.62rem;
+  border-radius: 999px;
   color: var(--texto-suave);
   font-size: 0.82rem;
   font-weight: 500;
+  white-space: nowrap;
   text-decoration: none;
   transition:
     background-color 0.18s ease,
@@ -729,27 +739,35 @@ defineEmits<{ alternarTema: [] }>();
 }
 .tu-public-sections a:hover,
 .tu-public-sections a[aria-current="page"] {
-  background: color-mix(in srgb, var(--acento) 10%, var(--superficie-2));
+  background: color-mix(in srgb, var(--acento) 12%, var(--superficie-2));
   color: var(--primario);
 }
 .tu-public-sections a:focus-visible {
   outline: 2px solid var(--primario);
   outline-offset: 2px;
 }
-/* Segunda fila del menú comercial (pantallas angostas): no es fija, se va al bajar. */
+/* Segunda fila del menú comercial (tabletas y móviles): limpia, centrada y sobre el fondo. */
 .tu-public-sections.tu-public-sections-fila {
+  position: relative;
+  z-index: 25;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  padding: 0.25rem 1rem;
-  background: var(--superficie);
-  border-bottom: 1px solid color-mix(in srgb, var(--borde) 70%, transparent);
+  gap: 0.2rem 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background: color-mix(in srgb, var(--superficie) 88%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--borde) 65%, transparent);
 }
 .tu-public-sections-fila a {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  padding-inline: 0.9rem;
+  justify-content: center;
+  min-height: 2.1rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
 }
 .tu-public-register-short {
   display: none;
@@ -759,26 +777,39 @@ defineEmits<{ alternarTema: [] }>();
 }
 @media (max-width: 639px) {
   .tu-public-container {
-    width: calc(100% - 3.25rem);
+    width: calc(100% - 2.75rem);
     margin-inline: 0;
     padding-inline: 0.75rem;
   }
   .tu-public-theme {
-    right: 0.25rem;
+    right: 0.35rem;
+  }
+  .tu-public-sections.tu-public-sections-fila {
+    gap: 0.15rem 0.2rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .tu-public-sections-fila a {
+    min-height: 1.95rem;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.76rem;
   }
 }
 @media (max-width: 479px) {
   .tu-public-container {
     gap: 0.25rem;
-    padding-right: 0.75rem;
-    padding-left: 0.75rem;
+    padding-right: 0.65rem;
+    padding-left: 0.65rem;
   }
   .tu-public-brand .agendauno-logo {
-    width: 132px !important;
+    width: 128px !important;
   }
   .tu-public-theme {
-    width: 2.25rem;
+    width: 2.2rem;
     margin-left: 0;
+  }
+  .tu-public-nav .tu-btn {
+    padding-inline: 0.75rem;
+    font-size: 0.76rem;
   }
   .tu-public-register {
     padding-right: 0.8rem;
@@ -802,15 +833,54 @@ defineEmits<{ alternarTema: [] }>();
     width: 104px !important;
   }
   .tu-public-container .tu-btn {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     padding-inline: 0.55rem;
+  }
+  .tu-public-sections-fila a {
+    padding: 0.2rem 0.48rem;
+    font-size: 0.72rem;
   }
 }
 @media (min-width: 900px) {
+  .tu-marketing:not(.tu-public-shell--access) .tu-public-nav {
+    top: 0.8rem;
+    width: min(calc(100% - 2.5rem), 81rem);
+    height: 3.85rem;
+    margin: 0 auto -3.85rem;
+    transform: translateY(0.8rem);
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--superficie) 65%, var(--borde));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--superficie) 92%, transparent);
+    backdrop-filter: blur(18px);
+    box-shadow:
+      0 14px 36px -14px rgb(13 59 110 / 15%),
+      0 2px 8px rgb(13 59 110 / 4%);
+  }
+  .dark.tu-marketing:not(.tu-public-shell--access) .tu-public-nav,
+  .dark .tu-marketing:not(.tu-public-shell--access) .tu-public-nav {
+    border-color: color-mix(in srgb, #60a5fa 22%, var(--borde));
+    background: color-mix(in srgb, var(--superficie) 88%, transparent);
+  }
   .tu-public-container {
     display: grid;
+    width: calc(100% - 6.5rem);
+    margin-inline: auto;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
+  }
+  .tu-marketing:not(.tu-public-shell--access) .tu-public-container {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-width: none;
+    padding-block: 0.4rem;
+    padding-left: 1.6rem;
+    padding-right: 3.45rem;
+  }
+  .tu-marketing:not(.tu-public-shell--access) .tu-public-nav .tu-btn {
+    min-height: 2.4rem !important;
+    padding-block: 0.4rem;
   }
   .tu-public-sections {
     display: flex;
@@ -826,6 +896,16 @@ defineEmits<{ alternarTema: [] }>();
   }
   .tu-public-sections.tu-public-sections-fila {
     display: none;
+  }
+}
+@media (min-width: 900px) and (max-width: 1079px) {
+  .tu-public-sections a {
+    padding: 0.32rem 0.45rem;
+    font-size: 0.76rem;
+  }
+  .tu-public-nav .tu-btn {
+    padding-inline: 0.85rem;
+    font-size: 0.78rem;
   }
 }
 </style>

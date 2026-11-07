@@ -168,7 +168,7 @@ const modulos = computed(() => {
   <div class="modulos-catalogo" data-prueba="modulos-landing">
     <div class="modulos-grid">
       <article
-        v-for="(modulo, i) in modulos"
+        v-for="modulo in modulos"
         :key="modulo.clave"
         class="modulo"
         :class="[
@@ -176,10 +176,6 @@ const modulos = computed(() => {
           { 'modulo-abierto': abierto === modulo.clave },
         ]"
         data-scroll="acomodo"
-        :style="{
-          '--desplaza-x': i % 3 === 0 ? '-28px' : i % 3 === 2 ? '28px' : '0px',
-          '--desplaza-y': i < 3 ? '24px' : '38px',
-        }"
       >
         <div class="modulo-marca">
           <svg
@@ -189,56 +185,90 @@ const modulos = computed(() => {
             fill="none"
             aria-hidden="true"
           >
-            <!-- Cuaderno/calendario geométrico de agenda con lomo marino, anillas y bloque de reserva ámbar -->
-            <rect x="7" y="10" width="34" height="32" rx="7" fill="#268EF0" />
+            <defs>
+              <linearGradient
+                id="mod-agenda-bg"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#e0f2fe" />
+                <stop offset="100%" stop-color="#bae6fd" />
+              </linearGradient>
+              <linearGradient
+                id="mod-agenda-top"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="0%"
+              >
+                <stop offset="0%" stop-color="#7dd3fc" />
+                <stop offset="100%" stop-color="#c4b5fd" />
+              </linearGradient>
+            </defs>
+            <!-- Calendario pastel con cabecera cielo-lavanda y bloque de turno en rosa pastel -->
+            <rect
+              x="6"
+              y="9"
+              width="36"
+              height="33"
+              rx="9"
+              fill="url(#mod-agenda-bg)"
+              stroke="#7dd3fc"
+              stroke-width="1.2"
+            />
             <path
-              d="M7 17C7 13.134 10.134 10 14 10H34C37.866 10 41 13.134 41 17V19H7V17Z"
-              fill="#0D3B6E"
+              d="M6 18C6 13.0294 10.0294 9 15 9H33C37.9706 9 42 13.0294 42 18V20H6V18Z"
+              fill="url(#mod-agenda-top)"
             />
-            <!-- Anillas de encuadernado de agenda -->
-            <rect x="14" y="6" width="4" height="8" rx="2" fill="#0D3B6E" />
-            <rect x="30" y="6" width="4" height="8" rx="2" fill="#0D3B6E" />
-            <rect x="15" y="7" width="2" height="4" rx="1" fill="#3A8FD4" />
-            <rect x="31" y="7" width="2" height="4" rx="1" fill="#3A8FD4" />
-            <!-- Celdas de cuadrícula de agenda -->
+            <rect x="14" y="5" width="4" height="8" rx="2" fill="#38bdf8" />
+            <rect x="30" y="5" width="4" height="8" rx="2" fill="#a78bfa" />
             <rect
-              x="12"
+              x="11"
               y="24"
-              width="6"
-              height="5"
-              rx="1.5"
-              fill="#FFFFFF"
-              fill-opacity="0.85"
+              width="7"
+              height="5.5"
+              rx="2"
+              fill="#ffffff"
+              fill-opacity="0.92"
             />
             <rect
-              x="21"
+              x="20.5"
               y="24"
-              width="6"
-              height="5"
-              rx="1.5"
-              fill="#FFFFFF"
-              fill-opacity="0.85"
+              width="7"
+              height="5.5"
+              rx="2"
+              fill="#ffffff"
+              fill-opacity="0.92"
             />
             <rect
               x="30"
               y="24"
-              width="6"
-              height="5"
-              rx="1.5"
-              fill="#FFFFFF"
-              fill-opacity="0.85"
+              width="7"
+              height="5.5"
+              rx="2"
+              fill="#ffffff"
+              fill-opacity="0.92"
             />
             <rect
-              x="12"
+              x="11"
               y="32"
-              width="6"
-              height="5"
-              rx="1.5"
-              fill="#FFFFFF"
-              fill-opacity="0.85"
+              width="7"
+              height="5.5"
+              rx="2"
+              fill="#ffffff"
+              fill-opacity="0.92"
             />
-            <!-- Bloque de cita/reserva destacada en ámbar -->
-            <rect x="21" y="32" width="15" height="5" rx="2" fill="#F5B825" />
+            <rect
+              x="20.5"
+              y="32"
+              width="16.5"
+              height="5.5"
+              rx="2.75"
+              fill="#f9a8d4"
+            />
+            <circle cx="24" cy="34.75" r="1.4" fill="#ffffff" />
           </svg>
           <svg
             v-else-if="modulo.clave === 'cobros'"
@@ -247,15 +277,71 @@ const modulos = computed(() => {
             fill="none"
             aria-hidden="true"
           >
-            <!-- Pilar verde esmeralda sobre base trapezoidal ámbar con intersección oliva -->
-            <rect x="14" y="6" width="20" height="28" rx="5" fill="#22B573" />
-            <path
-              d="M9.5 23C10.3284 21.3431 12.0219 20.3 13.8744 20.3H34.1256C35.9781 20.3 37.6716 21.3431 38.5 23L42.2 35.2C43.1889 38.4633 40.7478 42 37.3372 42H10.6628C7.2522 42 4.81112 38.4633 5.8 35.2L9.5 23Z"
-              fill="#F5B825"
+            <defs>
+              <linearGradient
+                id="mod-cobros-card"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#bae6fd" />
+                <stop offset="60%" stop-color="#e9d5ff" />
+                <stop offset="100%" stop-color="#fbcfe8" />
+              </linearGradient>
+              <linearGradient
+                id="mod-cobros-mint"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#a7f3d0" />
+                <stop offset="100%" stop-color="#6ee7b7" />
+              </linearGradient>
+            </defs>
+            <!-- Tarjeta de cobro pastel + insignia de pago confirmado en menta suave -->
+            <rect
+              x="5"
+              y="10"
+              width="32"
+              height="23"
+              rx="6.5"
+              fill="url(#mod-cobros-card)"
+              stroke="#93c5fd"
+              stroke-width="1.2"
+            />
+            <rect
+              x="5"
+              y="15.5"
+              width="32"
+              height="4.5"
+              fill="#7dd3fc"
+              fill-opacity="0.65"
+            />
+            <rect
+              x="10"
+              y="24"
+              width="9"
+              height="4"
+              rx="1.8"
+              fill="#ffffff"
+              fill-opacity="0.92"
+            />
+            <circle
+              cx="34"
+              cy="32"
+              r="9.5"
+              fill="url(#mod-cobros-mint)"
+              stroke="#ffffff"
+              stroke-width="2"
             />
             <path
-              d="M14 20.3H34V29C34 31.7614 31.7614 34 29 34H19C16.2386 34 14 31.7614 14 29V20.3Z"
-              fill="#659E38"
+              d="M30.2 32.2L32.8 34.8L37.8 29.5"
+              stroke="#0d3b6e"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             />
           </svg>
           <svg
@@ -265,12 +351,56 @@ const modulos = computed(() => {
             fill="none"
             aria-hidden="true"
           >
-            <!-- Dos esferas orgánicas entrelazadas (menta + azul cielo + lente cobalto) -->
-            <circle cx="16.5" cy="27.5" r="11.5" fill="#32C481" />
-            <circle cx="30.5" cy="24.5" r="14.5" fill="#268EF0" />
+            <defs>
+              <linearGradient
+                id="mod-personas-a"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#bae6fd" />
+                <stop offset="100%" stop-color="#7dd3fc" />
+              </linearGradient>
+              <linearGradient
+                id="mod-personas-b"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#fbcfe8" />
+                <stop offset="100%" stop-color="#f9a8d4" />
+              </linearGradient>
+            </defs>
+            <!-- Ficha de clientes/alumnos con perfiles en azul cielo y rosa pastel -->
+            <rect
+              x="6"
+              y="7"
+              width="36"
+              height="34"
+              rx="10"
+              fill="#f0f9ff"
+              stroke="#bae6fd"
+              stroke-width="1.2"
+            />
+            <circle cx="19" cy="18.5" r="5.2" fill="url(#mod-personas-a)" />
             <path
-              d="M28 27.5C28 32.1846 25.1995 36.2145 21.181 38.0124C17.8012 35.4024 15.625 31.3095 15.625 26.7C15.625 21.662 18.2348 17.2369 22.1765 14.7037C25.7369 17.523 28 22.2156 28 27.5Z"
-              fill="#1155A8"
+              d="M10.5 33.5C10.5 29.3579 14.3056 26 19 26C23.6944 26 27.5 29.3579 27.5 33.5"
+              fill="url(#mod-personas-a)"
+            />
+            <circle cx="30.5" cy="17.5" r="4.5" fill="url(#mod-personas-b)" />
+            <path
+              d="M24 33.5C24.4 29.9 27.3 27.2 30.8 27.2C34.5 27.2 37.5 30 37.5 33.5"
+              fill="url(#mod-personas-b)"
+            />
+            <rect
+              x="13"
+              y="36"
+              width="22"
+              height="2.4"
+              rx="1.2"
+              fill="#c4b5fd"
             />
           </svg>
           <svg
@@ -280,26 +410,55 @@ const modulos = computed(() => {
             fill="none"
             aria-hidden="true"
           >
-            <!-- Engranaje/red de equipo en ámbar con arco violeta y nodo coral -->
+            <defs>
+              <linearGradient
+                id="mod-equipo-aro"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#7dd3fc" />
+                <stop offset="50%" stop-color="#c4b5fd" />
+                <stop offset="100%" stop-color="#f9a8d4" />
+              </linearGradient>
+            </defs>
+            <!-- Red de equipo coordinada en tonos pastel (cielo, lavanda y rosa) -->
             <circle
-              cx="23"
+              cx="24"
               cy="25"
-              r="11.5"
-              stroke="#F6B924"
-              stroke-width="6.5"
+              r="13.5"
+              stroke="url(#mod-equipo-aro)"
+              stroke-width="2.6"
+              stroke-dasharray="5 3"
             />
-            <circle cx="23" cy="8.5" r="3.8" fill="#F6B924" />
-            <circle cx="8.5" cy="20" r="3.8" fill="#F6B924" />
-            <circle cx="11.5" cy="36.5" r="3.8" fill="#F6B924" />
-            <circle cx="27.5" cy="40.5" r="3.8" fill="#F6B924" />
-            <path
-              d="M23 13.5C29.3513 13.5 34.5 18.6487 34.5 25C34.5 28.05 33.312 30.8225 31.3728 32.881"
-              stroke="#9864E2"
-              stroke-width="6.5"
-              stroke-linecap="round"
+            <circle
+              cx="24"
+              cy="11"
+              r="6"
+              fill="#bae6fd"
+              stroke="#ffffff"
+              stroke-width="1.8"
             />
-            <circle cx="38.5" cy="14.5" r="4.2" fill="#9864E2" />
-            <circle cx="34.5" cy="25" r="3.2" fill="#E84E8A" />
+            <circle cx="24" cy="11" r="2.3" fill="#38bdf8" />
+            <circle
+              cx="12"
+              cy="32"
+              r="6"
+              fill="#e9d5ff"
+              stroke="#ffffff"
+              stroke-width="1.8"
+            />
+            <circle cx="12" cy="32" r="2.3" fill="#a78bfa" />
+            <circle
+              cx="36"
+              cy="32"
+              r="6"
+              fill="#fbcfe8"
+              stroke="#ffffff"
+              stroke-width="1.8"
+            />
+            <circle cx="36" cy="32" r="2.3" fill="#f472b6" />
           </svg>
           <svg
             v-else-if="modulo.clave === 'sitio'"
@@ -308,18 +467,60 @@ const modulos = computed(() => {
             fill="none"
             aria-hidden="true"
           >
-            <!-- Dos alas angulares (coral + azul cielo) con rombo marino central -->
-            <path
-              d="M7.5 24.2C5.8 22.8 6.1 20.1 8 19.1L20.2 12.6C22.1 11.6 24.4 13 24.4 15.2V35.5C24.4 37.9 21.7 39.3 19.8 37.8L7.5 24.2Z"
-              fill="#F2633A"
+            <defs>
+              <linearGradient
+                id="mod-sitio-hero"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stop-color="#bae6fd" />
+                <stop offset="55%" stop-color="#e9d5ff" />
+                <stop offset="100%" stop-color="#fbcfe8" />
+              </linearGradient>
+            </defs>
+            <!-- Ventana de página web de reservas en tonos pastel -->
+            <rect
+              x="5"
+              y="8"
+              width="38"
+              height="32"
+              rx="8"
+              fill="#f8fafc"
+              stroke="#93c5fd"
+              stroke-width="1.3"
             />
             <path
-              d="M40.5 20.8C42.2 19.4 41.9 16.7 40 15.7L27.8 9.2C25.9 8.2 23.6 9.6 23.6 11.8V35.5C23.6 37.9 26.3 39.3 28.2 37.8L40.5 20.8Z"
-              fill="#268EF0"
+              d="M5 15C5 11.134 8.13401 8 12 8H36C39.866 8 43 11.134 43 15V16.5H5V15Z"
+              fill="#e0f2fe"
             />
-            <path
-              d="M24 17.5L30.5 25.5L24 37.8L17.5 25.5L24 17.5Z"
-              fill="#0D3B6E"
+            <circle cx="10.5" cy="12.5" r="1.5" fill="#f9a8d4" />
+            <circle cx="15" cy="12.5" r="1.5" fill="#c4b5fd" />
+            <circle cx="19.5" cy="12.5" r="1.5" fill="#7dd3fc" />
+            <rect
+              x="9.5"
+              y="20"
+              width="29"
+              height="9"
+              rx="3.5"
+              fill="url(#mod-sitio-hero)"
+            />
+            <rect
+              x="9.5"
+              y="32"
+              width="15"
+              height="4.5"
+              rx="2.25"
+              fill="#7dd3fc"
+            />
+            <rect
+              x="27"
+              y="32"
+              width="11.5"
+              height="4.5"
+              rx="2.25"
+              fill="#f9a8d4"
             />
           </svg>
           <svg
@@ -329,16 +530,59 @@ const modulos = computed(() => {
             fill="none"
             aria-hidden="true"
           >
-            <!-- Dos cimas ascendentes (ámbar + verde esmeralda) con cruce verde profundo -->
-            <path
-              d="M8 15C8 11.6863 10.6863 9 14 9C16.4 9 18.5 10.4 19.5 12.6L28 31.5V40H13C10.2386 40 8 37.7614 8 35V15Z"
-              fill="#F5B825"
+            <defs>
+              <linearGradient id="mod-crec-1" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#bae6fd" />
+                <stop offset="100%" stop-color="#7dd3fc" />
+              </linearGradient>
+              <linearGradient id="mod-crec-2" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#e9d5ff" />
+                <stop offset="100%" stop-color="#c4b5fd" />
+              </linearGradient>
+              <linearGradient id="mod-crec-3" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#fbcfe8" />
+                <stop offset="100%" stop-color="#f472b6" />
+              </linearGradient>
+            </defs>
+            <!-- Gráfica ascendente en barras pastel con curva orbital y esfera en la cima -->
+            <rect
+              x="8"
+              y="27"
+              width="8"
+              height="13"
+              rx="3.5"
+              fill="url(#mod-crec-1)"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="8"
+              height="20"
+              rx="3.5"
+              fill="url(#mod-crec-2)"
+            />
+            <rect
+              x="32"
+              y="13"
+              width="8"
+              height="27"
+              rx="3.5"
+              fill="url(#mod-crec-3)"
             />
             <path
-              d="M40 13C40 9.68629 37.3137 7 34 7C31.6 7 29.5 8.4 28.5 10.6L20 31.5V40H35C37.7614 40 40 37.7614 40 35V13Z"
-              fill="#22B573"
+              d="M10 22C17 20 25 15 36 8.5"
+              stroke="#38bdf8"
+              stroke-width="2.2"
+              stroke-linecap="round"
             />
-            <path d="M24 22.6L28.5 32.5V40H19.5V32.5L24 22.6Z" fill="#0F7A4C" />
+            <circle
+              cx="36"
+              cy="8.5"
+              r="3.4"
+              fill="#f472b6"
+              stroke="#ffffff"
+              stroke-width="1.4"
+            />
           </svg>
           <div class="modulo-titulos">
             <span>{{ marca }}</span>
@@ -387,34 +631,48 @@ const modulos = computed(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 .modulo {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--borde);
-  background: var(--superficie);
-  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--modulo-acento) 24%, var(--borde));
+  background:
+    radial-gradient(
+      ellipse 68% 54% at 95% 5%,
+      color-mix(in srgb, var(--modulo-acento) 12%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  border-radius: 24px;
   padding: 26px;
+  box-shadow:
+    0 18px 42px -26px rgb(13 59 110 / 18%),
+    0 2px 8px rgb(13 59 110 / 4%);
   transition:
-    transform 0.25s,
-    border-color 0.25s,
-    box-shadow 0.25s;
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    box-shadow 0.28s ease;
 }
 .modulo:hover,
 .modulo:focus-within {
-  border-color: color-mix(in srgb, var(--modulo-acento) 50%, var(--borde));
-  box-shadow: 0 12px 35px -24px var(--modulo-acento);
+  border-color: color-mix(in srgb, var(--modulo-acento) 52%, var(--borde));
+  box-shadow:
+    0 24px 48px -24px color-mix(in srgb, var(--modulo-acento) 34%, transparent),
+    0 4px 12px rgb(13 59 110 / 6%);
   transform: translateY(-3px);
 }
 .modulo-azul {
   --modulo-acento: #3a8fd4;
 }
 .modulo-menta {
-  --modulo-acento: #0d3b6e;
+  --modulo-acento: #0ea5e9;
 }
 .modulo-rosa {
-  --modulo-acento: #256eb5;
+  --modulo-acento: #ec4899;
 }
 .modulo-marca {
   display: flex;
@@ -463,14 +721,16 @@ const modulos = computed(() => {
   font-size: 0.98rem;
   line-height: 1.4;
   font-weight: 600;
-  min-height: 2.2rem;
+  min-height: 2.6rem;
 }
 .modulo-texto {
+  flex: 1;
   margin-top: 6px;
+  margin-bottom: 20px;
   font-size: 0.87rem;
   line-height: 1.55;
   color: var(--texto-suave);
-  min-height: 2.8rem;
+  min-height: 4.2rem;
 }
 .modulo button {
   display: flex;
@@ -479,7 +739,7 @@ const modulos = computed(() => {
   gap: 12px;
   width: 100%;
   padding: 16px 0 0;
-  margin-top: 22px;
+  margin-top: auto;
   border: 0;
   border-top: 1px solid var(--borde);
   background: transparent;

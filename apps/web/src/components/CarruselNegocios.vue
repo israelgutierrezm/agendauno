@@ -171,6 +171,67 @@ onBeforeUnmount(() => {
       @pointerup="terminarGesto"
       @pointercancel="inicio = undefined"
     >
+      <svg
+        class="orbita-vectores"
+        viewBox="0 0 1200 500"
+        fill="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient
+            id="carrusel-trazo-sup"
+            gradientUnits="userSpaceOnUse"
+            x1="40"
+            y1="270"
+            x2="780"
+            y2="42"
+          >
+            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.72" />
+            <stop offset="32%" stop-color="#38bdf8" stop-opacity="0.9" />
+            <stop offset="72%" stop-color="#818cf8" stop-opacity="0.78" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.22" />
+          </linearGradient>
+          <radialGradient
+            id="carrusel-esfera-azul"
+            cx="34%"
+            cy="28%"
+            r="68%"
+            fx="28%"
+            fy="24%"
+          >
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="32%" stop-color="#bae6fd" />
+            <stop offset="72%" stop-color="#38bdf8" />
+            <stop offset="100%" stop-color="#0284c7" />
+          </radialGradient>
+        </defs>
+        <g opacity="0.42">
+          <path
+            d="M 55 288 C -30 142, 210 10, 770 46"
+            stroke="url(#carrusel-trazo-sup)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M 55 288 C -30 142, 210 10, 770 46"
+            stroke="url(#carrusel-trazo-sup)"
+            stroke-width="2.1"
+            stroke-linecap="round"
+          />
+        </g>
+        <circle r="7.6" fill="url(#carrusel-esfera-azul)" opacity="0.52">
+          <animateMotion
+            path="M 55 288 C -30 142, 210 10, 770 46"
+            dur="10s"
+            repeatCount="indefinite"
+            keyPoints="0.12;0.58;0.12"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+          />
+        </circle>
+      </svg>
       <button
         v-for="(item, i) in negocios"
         :key="item.clave"
@@ -311,6 +372,15 @@ onBeforeUnmount(() => {
   isolation: isolate;
   touch-action: pan-y;
 }
+.orbita-vectores {
+  position: absolute;
+  inset: -4% -3%;
+  width: 106%;
+  height: 108%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+}
 .orbita-foto {
   position: absolute;
   left: 50%;
@@ -319,24 +389,27 @@ onBeforeUnmount(() => {
   height: 86%;
   padding: 0;
   overflow: hidden;
-  border: 3px solid var(--superficie);
-  border-radius: var(--radio-imagen, 22px);
+  border: 4px solid color-mix(in srgb, #ffffff 90%, var(--superficie));
+  border-radius: 26px;
   background: #07172c;
   color: white;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 22px 45px -16px rgb(3 27 78 / 35%);
+  box-shadow: 0 22px 45px -16px rgb(13 59 110 / 32%);
   transform: translateX(calc(-50% + var(--pos) * 72%)) scale(var(--escala))
     rotateY(var(--giro));
   transition:
-    transform 850ms cubic-bezier(0.22, 0.8, 0.25, 1),
-    opacity 650ms ease,
-    filter 650ms ease;
-  filter: saturate(0.65) brightness(0.8);
+    transform 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 550ms ease,
+    filter 550ms ease;
+  filter: saturate(0.72) brightness(0.84);
+}
+:global(.dark) .orbita-foto {
+  border-color: rgb(255 255 255 / 14%);
 }
 .orbita-foto.es-principal {
   filter: none;
-  box-shadow: 0 26px 60px -18px rgb(3 27 78 / 45%);
+  box-shadow: 0 28px 60px -18px rgb(13 59 110 / 42%);
 }
 .orbita-foto.fuera {
   opacity: 0;
@@ -389,16 +462,22 @@ onBeforeUnmount(() => {
   place-items: center;
   width: 2.75rem;
   height: 2.75rem;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-boton, 11px);
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  border-radius: 999px;
   background: var(--superficie);
   color: var(--texto);
+  box-shadow: 0 8px 20px -12px rgb(13 59 110 / 16%);
   cursor: pointer;
   font-size: 1.1rem;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 .orbita-controles button:hover {
-  border-color: var(--primario);
+  border-color: #3a8fd4;
   color: var(--primario-fuerte);
+  transform: translateY(-1px);
 }
 .orbita-controles [data-reproducir] {
   grid-column: 2;
@@ -408,6 +487,7 @@ onBeforeUnmount(() => {
   height: 2rem;
   border: 0;
   background: transparent;
+  box-shadow: none;
 }
 .orbita-paginacion {
   font-size: 0.8rem;
@@ -443,18 +523,30 @@ onBeforeUnmount(() => {
   margin: 0.25rem auto 1.75rem;
 }
 .orbita-categorias button {
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-boton, 11px);
-  padding: 0.55rem 0.85rem;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 999px;
+  padding: 0.52rem 0.95rem;
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
   color: var(--texto-suave);
   font-size: 0.78rem;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 4px 14px -8px rgb(13 59 110 / 12%);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.orbita-categorias button:hover {
+  border-color: color-mix(in srgb, #3a8fd4 48%, var(--borde));
+  color: var(--primario);
 }
 .orbita-categorias button[aria-pressed="true"] {
-  background: var(--texto);
-  color: var(--fondo);
-  border-color: var(--texto);
+  background: #0d3b6e;
+  color: #ffffff;
+  border-color: #0d3b6e;
+  box-shadow: 0 8px 20px -10px rgb(13 59 110 / 42%);
 }
 button:focus-visible {
   outline: 3px solid var(--primario);

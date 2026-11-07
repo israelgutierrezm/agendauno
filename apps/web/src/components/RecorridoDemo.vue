@@ -341,23 +341,31 @@ function mover(delta: number): void {
   gap: 0.7rem;
   align-items: flex-start;
   text-align: left;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--borde);
-  border-radius: 14px;
+  padding: 0.9rem 1.05rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 22%, var(--borde));
+  border-radius: 20px;
   background: var(--superficie);
+  box-shadow: 0 10px 24px -18px rgb(13 59 110 / 16%);
   cursor: pointer;
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s,
-    transform 0.2s;
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
 }
 .recorrido-paso:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
+  border-color: color-mix(in srgb, #3a8fd4 48%, var(--borde));
 }
 .recorrido-paso[aria-selected="true"] {
-  border-color: var(--acento);
-  box-shadow: 0 10px 26px -18px rgb(13 59 110 / 35%);
+  border-color: #3a8fd4;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 95% 10%,
+      color-mix(in srgb, #7dd3fc 16%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  box-shadow: 0 16px 34px -20px rgb(13 59 110 / 28%);
 }
 .recorrido-paso--auto::after {
   content: "";
@@ -366,7 +374,7 @@ function mover(delta: number): void {
   bottom: 0;
   height: 3px;
   width: 100%;
-  background: #3a8fd4;
+  background: linear-gradient(90deg, #38bdf8 0%, #c084fc 55%, #f472b6 100%);
   transform-origin: 0 50%;
   animation: recorrido-progreso 4.2s linear infinite;
 }
@@ -382,16 +390,23 @@ function mover(delta: number): void {
   display: inline-grid;
   place-items: center;
   flex-shrink: 0;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 999px;
   font-size: 0.8rem;
-  font-weight: 600;
-  background: var(--superficie-2);
+  font-weight: 700;
+  background: color-mix(in srgb, #3a8fd4 12%, var(--fondo));
+  color: var(--primario);
 }
 .recorrido-paso[aria-selected="true"] .recorrido-num {
-  background: var(--primario);
-  color: var(--sobre-primario, #fff);
+  background: radial-gradient(
+    circle at 32% 28%,
+    #bae6fd 0%,
+    #38bdf8 38%,
+    #0284c7 78%,
+    #0d3b6e 100%
+  );
+  color: #ffffff;
 }
 .recorrido-paso-texto {
   display: grid;
@@ -410,10 +425,24 @@ function mover(delta: number): void {
   display: grid;
   gap: 1.5rem;
   margin-top: 1.25rem;
-  padding: 1.5rem;
-  border: 1px solid var(--borde);
-  border-radius: 18px;
-  background: var(--superficie);
+  padding: 1.65rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 26px;
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 94% 10%,
+      color-mix(in srgb, #7dd3fc 14%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 45% at 6% 92%,
+      color-mix(in srgb, #fbcfe8 10%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  box-shadow:
+    0 22px 48px -28px rgb(13 59 110 / 22%),
+    0 2px 8px rgb(13 59 110 / 4%);
 }
 @media (min-width: 900px) {
   .recorrido-panel {

@@ -29,81 +29,298 @@ const activa = ref(1);
 <template>
   <figure class="tu-hero-visual reveal">
     <div class="tu-hero-collage" @mouseleave="activa = 1">
-      <!-- Vectores decorativos, estela orbital y destellos alrededor del collage -->
+      <!-- Figuras traslúcidas a contraesquina y tramos posteriores del anillo orbital -->
       <svg
         class="tu-hero-vectores"
-        viewBox="0 0 600 480"
+        viewBox="0 0 640 420"
         fill="none"
         aria-hidden="true"
       >
+        <defs>
+          <!-- Rectángulo redondeado superior derecho (arriba de HYROX) -->
+          <linearGradient
+            id="rombo-rosa-grad"
+            x1="0%"
+            y1="30%"
+            x2="100%"
+            y2="70%"
+          >
+            <stop offset="0%" stop-color="#bfdbfe" stop-opacity="0.28" />
+            <stop offset="48%" stop-color="#e9d5ff" stop-opacity="0.32" />
+            <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0.46" />
+          </linearGradient>
+
+          <!-- Rectángulo redondeado inferior izquierdo a contraesquina (abajo de Pilates) -->
+          <linearGradient
+            id="rombo-inf-izq-grad"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+          >
+            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.34" />
+            <stop offset="52%" stop-color="#bae6fd" stop-opacity="0.26" />
+            <stop offset="100%" stop-color="#e9d5ff" stop-opacity="0.2" />
+          </linearGradient>
+
+          <!-- Arco superior alargado (sobre "Sincronizado en vivo" y "Pole dance") -->
+          <linearGradient
+            id="arco-sup-grad"
+            gradientUnits="userSpaceOnUse"
+            x1="-12"
+            y1="72"
+            x2="505"
+            y2="56"
+          >
+            <stop offset="0%" stop-color="#93c5fd" stop-opacity="0" />
+            <stop offset="16%" stop-color="#60a5fa" stop-opacity="0.72" />
+            <stop offset="48%" stop-color="#38bdf8" stop-opacity="0.9" />
+            <stop offset="78%" stop-color="#c084fc" stop-opacity="0.72" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.15" />
+          </linearGradient>
+
+          <!-- Bucle izquierdo alargado hacia fuera -->
+          <linearGradient
+            id="arco-izq-grad"
+            gradientUnits="userSpaceOnUse"
+            x1="-45"
+            y1="104"
+            x2="92"
+            y2="302"
+          >
+            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.24" />
+            <stop offset="25%" stop-color="#38bdf8" stop-opacity="0.9" />
+            <stop offset="65%" stop-color="#60a5fa" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.78" />
+          </linearGradient>
+
+          <!-- Arco inferior alargado (bajo Pilates y Pole dance) -->
+          <linearGradient
+            id="arco-inf-grad"
+            gradientUnits="userSpaceOnUse"
+            x1="78"
+            y1="338"
+            x2="336"
+            y2="376"
+          >
+            <stop offset="0%" stop-color="#f472b6" stop-opacity="0.16" />
+            <stop offset="50%" stop-color="#f472b6" stop-opacity="0.88" />
+            <stop offset="82%" stop-color="#f9a8d4" stop-opacity="0.88" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.24" />
+          </linearGradient>
+
+          <!-- Tramo posterior derecho alargado hacia fuera de HYROX -->
+          <linearGradient
+            id="arco-der-post-grad"
+            gradientUnits="userSpaceOnUse"
+            x1="518"
+            y1="178"
+            x2="678"
+            y2="272"
+          >
+            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.12" />
+            <stop offset="52%" stop-color="#e879f9" stop-opacity="0.65" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.9" />
+          </linearGradient>
+
+          <!-- Sombra ambiental bajo las tarjetas -->
+          <radialGradient id="halo-inf-collage" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0.18" />
+            <stop offset="55%" stop-color="#f472b6" stop-opacity="0.1" />
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+          </radialGradient>
+
+          <!-- Esfera azul con efecto 3D suave (sin sombra exterior) -->
+          <radialGradient
+            id="esfera-azul-3d"
+            cx="34%"
+            cy="28%"
+            r="68%"
+            fx="28%"
+            fy="24%"
+          >
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="32%" stop-color="#bae6fd" />
+            <stop offset="72%" stop-color="#38bdf8" />
+            <stop offset="100%" stop-color="#0284c7" />
+          </radialGradient>
+        </defs>
+
+        <!-- Sombra ambiental suave bajo las tarjetas -->
         <ellipse
-          cx="300"
-          cy="235"
-          rx="275"
-          ry="175"
-          transform="rotate(-8 300 235)"
-          stroke="#3a8fd4"
-          stroke-opacity="0.28"
-          stroke-width="1.6"
-          stroke-dasharray="7 7"
+          cx="295"
+          cy="368"
+          rx="205"
+          ry="32"
+          fill="url(#halo-inf-collage)"
         />
-        <path
-          d="M 32 340 Q 175 40 330 220 T 572 110"
-          stroke="#0d3b6e"
-          stroke-opacity="0.2"
-          stroke-width="2"
-          stroke-linecap="round"
-        />
-        <!-- Destellos vectoriales de 4 puntas y vectores inferiores -->
-        <path
-          d="M 42 428 Q 300 478 558 418"
-          stroke="#3a8fd4"
-          stroke-opacity="0.34"
-          stroke-width="2"
-          stroke-dasharray="5 7"
-          stroke-linecap="round"
-        />
+
+        <!-- Figura traslúcida detrás de la esquina superior derecha (arriba de HYROX) -->
         <rect
-          x="148"
-          y="420"
-          width="28"
-          height="28"
-          rx="8"
-          transform="rotate(24 148 420)"
-          stroke="#3a8fd4"
-          stroke-opacity="0.4"
-          stroke-width="1.5"
+          class="tu-hero-rombo-rosa"
+          x="436"
+          y="6"
+          width="172"
+          height="172"
+          rx="32"
+          transform="rotate(34 522 92)"
+          fill="url(#rombo-rosa-grad)"
+          stroke="#ffffff"
+          stroke-opacity="0.65"
+          stroke-width="1.3"
         />
-        <circle
-          cx="296"
-          cy="450"
-          r="18"
-          stroke="#0d3b6e"
-          stroke-opacity="0.28"
-          stroke-width="1.5"
-          stroke-dasharray="4 4"
+
+        <!-- Figura traslúcida a contraesquina (abajo de Pilates) -->
+        <rect
+          class="tu-hero-rombo-azul"
+          x="18"
+          y="238"
+          width="168"
+          height="168"
+          rx="32"
+          transform="rotate(34 102 322)"
+          fill="url(#rombo-inf-izq-grad)"
+          stroke="#ffffff"
+          stroke-opacity="0.6"
+          stroke-width="1.3"
         />
-        <circle cx="296" cy="450" r="5" fill="#3a8fd4" fill-opacity="0.55" />
+
+        <!-- 1. Arco orbital superior plano + esfera 3D azul con movimiento suave sobre la curva -->
         <path
-          class="tu-hero-destello tu-hero-destello--1"
-          d="M540 34 L544 46 L556 50 L544 54 L540 66 L536 54 L524 50 L536 46 Z"
-          fill="#3a8fd4"
-          fill-opacity="0.75"
+          d="M -12 72 C 105 -32, 325 -34, 505 56"
+          stroke="url(#arco-sup-grad)"
+          stroke-opacity="0.16"
+          stroke-width="5"
+          stroke-linecap="round"
         />
         <path
-          class="tu-hero-destello tu-hero-destello--2"
-          d="M46 376 L49 385 L58 388 L49 391 L46 400 L43 391 L34 388 L43 385 Z"
-          fill="#0d3b6e"
-          fill-opacity="0.55"
+          d="M -12 72 C 105 -32, 325 -34, 505 56"
+          stroke="url(#arco-sup-grad)"
+          stroke-width="2.4"
+          stroke-linecap="round"
+        />
+        <circle r="8.2" fill="url(#esfera-azul-3d)">
+          <animateMotion
+            path="M -12 72 C 105 -32, 325 -34, 505 56"
+            dur="9s"
+            repeatCount="indefinite"
+            keyPoints="0.36;0.64;0.36"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+          />
+        </circle>
+
+        <!-- 2. Bucle orbital izquierdo plano -->
+        <path
+          d="M 88 104 C -72 146, -76 258, 92 302"
+          stroke="url(#arco-izq-grad)"
+          stroke-opacity="0.16"
+          stroke-width="5.5"
+          stroke-linecap="round"
         />
         <path
-          class="tu-hero-destello tu-hero-destello--1"
-          d="M232 436 L235 444 L243 447 L235 450 L232 458 L229 450 L221 447 L229 444 Z"
-          fill="#3a8fd4"
-          fill-opacity="0.65"
+          d="M 88 104 C -72 146, -76 258, 92 302"
+          stroke="url(#arco-izq-grad)"
+          stroke-width="2.5"
+          stroke-linecap="round"
         />
-        <circle cx="52" cy="96" r="6" fill="#3a8fd4" fill-opacity="0.45" />
-        <circle cx="556" cy="368" r="7" fill="#0d3b6e" fill-opacity="0.3" />
+
+        <!-- 3. Tramo orbital inferior plano -->
+        <path
+          d="M 78 338 C 148 402, 244 406, 336 376"
+          stroke="url(#arco-inf-grad)"
+          stroke-opacity="0.18"
+          stroke-width="5.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M 78 338 C 148 402, 244 406, 336 376"
+          stroke="url(#arco-inf-grad)"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        />
+
+        <!-- 4. Tramo posterior derecho plano -->
+        <path
+          d="M 518 178 C 638 202, 692 236, 678 272"
+          stroke="url(#arco-der-post-grad)"
+          stroke-opacity="0.16"
+          stroke-width="5.5"
+          stroke-linecap="round"
+        />
+        <path
+          d="M 518 178 C 638 202, 692 236, 678 272"
+          stroke="url(#arco-der-post-grad)"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        />
+      </svg>
+
+      <!-- Tramo frontal del arco orbital derecho plano + esfera 3D rosa centrada en la curva -->
+      <svg
+        class="tu-hero-vectores tu-hero-vectores--frente"
+        viewBox="0 0 640 420"
+        fill="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient
+            id="arco-frente-rosa"
+            gradientUnits="userSpaceOnUse"
+            x1="678"
+            y1="272"
+            x2="428"
+            y2="352"
+          >
+            <stop offset="0%" stop-color="#f472b6" stop-opacity="0.9" />
+            <stop offset="50%" stop-color="#ec4899" stop-opacity="0.92" />
+            <stop offset="85%" stop-color="#f472b6" stop-opacity="0.88" />
+            <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0.22" />
+          </linearGradient>
+
+          <!-- Esfera rosa con efecto 3D suave (sin sombra exterior) -->
+          <radialGradient
+            id="esfera-rosa-3d"
+            cx="34%"
+            cy="28%"
+            r="68%"
+            fx="28%"
+            fy="24%"
+          >
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="32%" stop-color="#fbcfe8" />
+            <stop offset="72%" stop-color="#f472b6" />
+            <stop offset="100%" stop-color="#db2777" />
+          </radialGradient>
+        </defs>
+
+        <path
+          d="M 678 272 C 658 316, 562 342, 428 352"
+          stroke="url(#arco-frente-rosa)"
+          stroke-opacity="0.2"
+          stroke-width="6"
+          stroke-linecap="round"
+        />
+        <path
+          d="M 678 272 C 658 316, 562 342, 428 352"
+          stroke="url(#arco-frente-rosa)"
+          stroke-width="2.6"
+          stroke-linecap="round"
+        />
+
+        <!-- Esfera 3D rosa con movimiento suave sobre la curva frontal -->
+        <circle r="8.6" fill="url(#esfera-rosa-3d)">
+          <animateMotion
+            path="M 678 272 C 658 316, 562 342, 428 352"
+            dur="8s"
+            repeatCount="indefinite"
+            keyPoints="0.18;0.52;0.18"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+          />
+        </circle>
       </svg>
 
       <!-- Insignia flotante superior -->
@@ -176,43 +393,50 @@ const activa = ref(1);
 .tu-hero-collage {
   position: relative;
   display: grid;
-  height: clamp(16.5rem, calc(100svh - 11.25rem), 23.5rem);
+  height: clamp(18.5rem, calc(100svh - 10.8rem), 24.5rem);
   grid-template-columns: 1fr 1.22fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.5rem 1.2rem;
+  gap: 0;
+  padding: 2.35rem 3.1rem 2.2rem;
   isolation: isolate;
 }
 .tu-hero-vectores {
   position: absolute;
-  inset: -0.75rem -1rem;
-  width: calc(100% + 2rem);
-  height: calc(100% + 1.5rem);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
+  overflow: visible;
   pointer-events: none;
 }
-.tu-hero-destello--1 {
-  animation: tu-destello-pulso 3.4s ease-in-out infinite;
+.tu-hero-vectores--frente {
+  z-index: 3;
 }
-.tu-hero-destello--2 {
-  animation: tu-destello-pulso 4.2s ease-in-out 1.2s infinite;
+.tu-hero-rombo-rosa {
+  transform-origin: 522px 92px;
+  animation: tu-rombo-flota 8s ease-in-out infinite alternate;
+}
+.tu-hero-rombo-azul {
+  transform-origin: 102px 322px;
+  animation: tu-rombo-flota 9s ease-in-out 1.2s infinite alternate-reverse;
 }
 .tu-hero-pulso {
   position: absolute;
   z-index: 4;
-  left: 6%;
-  top: 0.35rem;
+  left: 11%;
+  top: 2.25rem;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.42rem 0.78rem;
-  border: 1px solid color-mix(in srgb, var(--acento) 35%, var(--borde));
+  padding: 0.42rem 0.88rem;
+  border: 1px solid color-mix(in srgb, var(--superficie) 65%, var(--borde));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--superficie) 92%, transparent);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 10px 24px -12px rgb(13 59 110 / 28%);
+  background: color-mix(in srgb, var(--superficie) 94%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 28px -12px rgb(13 59 110 / 20%);
   color: var(--primario);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
   pointer-events: none;
 }
@@ -223,7 +447,7 @@ const activa = ref(1);
   display: inline-flex;
   align-items: flex-end;
   gap: 2px;
-  height: 0.75rem;
+  height: 0.78rem;
 }
 .tu-hero-pulso-barras i {
   width: 2.5px;
@@ -237,7 +461,7 @@ const activa = ref(1);
 .tu-hero-pulso-barras i:nth-child(2) {
   height: 100%;
   animation-delay: 0.2s;
-  background: #0d3b6e;
+  background: var(--primario);
 }
 .tu-hero-pulso-barras i:nth-child(3) {
   height: 65%;
@@ -246,12 +470,14 @@ const activa = ref(1);
 .tu-hero-pulso-barras i:nth-child(4) {
   height: 85%;
   animation-delay: 0.6s;
-  background: #0d3b6e;
+  background: var(--primario);
 }
-@keyframes tu-destello-pulso {
-  50% {
-    opacity: 0.35;
-    transform: scale(0.86);
+@keyframes tu-rombo-flota {
+  from {
+    transform: translateY(0) rotate(34deg);
+  }
+  to {
+    transform: translateY(-5px) rotate(36deg);
   }
 }
 @keyframes tu-barra-onda {
@@ -262,56 +488,50 @@ const activa = ref(1);
 .tu-hero-foto {
   position: relative;
   height: 82%;
-  transform: rotate(-6deg) translateY(0.75rem);
+  min-height: 0;
+  z-index: 1;
+  transform: rotate(-6deg) translate(0.75rem, 0.65rem);
   overflow: hidden;
-  border: 4px solid var(--superficie);
+  border: 5px solid color-mix(in srgb, var(--superficie) 95%, var(--borde));
   border-radius: 1.35rem;
   background: var(--superficie);
-  box-shadow: 0 1.2rem 3.2rem rgb(13 59 110 / 16%);
+  box-shadow:
+    0 1.35rem 3rem -0.55rem rgb(13 59 110 / 24%),
+    0 0 0 1px color-mix(in srgb, #3a8fd4 16%, transparent);
   cursor: pointer;
   transition:
     transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.35s ease;
 }
-.tu-hero-foto--1 {
-  animation: tu-foto-flota-1 7s ease-in-out infinite alternate;
-}
 .tu-hero-foto--2 {
-  height: 100%;
+  height: 98%;
   z-index: 2;
-  transform: translateY(-0.5rem);
+  transform: rotate(-2.5deg) translateY(-0.15rem);
 }
 .tu-hero-foto--3 {
-  height: 82%;
-  transform: rotate(6deg) translateY(0.75rem);
-  animation: tu-foto-flota-3 8.5s ease-in-out infinite alternate;
-}
-.tu-hero-foto:hover,
-.tu-hero-foto--activa {
-  animation: none;
+  height: 83%;
+  z-index: 1;
+  transform: rotate(-1.5deg) translate(-0.75rem, 0.55rem);
 }
 .tu-hero-foto--activa {
+  z-index: 2;
+  border-color: color-mix(in srgb, var(--superficie) 98%, var(--borde));
+  box-shadow:
+    0 1.6rem 3.6rem -0.5rem rgb(13 59 110 / 26%),
+    0 0 0 1px color-mix(in srgb, #3a8fd4 24%, transparent);
+}
+.tu-hero-foto--1.tu-hero-foto--activa {
   z-index: 3;
-  transform: translateY(-0.65rem) scale(1.035) rotate(0deg);
-  border-color: color-mix(in srgb, var(--acento) 55%, var(--superficie));
-  box-shadow: 0 1.6rem 3.8rem rgb(13 59 110 / 26%);
+  transform: translate(0.55rem, -0.3rem) scale(1.03) rotate(-2deg);
 }
-@keyframes tu-foto-flota-1 {
-  from {
-    transform: rotate(-6deg) translateY(0.75rem);
-  }
-  to {
-    transform: rotate(-5deg) translateY(0.15rem);
-  }
+.tu-hero-foto--3.tu-hero-foto--activa {
+  z-index: 3;
+  transform: translate(-0.55rem, -0.3rem) scale(1.03) rotate(-0.5deg);
 }
-@keyframes tu-foto-flota-3 {
-  from {
-    transform: rotate(6deg) translateY(0.75rem);
-  }
-  to {
-    transform: rotate(5deg) translateY(0.15rem);
-  }
+.tu-hero-foto--2.tu-hero-foto--activa {
+  z-index: 2;
+  transform: rotate(-2deg) translateY(-0.25rem) scale(1.015);
 }
 .tu-hero-foto img {
   display: block;
@@ -323,15 +543,15 @@ const activa = ref(1);
 }
 .tu-hero-foto:hover img,
 .tu-hero-foto--activa img {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 .tu-hero-foto-etiqueta {
   position: absolute;
-  left: 0.65rem;
-  top: 0.65rem;
-  padding: 0.22rem 0.6rem;
+  left: 0.7rem;
+  top: 0.7rem;
+  padding: 0.24rem 0.68rem;
   border-radius: 999px;
-  background: rgb(13 59 110 / 78%);
+  background: rgb(18 48 89 / 82%);
   backdrop-filter: blur(8px);
   color: #ffffff;
   font-size: 0.68rem;
@@ -341,88 +561,97 @@ const activa = ref(1);
 .tu-hero-reserva {
   position: absolute;
   z-index: 4;
-  right: 10%;
-  bottom: 0.55rem;
+  left: 37%;
+  bottom: 0.9rem;
   display: flex;
-  max-width: 16.5rem;
+  width: max-content;
+  max-width: 21.5rem;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.68rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--acento) 32%, var(--borde));
-  border-radius: 1.05rem;
-  background: color-mix(in srgb, var(--superficie) 92%, transparent);
-  color: var(--texto);
-  text-align: left;
-  box-shadow: 0 1rem 2.6rem rgb(13 59 110 / 22%);
+  gap: 0.78rem;
+  padding: 0.76rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--superficie) 65%, var(--borde));
+  border-radius: 1.15rem;
+  background: color-mix(in srgb, var(--superficie) 95%, transparent);
   backdrop-filter: blur(18px);
-  animation: tu-reserva-flota 4.2s ease-in-out infinite;
+  box-shadow:
+    0 1.35rem 3rem -0.9rem rgb(13 59 110 / 24%),
+    0 2px 10px rgb(13 59 110 / 6%);
+  color: var(--texto);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  animation: tu-aviso-flota 5s ease-in-out infinite;
 }
-.tu-hero-reserva-check {
-  position: relative;
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 auto;
-  place-content: center;
-  border-radius: 50%;
-  background: #198754;
-  color: #fff;
-  box-shadow: 0 0 0 4px rgb(25 135 84 / 18%);
-}
-.tu-hero-reserva strong,
-.tu-hero-reserva small {
-  display: block;
+@keyframes tu-aviso-flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.28rem);
+  }
 }
 .tu-hero-reserva strong {
+  display: block;
   font-size: 0.84rem;
   font-weight: 600;
+  color: var(--primario);
 }
 .tu-hero-reserva small {
-  margin-top: 0.1rem;
+  display: block;
+  margin-top: 0.14rem;
   color: var(--texto-suave);
-  font-size: 0.7rem;
+  font-size: 0.71rem;
+  white-space: nowrap;
 }
-@keyframes tu-reserva-flota {
-  50% {
-    transform: translateY(-0.45rem);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tu-hero-foto--1,
-  .tu-hero-foto--3,
-  .tu-hero-reserva {
-    animation: none;
-  }
-  .tu-hero-foto img {
-    transition: none;
-  }
-  .tu-hero-foto:hover img {
-    transform: none;
-  }
-}
-@media (max-width: 1023px) {
-  .tu-hero-visual {
-    width: min(100%, 48rem);
-    margin-inline: auto;
-  }
-  .tu-hero-collage {
-    height: min(41rem, 72vw);
-  }
+.tu-hero-reserva-check {
+  display: inline-flex;
+  height: 2.15rem;
+  width: 2.15rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgb(16 185 129 / 18%);
 }
 @media (max-width: 639px) {
   .tu-hero-collage {
-    height: 27rem;
-    gap: 0.4rem;
-    padding: 1rem 0.5rem 3.2rem;
+    height: clamp(16rem, 68vw, 20rem);
+    padding: 0.75rem 0.65rem 1.4rem;
   }
-  .tu-hero-foto {
-    border-radius: 1.1rem;
+  .tu-hero-pulso {
+    display: none;
+  }
+  .tu-hero-foto-etiqueta {
+    left: 0.45rem;
+    top: 0.45rem;
+    padding: 0.16rem 0.5rem;
+    font-size: 0.62rem;
   }
   .tu-hero-reserva {
-    right: 0.85rem;
-    bottom: 0.85rem;
-    max-width: 13.5rem;
-    padding: 0.62rem 0.7rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    bottom: 0.25rem;
+    width: auto;
+    max-width: 17.5rem;
+    margin-inline: auto;
+    padding: 0.55rem 0.75rem;
+  }
+  .tu-hero-reserva small {
+    white-space: normal;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-hero-foto,
+  .tu-hero-foto img {
+    transition: none;
+  }
+  .tu-hero-reserva,
+  .tu-hero-rombo-rosa,
+  .tu-hero-rombo-azul,
+  .tu-hero-pulso-barras i {
+    animation: none;
   }
 }
 </style>

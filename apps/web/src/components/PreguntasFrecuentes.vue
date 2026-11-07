@@ -49,16 +49,11 @@ const DatosEstructurados = () =>
     </div>
     <div class="preguntas-grid mt-8">
       <details
-        v-for="(p, i) in preguntas"
+        v-for="p in preguntas"
         :key="p.clave"
         class="pregunta tu-card p-5 reveal"
         :data-pregunta="p.clave"
         data-scroll="acomodo"
-        :style="{
-          transitionDelay: i * 60 + 'ms',
-          '--desplaza-x': i % 2 === 0 ? '-22px' : '22px',
-          '--desplaza-y': '20px',
-        }"
       >
         <summary>
           {{ p.pregunta }}
@@ -106,17 +101,28 @@ const DatosEstructurados = () =>
   }
 }
 .pregunta {
-  border: 1px solid color-mix(in srgb, var(--acento) 20%, var(--borde));
-  background: var(--sobre-banda, var(--superficie));
-  box-shadow: 0 10px 26px -22px rgb(13 59 110 / 24%);
+  border: 1px solid color-mix(in srgb, #3a8fd4 22%, var(--borde));
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      ellipse 65% 50% at 95% 8%,
+      color-mix(in srgb, #7dd3fc 10%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--sobre-banda, var(--superficie));
+  box-shadow:
+    0 12px 28px -22px rgb(13 59 110 / 20%),
+    0 2px 6px rgb(13 59 110 / 3%);
   transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
 }
 .pregunta:hover,
 .pregunta[open] {
-  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
-  box-shadow: 0 14px 32px -22px rgb(13 59 110 / 32%);
+  border-color: color-mix(in srgb, #3a8fd4 48%, var(--borde));
+  box-shadow:
+    0 18px 36px -22px rgb(13 59 110 / 26%),
+    0 4px 10px rgb(13 59 110 / 5%);
 }
 .pregunta summary {
   display: flex;

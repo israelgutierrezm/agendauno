@@ -332,75 +332,177 @@ function medirOtra(): void {
     <!-- ===================== CONFIANZA ===================== -->
     <SellosConfianza :modo="modo" />
 
-    <!-- ===================== PRODUCTO (Estrella a la DERECHA) ===================== -->
+    <!-- ===================== PRODUCTO (Patrón A: Recuadros TL + BR · Órbita BL) ===================== -->
     <section id="producto" class="tu-banda tu-ancla" :style="BANDA_SUPERFICIE">
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
         <defs>
-          <linearGradient id="tu-estela-prod-a" x1="0" y1="0.2" x2="1" y2="0.1">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="32%" stop-color="#3a8fd4" stop-opacity="0.32" />
-            <stop
-              offset="72%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.44"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
+          <linearGradient
+            id="tu-rombo-rosa-grad"
+            x1="0%"
+            y1="20%"
+            x2="100%"
+            y2="80%"
+          >
+            <stop offset="0%" stop-color="#bfdbfe" stop-opacity="0.34" />
+            <stop offset="48%" stop-color="#e9d5ff" stop-opacity="0.38" />
+            <stop offset="100%" stop-color="#f9a8d4" stop-opacity="0.48" />
           </linearGradient>
-          <linearGradient id="tu-estela-prod-b" x1="1" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#3a8fd4" stop-opacity="0" />
-            <stop
-              offset="50%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.24"
-            />
-            <stop offset="100%" stop-color="#0d3b6e" stop-opacity="0" />
+          <linearGradient
+            id="tu-rombo-azul-grad"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+          >
+            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.38" />
+            <stop offset="52%" stop-color="#bae6fd" stop-opacity="0.34" />
+            <stop offset="100%" stop-color="#ddd6fe" stop-opacity="0.3" />
           </linearGradient>
+          <linearGradient
+            id="tu-rombo-lila-grad"
+            x1="0%"
+            y1="10%"
+            x2="100%"
+            y2="90%"
+          >
+            <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0.34" />
+            <stop offset="50%" stop-color="#fbcfe8" stop-opacity="0.38" />
+            <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.32" />
+          </linearGradient>
+          <linearGradient
+            id="tu-orbita-der-sup"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="0%"
+          >
+            <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.06" />
+            <stop offset="24%" stop-color="#38bdf8" stop-opacity="0.72" />
+            <stop offset="68%" stop-color="#c084fc" stop-opacity="0.76" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.18" />
+          </linearGradient>
+          <linearGradient
+            id="tu-orbita-izq-inf"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="0%"
+          >
+            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.18" />
+            <stop offset="48%" stop-color="#38bdf8" stop-opacity="0.74" />
+            <stop offset="85%" stop-color="#c084fc" stop-opacity="0.62" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.06" />
+          </linearGradient>
+          <linearGradient
+            id="tu-orbita-izq-sup"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="0%"
+          >
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.18" />
+            <stop offset="35%" stop-color="#38bdf8" stop-opacity="0.76" />
+            <stop offset="76%" stop-color="#c084fc" stop-opacity="0.66" />
+            <stop offset="100%" stop-color="#f472b6" stop-opacity="0.06" />
+          </linearGradient>
+          <linearGradient
+            id="tu-orbita-der-inf"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="0%"
+          >
+            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.06" />
+            <stop offset="38%" stop-color="#f472b6" stop-opacity="0.74" />
+            <stop offset="82%" stop-color="#ec4899" stop-opacity="0.7" />
+            <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0.18" />
+          </linearGradient>
+          <radialGradient
+            id="tu-esfera-azul-3d"
+            cx="34%"
+            cy="28%"
+            r="68%"
+            fx="28%"
+            fy="24%"
+          >
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="32%" stop-color="#bae6fd" />
+            <stop offset="72%" stop-color="#38bdf8" />
+            <stop offset="100%" stop-color="#0284c7" />
+          </radialGradient>
+          <radialGradient
+            id="tu-esfera-rosa-3d"
+            cx="34%"
+            cy="28%"
+            r="68%"
+            fx="28%"
+            fy="24%"
+          >
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="32%" stop-color="#fbcfe8" />
+            <stop offset="72%" stop-color="#f472b6" />
+            <stop offset="100%" stop-color="#db2777" />
+          </radialGradient>
         </defs>
-        <path
-          d="M-80 155 C 320 55, 680 245, 1080 115 C 1245 62, 1365 88, 1520 58"
-          stroke="url(#tu-estela-prod-a)"
-          stroke-width="2.4"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-112"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(-24 -31 177)"
+          fill="url(#tu-rombo-lila-grad)"
+          stroke="#c4b5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M-80 155 C 320 55, 680 245, 1080 115 C 1245 62, 1365 88, 1520 58"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.48"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1398"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(-18 1474 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <path
-          d="M-40 455 C 360 355, 820 510, 1500 365"
-          stroke="url(#tu-estela-prod-b)"
-          stroke-width="1.6"
-          stroke-dasharray="6 10"
-          stroke-linecap="round"
-        />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M1238 72 L1243 87 L1258 92 L1243 97 L1238 112 L1233 97 L1218 92 L1233 87 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.56"
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M1152 126 L1155 135 L1164 138 L1155 141 L1152 150 L1149 141 L1140 138 L1149 135 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.45"
+        <circle r="7.6" fill="url(#tu-esfera-azul-3d)" opacity="0.52">
+          <animateMotion
+            path="M -40 485 C 100 400, 270 425, 420 560"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.22;0.68;0.22"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div
         class="mx-auto max-w-5xl px-4 sm:px-6 pt-14 sm:pt-18"
@@ -445,66 +547,68 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== FUNCIONES (Sección blanca · Estrella a la IZQUIERDA) ===================== -->
+    <!-- ===================== FUNCIONES (Patrón B: Recuadros TR + BL · Órbita BR) ===================== -->
     <section id="soluciones" class="tu-banda tu-ancla" :style="BANDA_FONDO">
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id="tu-estela-sol" x1="1" y1="0.4" x2="0" y2="0.1">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="35%" stop-color="#3a8fd4" stop-opacity="0.34" />
-            <stop
-              offset="72%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.48"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M1500 220 C 1140 80, 740 275, 320 112 C 185 60, 80 88, -60 65"
-          stroke="url(#tu-estela-sol)"
-          stroke-width="2.5"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1390"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(24 1471 177)"
+          fill="url(#tu-rombo-rosa-grad)"
+          stroke="#f9a8d4"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M1500 220 C 1140 80, 740 275, 320 112 C 185 60, 80 88, -60 65"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.52"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-110"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(18 -34 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <path
-          d="M-40 445 C 420 335, 910 495, 1490 360"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.24"
-          stroke-width="1.4"
-          stroke-dasharray="5 9"
-        />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M168 68 L173 83 L188 88 L173 93 L168 108 L163 93 L148 88 L163 83 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.62"
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M254 122 L257 131 L266 134 L257 137 L254 146 L251 137 L242 134 L251 131 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.46"
+        <circle r="7.6" fill="url(#tu-esfera-rosa-3d)" opacity="0.52">
+          <animateMotion
+            path="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.32;0.78;0.32"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-18">
         <div data-scroll="cabecera">
@@ -545,7 +649,7 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== CÓMO FUNCIONA (Estrella a la DERECHA) ===================== -->
+    <!-- ===================== CÓMO FUNCIONA (Patrón A: Recuadros TL + BR · Órbita BL) ===================== -->
     <section
       id="como-funciona"
       class="tu-banda tu-ancla"
@@ -553,72 +657,67 @@ function medirOtra(): void {
     >
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id="tu-estela-pasos" x1="0" y1="0.2" x2="1" y2="0.8">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="38%" stop-color="#3a8fd4" stop-opacity="0.32" />
-            <stop
-              offset="75%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.45"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M-50 175 C 340 85, 760 270, 1180 135 C 1310 95, 1400 115, 1510 90"
-          stroke="url(#tu-estela-pasos)"
-          stroke-width="2.4"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-112"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(-24 -31 177)"
+          fill="url(#tu-rombo-lila-grad)"
+          stroke="#c4b5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M-50 175 C 340 85, 760 270, 1180 135 C 1310 95, 1400 115, 1510 90"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.48"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1398"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(-18 1474 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M1262 84 L1267 99 L1282 104 L1267 109 L1262 124 L1257 109 L1242 104 L1257 99 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.56"
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M1175 138 L1178 147 L1187 150 L1178 153 L1175 162 L1172 153 L1163 150 L1172 147 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.44"
+        <circle r="7.6" fill="url(#tu-esfera-azul-3d)" opacity="0.52">
+          <animateMotion
+            path="M -40 485 C 100 400, 270 425, 420 560"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.22;0.68;0.22"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-18">
         <div class="tu-cabecera-con-monograma" data-scroll="cabecera">
-          <div class="tu-monograma-sello" aria-hidden="true">
-            <LogoProducto
-              v-if="modo === 'clases'"
-              producto="agendauno"
-              variante="isotipo"
-              :ancho="210"
-              alt="Monograma de AgendaUno"
-            />
-            <span
-              v-else
-              class="tu-monograma-iniciales tu-monograma-iniciales--fondo"
-              >TU</span
-            >
-          </div>
           <div class="tu-cabecera-monograma-texto">
             <h2 class="tu-titulo reveal">
               {{
@@ -639,11 +738,6 @@ function medirOtra(): void {
             class="tu-card p-6 reveal"
             :data-paso="paso.clave"
             data-scroll="acomodo"
-            :style="{
-              transitionDelay: i * 90 + 'ms',
-              '--desplaza-x': i === 0 ? '-28px' : i === 2 ? '28px' : '0px',
-              '--desplaza-y': i === 1 ? '32px' : '22px',
-            }"
           >
             <div class="tu-paso-top">
               <span class="tu-paso-num" aria-hidden="true">{{ i + 1 }}</span>
@@ -670,7 +764,7 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== GIROS (Sección blanca · Estrella a la IZQUIERDA) ===================== -->
+    <!-- ===================== GIROS (Patrón B: Recuadros TR + BL · Órbita BR) ===================== -->
     <section
       id="para-quien"
       class="tu-banda tu-ancla tu-modalidad-giros"
@@ -678,55 +772,64 @@ function medirOtra(): void {
     >
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id="tu-estela-giros" x1="1" y1="0.3" x2="0" y2="0.1">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="35%" stop-color="#3a8fd4" stop-opacity="0.32" />
-            <stop
-              offset="72%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.48"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M1490 190 C 1100 65, 690 250, 290 105 C 165 58, 70 82, -50 62"
-          stroke="url(#tu-estela-giros)"
-          stroke-width="2.4"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1390"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(24 1471 177)"
+          fill="url(#tu-rombo-rosa-grad)"
+          stroke="#f9a8d4"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M1490 190 C 1100 65, 690 250, 290 105 C 165 58, 70 82, -50 62"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.52"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-110"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(18 -34 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M174 72 L179 87 L194 92 L179 97 L174 112 L169 97 L154 92 L169 87 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.62"
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M262 126 L265 135 L274 138 L265 141 L262 150 L259 141 L250 138 L259 135 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.45"
+        <circle r="7.6" fill="url(#tu-esfera-rosa-3d)" opacity="0.52">
+          <animateMotion
+            path="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.32;0.78;0.32"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
         <div class="text-center mx-auto max-w-3xl" data-scroll="cabecera">
@@ -783,66 +886,68 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== RECORRIDO (Estrella a la DERECHA) ===================== -->
+    <!-- ===================== RECORRIDO (Patrón A: Recuadros TL + BR · Órbita BL) ===================== -->
     <section id="recorrido" class="tu-banda tu-ancla" :style="BANDA_SUPERFICIE">
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id="tu-estela-rec" x1="0" y1="0" x2="1" y2="0.6">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="40%" stop-color="#3a8fd4" stop-opacity="0.32" />
-            <stop
-              offset="76%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.44"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M-40 135 C 420 250, 860 40, 1490 195"
-          stroke="url(#tu-estela-rec)"
-          stroke-width="2.4"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-112"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(-24 -31 177)"
+          fill="url(#tu-rombo-lila-grad)"
+          stroke="#c4b5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M-40 135 C 420 250, 860 40, 1490 195"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.48"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1398"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(-18 1474 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <path
-          d="M-60 445 C 400 345, 920 495, 1480 375"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.22"
-          stroke-width="1.35"
-          stroke-dasharray="5 9"
-        />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M1228 74 L1233 89 L1248 94 L1233 99 L1228 114 L1223 99 L1208 94 L1223 89 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.56"
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M1142 124 L1145 133 L1154 136 L1145 139 L1142 148 L1139 139 L1130 136 L1139 133 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.44"
+        <circle r="7.6" fill="url(#tu-esfera-azul-3d)" opacity="0.52">
+          <animateMotion
+            path="M -40 485 C 100 400, 270 425, 420 560"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.22;0.68;0.22"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-18">
         <div data-scroll="cabecera">
@@ -859,11 +964,7 @@ function medirOtra(): void {
         <div class="mt-8 reveal" data-scroll="escala">
           <RecorridoDemo :modo="modo" />
         </div>
-        <div
-          class="tu-recorrido-ademas reveal"
-          data-scroll="acomodo"
-          style="--desplaza-y: 24px"
-        >
+        <div class="tu-recorrido-ademas reveal" data-scroll="acomodo">
           <p class="font-medium">
             {{ t("landing.modalidad.recorridoAdemas") }}
           </p>
@@ -906,72 +1007,68 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== PRECIOS (Sección blanca · Estrella a la IZQUIERDA) ===================== -->
+    <!-- ===================== PRECIOS (Patrón B: Recuadros TR + BL · Órbita BR) ===================== -->
     <section id="precios" class="tu-banda tu-ancla" :style="BANDA_FONDO">
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient
-            id="tu-estela-precios"
-            x1="1"
-            y1="0.4"
-            x2="0"
-            y2="0.1"
-          >
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="36%" stop-color="#3a8fd4" stop-opacity="0.34" />
-            <stop
-              offset="74%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.48"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M1500 185 C 1080 55, 680 245, 290 100 C 165 55, 70 80, -60 58"
-          stroke="url(#tu-estela-precios)"
-          stroke-width="2.5"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1390"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(24 1471 177)"
+          fill="url(#tu-rombo-rosa-grad)"
+          stroke="#f9a8d4"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M1500 185 C 1080 55, 680 245, 290 100 C 165 55, 70 80, -60 58"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.52"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-110"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(18 -34 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <path
-          d="M-40 450 C 420 345, 920 495, 1490 365"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.22"
-          stroke-width="1.35"
-          stroke-dasharray="5 9"
-        />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M162 66 L167 81 L182 86 L167 91 L162 106 L157 91 L142 86 L157 81 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.62"
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M248 118 L251 127 L260 130 L251 133 L248 142 L245 133 L236 130 L245 127 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.46"
+        <circle r="7.6" fill="url(#tu-esfera-rosa-3d)" opacity="0.52">
+          <animateMotion
+            path="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.32;0.78;0.32"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-18">
         <div class="max-w-3xl reveal" data-scroll="cabecera">
@@ -988,11 +1085,7 @@ function medirOtra(): void {
           <PreciosLanding :modo="modo" />
         </div>
         <!-- Pestañas compactas para no apilar bloques: qué reemplaza vs servicios aparte. -->
-        <div
-          class="tu-precios-complemento mt-10"
-          data-scroll="acomodo"
-          style="--desplaza-y: 26px"
-        >
+        <div class="tu-precios-complemento mt-10" data-scroll="acomodo">
           <div
             v-if="registroAbierto"
             class="tu-precios-pestanas"
@@ -1041,7 +1134,7 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== PÁGINA PÚBLICA (Estrella a la DERECHA) ===================== -->
+    <!-- ===================== PÁGINA PÚBLICA (Patrón A: Recuadros TL + BR · Órbita BL) ===================== -->
     <section
       id="pagina-publica"
       class="tu-banda tu-ancla"
@@ -1049,65 +1142,70 @@ function medirOtra(): void {
     >
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id="tu-estela-pub" x1="0" y1="0.3" x2="1" y2="0.1">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="38%" stop-color="#3a8fd4" stop-opacity="0.32" />
-            <stop
-              offset="76%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.45"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M-50 180 C 360 70, 780 250, 1190 115 C 1315 72, 1405 95, 1510 70"
-          stroke="url(#tu-estela-pub)"
-          stroke-width="2.4"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-112"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(-24 -31 177)"
+          fill="url(#tu-rombo-lila-grad)"
+          stroke="#c4b5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M-50 180 C 360 70, 780 250, 1190 115 C 1315 72, 1405 95, 1510 70"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.48"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1398"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(-18 1474 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M1255 72 L1260 87 L1275 92 L1260 97 L1255 112 L1250 97 L1235 92 L1250 87 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.56"
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M -40 485 C 100 400, 270 425, 420 560"
+            stroke="url(#tu-orbita-izq-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M1168 124 L1171 133 L1180 136 L1171 139 L1168 148 L1165 139 L1156 136 L1165 133 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.44"
+        <circle r="7.6" fill="url(#tu-esfera-azul-3d)" opacity="0.52">
+          <animateMotion
+            path="M -40 485 C 100 400, 270 425, 420 560"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.22;0.68;0.22"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-14 sm:py-20">
         <div
           class="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16"
         >
-          <div
-            class="reveal"
-            data-scroll="acomodo"
-            style="--desplaza-x: -28px; --desplaza-y: 20px"
-          >
+          <div class="reveal" data-scroll="acomodo">
             <p class="tu-seccion-etiqueta">{{ t(k("pagina.etiqueta")) }}</p>
             <h2 class="tu-titulo mt-3">{{ t(k("pagina.titulo")) }}</h2>
             <p class="mt-5 max-w-xl text-lg leading-relaxed" :style="SUAVE">
@@ -1164,59 +1262,68 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== PREGUNTAS (Sección blanca · Estrella a la IZQUIERDA) ===================== -->
+    <!-- ===================== PREGUNTAS (Patrón B: Recuadros TR + BL · Órbita BR) ===================== -->
     <section id="preguntas" class="tu-banda tu-ancla" :style="BANDA_FONDO">
       <svg
         class="tu-banda-estela"
-        viewBox="0 0 1440 560"
+        viewBox="0 0 1440 640"
         fill="none"
-        preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id="tu-estela-faq" x1="1" y1="0.4" x2="0" y2="0.1">
-            <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-            <stop offset="36%" stop-color="#3a8fd4" stop-opacity="0.32" />
-            <stop
-              offset="74%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0.48"
-            />
-            <stop
-              offset="100%"
-              stop-color="var(--marketing-rosa)"
-              stop-opacity="0"
-            />
-          </linearGradient>
-        </defs>
-        <path
-          d="M1490 195 C 1090 65, 680 250, 290 105 C 165 58, 70 84, -50 64"
-          stroke="url(#tu-estela-faq)"
-          stroke-width="2.4"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota"
+          x="1390"
+          y="96"
+          width="162"
+          height="162"
+          rx="32"
+          transform="rotate(24 1471 177)"
+          fill="url(#tu-rombo-rosa-grad)"
+          stroke="#f9a8d4"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.74"
         />
-        <path
-          class="tu-estela-pulso"
-          d="M1490 195 C 1090 65, 680 250, 290 105 C 165 58, 70 84, -50 64"
-          stroke="var(--marketing-rosa)"
-          stroke-opacity="0.52"
-          stroke-width="2.8"
-          stroke-linecap="round"
+        <rect
+          class="tu-rombo-flota tu-rombo-flota--alt"
+          x="-110"
+          y="375"
+          width="152"
+          height="152"
+          rx="28"
+          transform="rotate(18 -34 451)"
+          fill="url(#tu-rombo-azul-grad)"
+          stroke="#93c5fd"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+          opacity="0.7"
         />
-        <g class="tu-estrella-movil">
+        <g opacity="0.42">
           <path
-            d="M168 74 L173 89 L188 94 L173 99 L168 114 L163 99 L148 94 L163 89 Z"
-            fill="var(--marketing-rosa)"
-            fill-opacity="0.62"
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-opacity="0.15"
+            stroke-width="4.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            stroke="url(#tu-orbita-der-inf)"
+            stroke-width="2.1"
+            stroke-linecap="round"
           />
         </g>
-        <g class="tu-estrella-movil tu-estrella-movil--lenta">
-          <path
-            d="M254 128 L257 137 L266 140 L257 143 L254 152 L251 143 L242 140 L251 137 Z"
-            fill="#3a8fd4"
-            fill-opacity="0.46"
+        <circle r="7.6" fill="url(#tu-esfera-rosa-3d)" opacity="0.52">
+          <animateMotion
+            path="M 1020 560 C 1170 425, 1340 400, 1480 485"
+            dur="8.8s"
+            repeatCount="indefinite"
+            keyPoints="0.32;0.78;0.32"
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
           />
-        </g>
+        </circle>
       </svg>
       <div class="mx-auto max-w-5xl px-4 sm:px-6 py-14 sm:py-18">
         <PreguntasFrecuentes
@@ -1248,7 +1355,7 @@ function medirOtra(): void {
       </div>
     </section>
 
-    <!-- ===================== LLAMADO FINAL ===================== -->
+    <!-- ===================== LLAMADO FINAL (Patrón A en tarjeta) ===================== -->
     <section class="tu-banda tu-modalidad-final" :style="BANDA_SUPERFICIE">
       <div class="mx-auto max-w-5xl px-4 sm:px-6 py-14 sm:py-20">
         <div class="tu-final-caja text-center reveal" data-scroll="escala">
@@ -1256,60 +1363,62 @@ function medirOtra(): void {
             class="tu-banda-estela"
             viewBox="0 0 1000 420"
             fill="none"
-            preserveAspectRatio="xMidYMid slice"
             aria-hidden="true"
           >
-            <defs>
-              <linearGradient id="tu-estela-final" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#0d3b6e" stop-opacity="0" />
-                <stop offset="42%" stop-color="#3a8fd4" stop-opacity="0.34" />
-                <stop
-                  offset="78%"
-                  stop-color="var(--marketing-rosa)"
-                  stop-opacity="0.48"
-                />
-                <stop
-                  offset="100%"
-                  stop-color="var(--marketing-rosa)"
-                  stop-opacity="0"
-                />
-              </linearGradient>
-            </defs>
-            <path
-              d="M-40 330 C 240 190, 560 370, 1040 110"
-              stroke="url(#tu-estela-final)"
-              stroke-width="2.4"
-              stroke-linecap="round"
+            <rect
+              class="tu-rombo-flota tu-rombo-flota--alt"
+              x="-105"
+              y="32"
+              width="156"
+              height="156"
+              rx="30"
+              transform="rotate(-24 -27 110)"
+              fill="url(#tu-rombo-lila-grad)"
+              stroke="#c4b5fd"
+              stroke-opacity="0.32"
+              stroke-width="1.2"
+              opacity="0.74"
             />
-            <path
-              class="tu-estela-pulso"
-              d="M-40 330 C 240 190, 560 370, 1040 110"
-              stroke="var(--marketing-rosa)"
-              stroke-opacity="0.52"
-              stroke-width="2.8"
-              stroke-linecap="round"
+            <rect
+              class="tu-rombo-flota"
+              x="952"
+              y="235"
+              width="148"
+              height="148"
+              rx="28"
+              transform="rotate(-18 1026 309)"
+              fill="url(#tu-rombo-azul-grad)"
+              stroke="#93c5fd"
+              stroke-opacity="0.32"
+              stroke-width="1.2"
+              opacity="0.7"
             />
-            <path
-              d="M-20 90 C 310 210, 690 30, 1030 220"
-              stroke="var(--marketing-rosa)"
-              stroke-opacity="0.24"
-              stroke-width="1.4"
-              stroke-dasharray="5 9"
-            />
-            <g class="tu-estrella-movil">
+            <g opacity="0.42">
               <path
-                d="M860 72 L865 87 L880 92 L865 97 L860 112 L855 97 L840 92 L855 87 Z"
-                fill="var(--marketing-rosa)"
-                fill-opacity="0.6"
+                d="M -30 340 C 85 270, 225 295, 345 405"
+                stroke="url(#tu-orbita-izq-inf)"
+                stroke-opacity="0.15"
+                stroke-width="4.8"
+                stroke-linecap="round"
+              />
+              <path
+                d="M -30 340 C 85 270, 225 295, 345 405"
+                stroke="url(#tu-orbita-izq-inf)"
+                stroke-width="2.1"
+                stroke-linecap="round"
               />
             </g>
-            <g class="tu-estrella-movil tu-estrella-movil--lenta">
-              <path
-                d="M142 292 L146 303 L157 307 L146 311 L142 322 L138 311 L127 307 L138 303 Z"
-                fill="#3a8fd4"
-                fill-opacity="0.48"
+            <circle r="7.4" fill="url(#tu-esfera-azul-3d)" opacity="0.52">
+              <animateMotion
+                path="M -30 340 C 85 270, 225 295, 345 405"
+                dur="8.8s"
+                repeatCount="indefinite"
+                keyPoints="0.22;0.68;0.22"
+                keyTimes="0;0.5;1"
+                calcMode="spline"
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
               />
-            </g>
+            </circle>
           </svg>
           <div class="tu-monograma-insignia" aria-hidden="true">
             <LogoProducto
@@ -1319,7 +1428,29 @@ function medirOtra(): void {
               :ancho="44"
               alt="Monograma de AgendaUno"
             />
-            <span v-else class="tu-monograma-iniciales">TU</span>
+            <svg
+              v-else
+              viewBox="0 0 44 44"
+              width="40"
+              height="40"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M 8 28 C 12 14, 28 10, 38 18"
+                stroke="#38bdf8"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+              <path
+                d="M 6 20 C 16 32, 32 30, 38 16"
+                stroke="#f472b6"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+              <circle cx="29" cy="14" r="4.2" fill="url(#tu-esfera-azul-3d)" />
+              <circle cx="16" cy="26" r="3.8" fill="url(#tu-esfera-rosa-3d)" />
+            </svg>
           </div>
           <h2 class="tu-titulo tu-titulo-final">
             {{
@@ -1397,7 +1528,6 @@ function medirOtra(): void {
   );
   transform-origin: 0 50%;
   transform: scaleX(var(--scroll-progreso, 0));
-  transition: transform 0.1s linear;
 }
 @media (min-width: 1024px) {
   .tu-hero-layout {
@@ -1411,15 +1541,25 @@ function medirOtra(): void {
 }
 .tu-funciones-avanzadas {
   margin-top: 2rem;
-  border: 1px solid color-mix(in srgb, var(--acento) 22%, var(--borde));
-  border-radius: 18px;
-  background: var(--superficie);
-  box-shadow: 0 10px 30px -22px rgb(13 59 110 / 28%);
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 94% 12%,
+      color-mix(in srgb, #7dd3fc 12%, transparent) 0%,
+      transparent 70%
+    ),
+    var(--superficie);
+  box-shadow:
+    0 18px 42px -24px rgb(13 59 110 / 20%),
+    0 2px 8px rgb(13 59 110 / 4%);
   overflow: hidden;
-  transition: border-color 0.2s ease;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 .tu-funciones-avanzadas:hover {
-  border-color: color-mix(in srgb, var(--acento) 42%, var(--borde));
+  border-color: color-mix(in srgb, #3a8fd4 48%, var(--borde));
 }
 .tu-funciones-avanzadas > summary {
   display: flex;
@@ -1449,12 +1589,23 @@ function medirOtra(): void {
   outline-offset: -4px;
 }
 .tu-avanzadas-signo {
-  font-size: 1.5rem;
-  color: var(--enlace);
-  transition: transform 0.2s;
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  background: color-mix(in srgb, #3a8fd4 10%, var(--fondo));
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--primario);
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
 }
 .tu-funciones-avanzadas[open] .tu-avanzadas-signo {
   transform: rotate(45deg);
+  background: color-mix(in srgb, #3a8fd4 18%, var(--fondo));
 }
 @media (max-width: 639px) {
   .tu-funciones-avanzadas > summary {
@@ -1470,23 +1621,25 @@ function medirOtra(): void {
 .tu-modalidad-nombre {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.45rem;
-  padding: 0.28rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--acento) 28%, var(--borde));
+  gap: 0.55rem;
+  margin-bottom: 0.5rem;
+  padding: 0.34rem 0.85rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--acento) 9%, var(--superficie));
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
+  box-shadow: 0 4px 14px -6px rgb(13 59 110 / 10%);
   color: var(--primario);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
 .tu-modalidad-nombre::before {
   content: "";
-  width: 0.45rem;
-  height: 0.45rem;
+  width: 0.42rem;
+  height: 0.42rem;
   border-radius: 999px;
   background: var(--acento);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--acento) 22%, transparent);
 }
 /* El carrusel gira fuera de su caja: sin desbordar la página. */
 .tu-modalidad-giros {
@@ -1510,7 +1663,12 @@ function medirOtra(): void {
     left: 10%;
     right: 10%;
     height: 2px;
-    background: color-mix(in srgb, #3a8fd4 32%, transparent);
+    background: linear-gradient(
+      90deg,
+      rgb(56 189 248 / 38%) 0%,
+      rgb(192 132 252 / 38%) 50%,
+      rgb(244 114 182 / 38%) 100%
+    );
     pointer-events: none;
     z-index: 0;
   }
@@ -1526,7 +1684,11 @@ function medirOtra(): void {
   height: 2px;
   max-width: 5.5rem;
   border-radius: 999px;
-  background: color-mix(in srgb, #3a8fd4 38%, transparent);
+  background: linear-gradient(
+    90deg,
+    rgb(56 189 248 / 55%) 0%,
+    rgb(244 114 182 / 35%) 100%
+  );
 }
 .tu-cabecera-con-monograma {
   position: relative;
@@ -1536,91 +1698,89 @@ function medirOtra(): void {
   position: relative;
   z-index: 1;
 }
-.tu-monograma-sello {
-  position: absolute;
-  top: -2.2rem;
-  right: 2%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  opacity: 0.12;
-  pointer-events: none;
-  user-select: none;
-  z-index: 0;
+.tu-rombo-flota {
+  animation: tu-rombo-pulso 8s ease-in-out infinite alternate;
 }
-.tu-monograma-iniciales--fondo {
-  font-size: 8.5rem;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.06em;
-  color: #3a8fd4;
+.tu-rombo-flota--alt {
+  animation-delay: -4s;
+}
+@keyframes tu-rombo-pulso {
+  0% {
+    opacity: 0.84;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 .tu-monograma-insignia {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 4.25rem;
-  height: 4.25rem;
+  width: 4.35rem;
+  height: 4.35rem;
   margin: 0 auto 1.25rem;
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, #3a8fd4 36%, var(--borde));
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, #3a8fd4 32%, var(--borde));
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, #ffffff 90%, var(--superficie)) 0%,
-    color-mix(in srgb, #3a8fd4 14%, var(--fondo)) 100%
+    color-mix(in srgb, #ffffff 94%, var(--superficie)) 0%,
+    color-mix(in srgb, #bae6fd 22%, var(--fondo)) 55%,
+    color-mix(in srgb, #fbcfe8 18%, var(--fondo)) 100%
   );
   box-shadow:
-    0 16px 34px -18px rgb(13 59 110 / 34%),
-    0 0 0 6px color-mix(in srgb, #3a8fd4 10%, transparent);
+    0 18px 36px -18px rgb(13 59 110 / 26%),
+    0 0 0 6px color-mix(in srgb, #3a8fd4 9%, transparent);
 }
-.tu-monograma-iniciales {
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: #3a8fd4;
-}
-@media (max-width: 639px) {
-  .tu-monograma-sello {
-    top: -1.4rem;
-    right: -0.5rem;
-    transform: scale(0.72);
-    transform-origin: top right;
+@media (prefers-reduced-motion: reduce) {
+  .tu-rombo-flota {
+    animation: none;
   }
 }
 .tu-precios-complemento {
-  padding: 1.35rem 1.5rem;
-  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--superficie) 72%, var(--fondo));
-  box-shadow: 0 14px 34px -26px rgb(13 59 110 / 24%);
+  padding: 1.45rem 1.6rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      ellipse 65% 55% at 95% 8%,
+      color-mix(in srgb, #7dd3fc 14%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 55% 50% at 5% 94%,
+      color-mix(in srgb, #fbcfe8 12%, transparent) 0%,
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--superficie) 84%, var(--fondo));
+  box-shadow:
+    0 18px 42px -26px rgb(13 59 110 / 22%),
+    0 2px 8px rgb(13 59 110 / 4%);
 }
 .tu-precios-pestanas {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  padding: 0.3rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--borde);
-  border-radius: 14px;
-  background: var(--fondo);
+  gap: 0.4rem;
+  padding: 0.32rem;
+  margin-bottom: 1.1rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 24%, var(--borde));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--superficie) 92%, var(--fondo));
+  box-shadow: 0 8px 22px -14px rgb(13 59 110 / 16%);
 }
 .tu-precios-pestana {
-  padding: 0.55rem 1.05rem;
+  padding: 0.52rem 1.15rem;
   border: 0;
-  border-radius: 10px;
+  border-radius: 999px;
   background: transparent;
   color: var(--texto-suave);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
+    background-color 0.22s ease,
+    color 0.22s ease,
+    box-shadow 0.22s ease;
 }
 .tu-precios-pestana:hover {
   color: var(--texto);
@@ -1628,7 +1788,7 @@ function medirOtra(): void {
 .tu-precios-pestana--activa {
   background: #0d3b6e;
   color: #ffffff;
-  box-shadow: 0 6px 16px -8px rgb(13 59 110 / 45%);
+  box-shadow: 0 8px 18px -8px rgb(13 59 110 / 45%);
 }
 .tu-faq-mas {
   display: flex;
@@ -1636,10 +1796,19 @@ function medirOtra(): void {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.15rem 1.4rem;
-  border: 1px solid color-mix(in srgb, #3a8fd4 30%, var(--borde));
-  border-radius: 18px;
-  background: color-mix(in srgb, #3a8fd4 7%, var(--superficie));
+  padding: 1.25rem 1.5rem;
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      ellipse 60% 55% at 92% 15%,
+      color-mix(in srgb, #7dd3fc 14%, transparent) 0%,
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--superficie) 92%, var(--fondo));
+  box-shadow:
+    0 16px 36px -24px rgb(13 59 110 / 18%),
+    0 2px 8px rgb(13 59 110 / 4%);
 }
 .tu-faq-mas strong {
   display: block;
@@ -1657,20 +1826,42 @@ function medirOtra(): void {
   isolation: isolate;
   overflow: hidden;
   padding: clamp(2.5rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3.5rem);
-  border: 1px solid color-mix(in srgb, #3a8fd4 38%, var(--borde));
-  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, #3a8fd4 32%, var(--borde));
+  border-radius: 30px;
   background:
     radial-gradient(
-      ellipse 70% 65% at 88% 15%,
-      color-mix(in srgb, #3a8fd4 22%, transparent) 0%,
+      ellipse 52% 48% at 6% 10%,
+      color-mix(in srgb, #7dd3fc 20%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 52% 48% at 94% 90%,
+      color-mix(in srgb, #f472b6 18%, transparent) 0%,
       transparent 70%
     ),
     linear-gradient(
       135deg,
-      color-mix(in srgb, #0d3b6e 8%, var(--superficie)) 0%,
-      color-mix(in srgb, #3a8fd4 12%, var(--fondo)) 100%
+      color-mix(in srgb, #bae6fd 16%, var(--superficie)) 0%,
+      var(--superficie) 50%,
+      color-mix(in srgb, #fbcfe8 12%, var(--fondo)) 100%
     );
-  box-shadow: 0 24px 52px -28px rgb(13 59 110 / 28%);
+  box-shadow:
+    0 26px 56px -28px rgb(13 59 110 / 24%),
+    0 2px 10px rgb(13 59 110 / 5%);
+}
+:global(.dark) .tu-final-caja {
+  background:
+    radial-gradient(
+      ellipse 48% 44% at 8% 12%,
+      rgb(56 189 248 / 10%) 0%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 48% 44% at 92% 88%,
+      rgb(236 72 153 / 9%) 0%,
+      transparent 68%
+    ),
+    var(--superficie);
 }
 .tu-final-caja > :not(.tu-banda-estela) {
   position: relative;

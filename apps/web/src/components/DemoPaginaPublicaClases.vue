@@ -88,15 +88,25 @@ const CLASES = [
 <style scoped>
 .demo-clases {
   overflow: hidden;
-  border-radius: var(--radio-panel, 28px);
+  border: 1px solid color-mix(in srgb, #3a8fd4 26%, var(--borde));
+  border-radius: 28px;
   background: var(--fondo);
+  box-shadow:
+    0 24px 54px -28px rgb(13 59 110 / 22%),
+    0 2px 10px rgb(13 59 110 / 4%);
 }
 .demo-clases-cabecera {
   display: flex;
   align-items: center;
   gap: 0.9rem;
   padding: 1.5rem;
-  background: color-mix(in srgb, var(--acento) 8%, var(--superficie));
+  border-bottom: 1px solid color-mix(in srgb, #3a8fd4 16%, var(--borde));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #bae6fd 18%, var(--superficie)) 0%,
+    var(--superficie) 55%,
+    color-mix(in srgb, #fbcfe8 12%, var(--superficie)) 100%
+  );
 }
 .demo-clases-logo {
   display: inline-flex;
